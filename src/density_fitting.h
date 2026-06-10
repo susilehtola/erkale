@@ -253,6 +253,35 @@ class DensityFit {
   template<typename T>
   void accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & K) const;
 
+  /// Half-transform a single occupied orbital io: fill aui (Naux x Nbf)
+  /// with B^a_{mu,i} = X^T sum_nu (a|mu nu) C(nu,io), looping orbital
+  /// shellpairs and applying the metric half-inverse X = ab_invh once
+  /// (skipped in cholesky_mode, where the blocks are already L = X^T
+  /// (piv|mu nu)). The three scratch buffers are caller-owned per-thread
+  /// workspace. Shared by accumulate_K_from_blocks (conventional RI-K)
+  /// and accumulate_KC_from_blocks (occ-RI-K).
+  template<typename T>
+  void halftransform_orbital(const arma::Mat<T> & C, size_t io, arma::Mat<T> & aui,
+                             arma::Mat<T> & ui_scratch, arma::Mat<T> & vi_scratch,
+                             arma::mat & anumu_scratch) const;
+
+  /// occ-RI-K assembly: accumulate only the occupied columns of the
+  /// exchange matrix, KC(mu,k) += sum_i occs[i] sum_a B^a_{mu,i} B^a_{k,i}
+  /// = (K C)_{mu,k}, where C holds the (already occupied-filtered)
+  /// orbitals. Costs O(Nocc^2 Nbf Naux) instead of conventional RI-K's
+  /// O(Nocc Nbf^2 Naux), at the price of only producing K on the
+  /// occupied space (see calcK_occ_impl for the full-matrix recovery).
+  template<typename T>
+  void accumulate_KC_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & KC) const;
+
+  /// Templated occ-RI-K implementation; the real / complex public
+  /// calcK_occ overloads forward here. Builds the occupied columns
+  /// KC = K C_o and recovers a full symmetric/Hermitian AO exchange
+  /// matrix that reproduces the exact (RI) occupied-occupied and
+  /// occupied-virtual blocks; see calcK_occ for the algorithm.
+  template<typename T>
+  arma::Mat<T> calcK_occ_impl(const arma::Mat<T> & Corig, const std::vector<double> & occo, const arma::mat & S) const;
+
  public:
   /// Constructor
   DensityFit();
@@ -349,6 +378,25 @@ class DensityFit {
   arma::mat calcK(const arma::mat & C, const std::vector<double> & occs) const;
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
+
+  /// Exchange matrix via the occ-RI-K algorithm (Manzer, Horn,
+  /// Mardirossian, Head-Gordon, J. Chem. Phys. 143, 024113 (2015)).
+  ///
+  /// Only the occupied columns KC = K C_o are assembled (cost
+  /// O(Nocc^2 Nbf Naux), a factor ~Nbf/Nocc below conventional RI-K);
+  /// the full AO matrix is then recovered by the symmetric/Hermitian
+  /// reconstruction
+  ///   K = KC (S C_o)^H + (S C_o) KC^H - (S C_o)(C_o^H K C_o)(S C_o)^H,
+  /// which -- using C_o^H S C_o = I -- reproduces the occupied-occupied
+  /// and occupied-virtual blocks of the RI exchange exactly, leaving
+  /// only the virtual-virtual block approximate. The SCF energy,
+  /// density and orbital gradient are therefore unchanged from
+  /// conventional RI-K; virtual orbital energies are not. The occupied
+  /// orbitals supplied in C must be S-orthonormal (as SCF eigenvectors
+  /// are). S is the orbital-basis overlap.
+  arma::mat calcK_occ(const arma::mat & C, const std::vector<double> & occs, const arma::mat & S) const;
+  /// Complex-orbital occ-RI-K exchange; see calcK_occ.
+  arma::cx_mat calcK_occ(const arma::cx_mat & C, const std::vector<double> & occs, const arma::mat & S) const;
 
   /// Get the number of auxiliary functions
   size_t get_Naux() const;

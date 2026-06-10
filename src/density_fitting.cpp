@@ -1365,6 +1365,56 @@ void DensityFit::contract_aux_to_J(const arma::vec & gamma, size_t ip, const arm
 }
 
 template<typename T>
+void DensityFit::halftransform_orbital(const arma::Mat<T> & C, size_t io, arma::Mat<T> & aui,
+                                       arma::Mat<T> & ui_scratch, arma::Mat<T> & vi_scratch,
+                                       arma::mat & anumu_scratch) const {
+  aui.zeros(Naux,Nbf);
+  for(size_t ip=0;ip<orbpairs.size();ip++) {
+    const size_t imus = orbpairs[ip].is;
+    const size_t inus = orbpairs[ip].js;
+    const size_t mu0  = orbshells[imus].get_first_ind();
+    const size_t nu0  = orbshells[inus].get_first_ind();
+    const size_t Nmu  = orbshells[imus].get_Nbf();
+    const size_t Nnu  = orbshells[inus].get_Nbf();
+    // (Naux x Nmu*Nnu) block, always real (integrals).
+    arma::mat amunu = blocks->get_block(ip);
+
+    // Half-transform (a | u; i): reshape amunu to (Naux*Nmu, Nnu)
+    // and contract over nu with C(nu, io). Advisory view into
+    // ui_scratch avoids per-quartet heap alloc.
+    {
+      arma::Mat<T> ui(ui_scratch.memptr(), Naux*Nmu, 1, false, true);
+      ui = arma::reshape(amunu, Naux*Nmu, Nnu) * C.submat(nu0,io,nu0+Nnu-1,io);
+      ui.reshape(Naux, Nmu);
+      aui.cols(mu0, mu0+Nmu-1) += ui;
+    }
+
+    if(imus != inus) {
+      // Off-diagonal shellpair: swap mu/nu axes to compute (a | v; i).
+      arma::mat anumu(anumu_scratch.memptr(), Naux, Nmu*Nnu, false, true);
+      for(size_t mu=0;mu<Nmu;mu++)
+        for(size_t nu=0;nu<Nnu;nu++)
+          anumu.col(mu*Nnu+nu) = amunu.col(nu*Nmu+mu);
+
+      arma::Mat<T> vi(vi_scratch.memptr(), Naux*Nnu, 1, false, true);
+      vi = arma::reshape(anumu, Naux*Nnu, Nmu) * C.submat(mu0,io,mu0+Nmu-1,io);
+      vi.reshape(Naux, Nnu);
+      aui.cols(nu0, nu0+Nnu-1) += vi;
+    }
+  }
+  // K_uv = (a|ui) (a|b)^-1 (b|vi); ab_invh is the canonical-orth
+  // half-inverse X with X^T (a|b) X = I, so (a|b)^{-1} ≈ X X^T
+  // and the half-transform is X^T aui. In CD mode the blocks are
+  // already L = X^T (piv|mu nu), so aui = sum_munu L C is the
+  // half-transform directly -- no X^T multiply (ab_invh is empty).
+  if(!cholesky_mode)
+    aui = ab_invh.t() * aui;
+}
+
+template void DensityFit::halftransform_orbital<double>(const arma::mat &, size_t, arma::mat &, arma::mat &, arma::mat &, arma::mat &) const;
+template void DensityFit::halftransform_orbital<std::complex<double>>(const arma::cx_mat &, size_t, arma::cx_mat &, arma::cx_mat &, arma::cx_mat &, arma::mat &) const;
+
+template<typename T>
 void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & K) const {
   if(C.n_rows != Nbf) {
     std::ostringstream oss;
@@ -1397,47 +1447,7 @@ void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::ve
 #pragma omp for
 #endif
     for(size_t io=0;io<C.n_cols;io++) {
-      aui.zeros(Naux,Nbf);
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-        const size_t imus = orbpairs[ip].is;
-        const size_t inus = orbpairs[ip].js;
-        const size_t mu0  = orbshells[imus].get_first_ind();
-        const size_t nu0  = orbshells[inus].get_first_ind();
-        const size_t Nmu  = orbshells[imus].get_Nbf();
-        const size_t Nnu  = orbshells[inus].get_Nbf();
-        // (Naux x Nmu*Nnu) block, always real (integrals).
-        arma::mat amunu = blocks->get_block(ip);
-
-        // Half-transform (a | u; i): reshape amunu to (Naux*Nmu, Nnu)
-        // and contract over nu with C(nu, io). Advisory view into
-        // ui_scratch avoids per-quartet heap alloc.
-        {
-          arma::Mat<T> ui(ui_scratch.memptr(), Naux*Nmu, 1, false, true);
-          ui = arma::reshape(amunu, Naux*Nmu, Nnu) * C.submat(nu0,io,nu0+Nnu-1,io);
-          ui.reshape(Naux, Nmu);
-          aui.cols(mu0, mu0+Nmu-1) += ui;
-        }
-
-        if(imus != inus) {
-          // Off-diagonal shellpair: swap mu/nu axes to compute (a | v; i).
-          arma::mat anumu(anumu_scratch.memptr(), Naux, Nmu*Nnu, false, true);
-          for(size_t mu=0;mu<Nmu;mu++)
-            for(size_t nu=0;nu<Nnu;nu++)
-              anumu.col(mu*Nnu+nu) = amunu.col(nu*Nmu+mu);
-
-          arma::Mat<T> vi(vi_scratch.memptr(), Naux*Nnu, 1, false, true);
-          vi = arma::reshape(anumu, Naux*Nnu, Nmu) * C.submat(mu0,io,mu0+Nmu-1,io);
-          vi.reshape(Naux, Nnu);
-          aui.cols(nu0, nu0+Nnu-1) += vi;
-        }
-      }
-      // K_uv = (a|ui) (a|b)^-1 (b|vi); ab_invh is the canonical-orth
-      // half-inverse X with X^T (a|b) X = I, so (a|b)^{-1} ≈ X X^T
-      // and the half-transform is X^T aui. In CD mode the blocks are
-      // already L = X^T (piv|mu nu), so aui = sum_munu L C is the
-      // half-transform directly -- no X^T multiply (ab_invh is empty).
-      if(!cholesky_mode)
-        aui = ab_invh.t() * aui;
+      halftransform_orbital(C, io, aui, ui_scratch, vi_scratch, anumu_scratch);
       arma::Mat<T> K_io = occs[io] * arma::trans(aui) * aui;
 #ifdef _OPENMP
 #pragma omp critical
@@ -1449,6 +1459,100 @@ void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::ve
 
 template void DensityFit::accumulate_K_from_blocks<double>(const arma::mat &, const arma::vec &, arma::mat &) const;
 template void DensityFit::accumulate_K_from_blocks<std::complex<double>>(const arma::cx_mat &, const arma::vec &, arma::cx_mat &) const;
+
+template<typename T>
+void DensityFit::accumulate_KC_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & KC) const {
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
+  // occ-RI-K: assemble only the occupied columns
+  //   KC(mu,k) = sum_i n_i sum_a B^a_{mu,i} B^a_{k,i} = (K C)_{mu,k},
+  // with B^a_{k,i} = sum_mu C(mu,k) B^a_{mu,i} = (aui * C)(a,k). The
+  // contraction is Nbf x Nocc per orbital instead of Nbf x Nbf, which
+  // is the whole point of occ-RI-K. Parallelise over orbitals into a
+  // per-thread accumulator and reduce once at the end.
+  size_t Nmax=0;
+  for(size_t is=0;is<orbshells.size();is++)
+    Nmax=std::max(Nmax, orbshells[is].get_Nbf());
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    arma::Mat<T> aui;
+    arma::Mat<T> ui_scratch(Naux*Nmax, 1);
+    arma::Mat<T> vi_scratch(Naux*Nmax, 1);
+    arma::mat    anumu_scratch(Naux, Nmax*Nmax);
+    arma::Mat<T> KC_local(Nbf, C.n_cols, arma::fill::zeros);
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t io=0;io<C.n_cols;io++) {
+      halftransform_orbital(C, io, aui, ui_scratch, vi_scratch, anumu_scratch);
+      // trans(aui) is (Nbf x Naux); aui*C is (Naux x Nocc). For complex
+      // orbitals trans() is the conjugate transpose, matching the
+      // conjugation of conventional K (sum_a conj(B_mu) B_k).
+      KC_local += occs[io] * arma::trans(aui) * (aui * C);
+    }
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    KC += KC_local;
+  }
+}
+
+template void DensityFit::accumulate_KC_from_blocks<double>(const arma::mat &, const arma::vec &, arma::mat &) const;
+template void DensityFit::accumulate_KC_from_blocks<std::complex<double>>(const arma::cx_mat &, const arma::vec &, arma::cx_mat &) const;
+
+namespace {
+  // S * C with S real; explicit overloads so the complex path promotes
+  // the (real) overlap rather than relying on a mixed-type product.
+  arma::mat occk_S_times_C(const arma::mat & S, const arma::mat & C) {
+    return S * C;
+  }
+  arma::cx_mat occk_S_times_C(const arma::mat & S, const arma::cx_mat & C) {
+    return arma::conv_to<arma::cx_mat>::from(S) * C;
+  }
+}
+
+template<typename T>
+arma::Mat<T> DensityFit::calcK_occ_impl(const arma::Mat<T> & Corig, const std::vector<double> & occo, const arma::mat & S) const {
+  if(S.n_rows != Nbf || S.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit::calcK_occ: overlap is " << S.n_rows << "x" << S.n_cols
+        << ", expected " << Nbf << "x" << Nbf << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
+  arma::Mat<T> C;
+  arma::vec occs;
+  filter_occupied(Corig, occo, C, occs);
+
+  // Occupied columns KC = K C_o (Nbf x Nocc).
+  arma::Mat<T> KC(Nbf, C.n_cols, arma::fill::zeros);
+  accumulate_KC_from_blocks(C, occs, KC);
+
+  // Reconstruct the full AO exchange matrix reproducing the exact (RI)
+  // occupied-occupied and occupied-virtual blocks:
+  //   K = KC (SC)^H + (SC) KC^H - (SC) M (SC)^H,
+  // with SC = S C_o and M = C_o^H K C_o = C_o^H KC. Using C_o^H S C_o = I,
+  // K C_o = KC and C_o^H K C_o = M exactly, so the occupied projection is
+  // exact and K is Hermitian; only the virtual-virtual block is
+  // approximate. M is symmetrised to keep K exactly Hermitian under RI
+  // noise.
+  arma::Mat<T> SC = occk_S_times_C(S, C);   // Nbf x Nocc
+  arma::Mat<T> M  = C.t() * KC;             // Nocc x Nocc
+  M = 0.5 * (M + M.t());
+  arma::Mat<T> K = KC * SC.t() + SC * KC.t() - SC * (M * SC.t());
+  return K;
+}
+
+template arma::mat DensityFit::calcK_occ_impl<double>(const arma::mat &, const std::vector<double> &, const arma::mat &) const;
+template arma::cx_mat DensityFit::calcK_occ_impl<std::complex<double>>(const arma::cx_mat &, const std::vector<double> &, const arma::mat &) const;
 
 size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double thr, bool dir) const {
   // Amount of auxiliary functions (for representing the electron density)
@@ -1696,6 +1800,14 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 
 arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo) const {
   return calcK_impl(Corig, occo);
+}
+
+arma::mat DensityFit::calcK_occ(const arma::mat & Corig, const std::vector<double> & occo, const arma::mat & S) const {
+  return calcK_occ_impl(Corig, occo, S);
+}
+
+arma::cx_mat DensityFit::calcK_occ(const arma::cx_mat & Corig, const std::vector<double> & occo, const arma::mat & S) const {
+  return calcK_occ_impl(Corig, occo, S);
 }
 
 size_t DensityFit::get_Naux() const {
