@@ -73,6 +73,19 @@ bool JKBuilder::uses_dfit() const {
   return method != Method::FourIndex;
 }
 
+arma::mat JKBuilder::calcK(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const {
+  return occ_rik ? dfit.calcK_occ(C, occ, S) : dfit.calcK(C, occ);
+}
+arma::cx_mat JKBuilder::calcK(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const {
+  return occ_rik ? dfit.calcK_occ(C, occ, S) : dfit.calcK(C, occ);
+}
+arma::mat JKBuilder::calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const {
+  return occ_rik ? dfit_rs.calcK_occ(C, occ, S) : dfit_rs.calcK(C, occ);
+}
+arma::cx_mat JKBuilder::calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const {
+  return occ_rik ? dfit_rs.calcK_occ(C, occ, S) : dfit_rs.calcK(C, occ);
+}
+
 bool JKBuilder::is_cholesky() const {
   return dfit.is_cholesky();
 }

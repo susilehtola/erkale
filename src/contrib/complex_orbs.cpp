@@ -278,7 +278,7 @@ int main_guarded(int argc, char **argv) {
     arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
     arma::mat J = jk.densityfit().calcJ(P);
-    arma::cx_mat K = -jk.densityfit().calcK(C_c, arma::conv_to<std::vector<double>>::from(occs));
+    arma::cx_mat K = -jk.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), S);
 
     // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
     K = arma::conj(K);

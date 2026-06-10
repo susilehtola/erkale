@@ -158,6 +158,18 @@ class JKBuilder {
   /// Decontracted basis (decfock).
   const BasisSet & decontracted_basis() const { return decbas; }
 
+  /// Density-fitted / Cholesky exchange matrix from the occupied
+  /// orbitals C (occupations occ), for the full-range operator. Routes
+  /// to occ-RI-K (DensityFit::calcK_occ) when OccRIK is set, otherwise
+  /// to conventional RI-K (DensityFit::calcK). S is the orbital-basis
+  /// overlap, needed by occ-RI-K's reconstruction. Real and complex
+  /// (PZ-SIC / complex-orbital) orbitals are both supported.
+  arma::mat   calcK(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const;
+  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const;
+  /// Same, for the range-separated (short-range) exchange operator.
+  arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const;
+  arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const;
+
   /// Engine accessors. Transitional: the Fock / force dispatch reaches
   /// the owned engines through these until the build/force methods
   /// below subsume every call site.

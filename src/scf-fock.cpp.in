@@ -125,27 +125,27 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #ifdef RESTRICTED
       if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
 	// Complex exchange matrix is
-	arma::cx_mat cK(jk.densityfit().calcK(sol.cC,occs));
+	arma::cx_mat cK(jk.calcK(sol.cC,occs, S));
 	Kfull=arma::real(cK);
 	Kfull_im=arma::imag(cK);
       } else
-	Kfull=jk.densityfit().calcK(sol.C,occs);
+	Kfull=jk.calcK(sol.C,occs, S);
 #else
       if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
 	// Complex exchange matrix is
-	arma::cx_mat cKa(jk.densityfit().calcK(sol.cCa,occa));
+	arma::cx_mat cKa(jk.calcK(sol.cCa,occa, S));
 	Kafull=arma::real(cKa);
 	Kafull_im=arma::imag(cKa);
       } else
-	Kafull=jk.densityfit().calcK(sol.Ca,occa);
+	Kafull=jk.calcK(sol.Ca,occa, S);
 
       if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
 	// Complex exchange matrix is
-	arma::cx_mat cKb(jk.densityfit().calcK(sol.cCb,occb));
+	arma::cx_mat cKb(jk.calcK(sol.cCb,occb, S));
 	Kbfull=arma::real(cKb);
 	Kbfull_im=arma::imag(cKb);
       } else
-	Kbfull=jk.densityfit().calcK(sol.Cb,occb);
+	Kbfull=jk.calcK(sol.Cb,occb, S);
 #endif
 
       if(verbose) {
@@ -164,25 +164,25 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 #ifdef RESTRICTED
 	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	  arma::cx_mat cK(jk.densityfit_rs().calcK(sol.cC,occs));
+	  arma::cx_mat cK(jk.calcK_short(sol.cC,occs, S));
 	  Kshort=arma::real(cK);
 	  Kshort_im=arma::imag(cK);
 	} else
-	  Kshort=jk.densityfit_rs().calcK(sol.C,occs);
+	  Kshort=jk.calcK_short(sol.C,occs, S);
 #else
 	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	  arma::cx_mat cKa(jk.densityfit_rs().calcK(sol.cCa,occa));
+	  arma::cx_mat cKa(jk.calcK_short(sol.cCa,occa, S));
 	  Kashort=arma::real(cKa);
 	  Kashort_im=arma::imag(cKa);
 	} else
-	  Kashort=jk.densityfit_rs().calcK(sol.Ca,occa);
+	  Kashort=jk.calcK_short(sol.Ca,occa, S);
 
 	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
-	  arma::cx_mat cKb(jk.densityfit_rs().calcK(sol.cCb,occb));
+	  arma::cx_mat cKb(jk.calcK_short(sol.cCb,occb, S));
 	  Kbshort=arma::real(cKb);
 	  Kbshort_im=arma::imag(cKb);
 	} else
-	  Kbshort=jk.densityfit_rs().calcK(sol.Cb,occb);
+	  Kbshort=jk.calcK_short(sol.Cb,occb, S);
 #endif
 
 	if(verbose) {
