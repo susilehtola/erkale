@@ -27,6 +27,7 @@ class DFTGrid;
 #include "eritable.h"
 #include "eriscreen.h"
 #include "density_fitting.h"
+#include "jkbuilder.h"
 
 class Checkpoint;
 
@@ -214,8 +215,6 @@ protected:
 
   /// Basis set to use (needed for DFT grid operation)
   const BasisSet * basisp;
-  /// Density fitting basis
-  BasisSet dfitbas;
   /// Checkpoint file
   Checkpoint * chkptp;
 
@@ -282,18 +281,6 @@ protected:
 
   /// Density fitting calculation?
   bool densityfit;
-  /// Threshold for density fitting
-  double fitthr;
-  /// Pivoted Cholesky threshold for density fitting
-  double fitcholthr;
-
-  /// Cholesky threshold
-  double cholthr;
-  /// Cholesky shell threshold (for caching)
-  double cholshthr;
-  /// Cholesky mode (legacy; only used to issue an ignored-warning on
-  /// the merged Cholesky/DensityFit path).
-  int cholmode;
 
   /// Calculate forces?
   bool doforce;
@@ -301,25 +288,11 @@ protected:
   /// Nuclear repulsion energy
   double Enuc;
 
-  /// Electron repulsion table
-  ERItable tab;
-  /// Electron repulsion table, range separation
-  ERItable tab_rs;
-  /// Electron repulsion screening table (for direct calculations)
-  ERIscreen scr;
-  /// Electron repulsion screening table, range separation
-  ERIscreen scr_rs;
-  /// Density fitting / Cholesky table (CD lives on the same object
-  /// since the erichol/densityfit merge; cholesky_mode flag selects
-  /// the storage layout)
-  DensityFit dfit;
-  /// Same, range separation
-  DensityFit dfit_rs;
-
-  /// Decontracted basis set
-  BasisSet decbas;
-  /// Conversion matrix
-  arma::mat decconv;
+  /// Unified J/K build driver: owns the integral engines (four-index
+  /// in-core / direct, density fitting, Cholesky) and the resolved
+  /// build method, and dispatches the Coulomb / exchange builds and
+  /// their gradients.
+  JKBuilder jk;
 
   /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
   std::vector<arma::mat> freeze;
