@@ -35,7 +35,6 @@ density_fitting.cpp jkbuilder.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
 stockholder.cpp b_tensor.cpp lbfgs.cpp gdm.cpp
 slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
-atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp
 sap.cpp)
 
 # The name of the executable is
@@ -211,8 +210,6 @@ add_subdirectory(xrs)
 
 # Create the Slater fit tool
 add_subdirectory(slaterfit)
-# Create the atom program
-add_subdirectory(atom)
 # Create test tool
 add_subdirectory(test)
 # Create basis set tool
