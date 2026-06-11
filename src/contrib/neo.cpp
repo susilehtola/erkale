@@ -19,6 +19,8 @@
 #include <memory>
 #include "checkpoint.h"
 #include "dftgrid.h"
+#include "dftfuncs.h"
+#include "scf.h"
 #include "elements.h"
 #include "find_molecules.h"
 #include "guess.h"
@@ -117,6 +119,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("NEODump", "Dump converged NEO-SCF to this HDF5 file for post-SCF correlation codes (empty = off)", "");
   settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
   settings.add_bool("NEODumpVerify", "Reconstruct the energy from the NEODump tensors and check it against the SCF energy", true);
+  settings.add_string("EPCFunctional", "Electron-proton correlation functional (e.g. lda_c_epc17_2); empty for none", "");
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -249,6 +252,78 @@ int main_guarded(int argc, char **argv) {
       Ecnucr+=Qi*Qj/sqrt(std::pow(xi-xj,2)+std::pow(yi-yj,2)+std::pow(zi-zj,2));
     }
   }
+
+  // Electronic exchange-correlation functional (HF when Method is
+  // Hartree-Fock) and the electron-proton correlation (EPC) functional.
+  bool ehf = (stricmp(settings.get_string("Method"),"HF")==0);
+  int ex_func=0, ec_func=0;
+  if(!ehf)
+    parse_xc_func(ex_func, ec_func, settings.get_string("Method"));
+  // Fraction of exact exchange (1 for HF, the hybrid coefficient for DFT).
+  double kfrac = ehf ? 1.0 : exact_exchange(ex_func);
+  std::string epcname = settings.get_string("EPCFunctional");
+  int epc_func = epcname.size() ? find_func(epcname) : 0;
+  bool do_exc = (ex_func>0 || ec_func>0);
+  bool do_epc = (epc_func>0);
+
+  // Refuse what the Fock builders below do not implement, rather than
+  // silently computing something else.
+  if(ex_func>0 && is_range_separated(ex_func))
+    throw std::runtime_error("Range-separated functionals are not supported in erkale_neo.\n");
+  {
+    double b, C;
+    if((ex_func>0 && needs_VV10(ex_func, b, C)) || (ec_func>0 && needs_VV10(ec_func, b, C)))
+      throw std::runtime_error("VV10 functionals are not supported in erkale_neo.\n");
+  }
+  // The EPC functionals are parametrized for a proton.
+  if(do_epc && (particle.q != 1.0 || particle.m != PROTON_MASS))
+    throw std::runtime_error("EPCFunctional requires the quantum particle to be a proton.\n");
+
+  // Electronic integration grid for the XC / EPC terms (the EPC term is
+  // evaluated on this shared electron grid with the proton basis).
+  DFTGrid egrid(&basis, verbose);
+  if(do_exc || do_epc) {
+    const std::string gridstr = settings.get_string("DFTGrid");
+    if(stricmp(gridstr,"Auto")==0)
+      throw std::runtime_error("Adaptive DFT grids are not supported in erkale_neo; give DFTGrid as nrad lmax.\n");
+    dft_t griddft;
+    parse_grid(griddft, gridstr, "DFT");
+    egrid.construct(griddft.nrad, griddft.lmax, ex_func, ec_func);
+  }
+
+  // Electronic exchange-correlation energy and potential, restricted
+  // (total density Pe) and unrestricted (spin densities). Zero when the
+  // electrons are treated with Hartree-Fock.
+  std::function<double(const arma::mat &, arma::mat &)> electronic_xc = [&](const arma::mat & Pe, arma::mat & Vxc) {
+    double Exc=0.0, Nelxc;
+    if(do_exc)
+      egrid.eval_Fxc(ex_func, ec_func, Pe, Vxc, Exc, Nelxc);
+    else
+      Vxc.zeros(Pe.n_rows, Pe.n_cols);
+    return Exc;
+  };
+  std::function<double(const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> electronic_xc_u = [&](const arma::mat & Pa, const arma::mat & Pb, arma::mat & Vxca, arma::mat & Vxcb) {
+    double Exc=0.0, Nelxc;
+    if(do_exc)
+      egrid.eval_Fxc(ex_func, ec_func, Pa, Pb, Vxca, Vxcb, Exc, Nelxc);
+    else {
+      Vxca.zeros(Pa.n_rows, Pa.n_cols);
+      Vxcb.zeros(Pb.n_rows, Pb.n_cols);
+    }
+    return Exc;
+  };
+  // Electron-proton correlation energy and its electron and proton
+  // potentials, evaluated on the electron grid with the proton basis.
+  std::function<double(const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> ep_correlation = [&](const arma::mat & Pe, const arma::mat & Pp, arma::mat & Vepce, arma::mat & Vepcp) {
+    double Eepc=0.0, Nelxc;
+    if(do_epc)
+      egrid.eval_Fxc(epc_func, 0, Pe, Pp, Vepce, Vepcp, Eepc, Nelxc, &pbasis);
+    else {
+      Vepce.zeros(Pe.n_rows, Pe.n_cols);
+      Vepcp.zeros(Pp.n_rows, Pp.n_cols);
+    }
+    return Eepc;
+  };
 
   // Construct linearly independent basis
   arma::mat S(basis.overlap());
@@ -407,6 +482,10 @@ int main_guarded(int argc, char **argv) {
   arma::mat frozen_Jpe(T.n_rows, T.n_cols, arma::fill::zeros);
   arma::mat frozen_Jep(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
   double frozen_Ee=0.0, frozen_Ep=0.0;
+  // Frozen densities for the stepwise solution: the electron-proton
+  // correlation couples the two components through the densities.
+  arma::mat frozen_Pe(T.n_rows, T.n_cols, arma::fill::zeros);
+  arma::mat frozen_Pp(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
 
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
@@ -609,17 +688,20 @@ int main_guarded(int argc, char **argv) {
     // Compute the terms in the Fock matrices
     arma::mat J, K;
     std::tie(J, K) = electronic_terms(Ce, occe);
+    arma::mat Vxc, Vepce, Vepcp;
+    double Exc = electronic_xc(Pe, Vxc);
+    double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp);
     // Form the Fock matrices
-    arma::mat Fe = X.t() * (T + Vc + J + .5*K + frozen_Jpe) * X;
+    arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxc + Vepce + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fe});
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
     double Enuc = arma::trace(Pe*Vc);
     double Ecoul = 0.5*arma::trace(J*Pe);
-    double Eexch = 0.25*arma::trace(K*Pe);
+    double Eexch = 0.25*kfrac*arma::trace(K*Pe);
     double Epe = arma::trace(Pe*frozen_Jpe);
-    double Etot = Ekin+Enuc+Ecoul+Eexch+Ecnucr+Epe+frozen_Ep;
+    double Etot = Ekin+Enuc+Ecoul+Eexch+Exc+Eepc+Ecnucr+Epe+frozen_Ep;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
@@ -627,6 +709,10 @@ int main_guarded(int argc, char **argv) {
       printf("p-e frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
+      if(do_exc)
+        printf("e exchange-correlation   % .10f\n",Exc);
+      if(do_epc)
+        printf("e-p correlation energy   % .10f\n",Eepc);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
       printf("frozen proton energy     % .10f\n",frozen_Ep);
       printf("Total energy             % .10f\n",Etot);
@@ -657,18 +743,21 @@ int main_guarded(int argc, char **argv) {
     arma::mat Ja, Jb, Ka, Kb, Jp, Kp, Jep, Jpe;
     std::tie(Ja, Ka) = electronic_terms(Ca, occa);
     std::tie(Jb, Kb) = electronic_terms(Cb, occb);
+    arma::mat Vxca, Vxcb, Vepce, Vepcp;
+    double Exc = electronic_xc_u(Pa, Pb, Vxca, Vxcb);
+    double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp);
     // Form the Fock matrices
-    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + Ka + frozen_Jpe) * X;
-    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + Kb + frozen_Jpe) * X;
+    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + frozen_Jpe) * X;
+    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + kfrac*Kb + Vxcb + Vepce + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fa,Fb});
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
     double Enuc = arma::trace(Pe*Vc);
     double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
-    double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
+    double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
     double Epe = arma::trace(Pe*frozen_Jpe);
-    double Etot = Ekin+Enuc+Ecoul+Eexch+Ecnucr+Epe+frozen_Ep;
+    double Etot = Ekin+Enuc+Ecoul+Eexch+Exc+Eepc+Ecnucr+Epe+frozen_Ep;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
@@ -676,6 +765,10 @@ int main_guarded(int argc, char **argv) {
       printf("p-e frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
+      if(do_exc)
+        printf("e exchange-correlation   % .10f\n",Exc);
+      if(do_epc)
+        printf("e-p correlation energy   % .10f\n",Eepc);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
       printf("frozen proton energy     % .10f\n",frozen_Ep);
       printf("Total energy             % .10f\n",Etot);
@@ -721,9 +814,14 @@ int main_guarded(int argc, char **argv) {
     Jep = electron_proton_coulomb(Pe);
     Jpe = proton_electron_coulomb(Pp);
 
+    // Electronic exchange-correlation and electron-proton correlation
+    arma::mat Vxce, Vepce, Vepcp;
+    double Exce = electronic_xc(Pe, Vxce);
+    double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp);
+
     // Form the Fock matrices
-    arma::mat Fe = X.t() * (T + Vc + J + .5*K + Jpe) * X;
-    arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Jep) * Xp;
+    arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxce + Vepce + Jpe) * X;
+    arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Vepcp + Jep) * Xp;
     std::vector<arma::mat> fock({Fe,Fp});
 
     // Compute energy terms
@@ -733,10 +831,10 @@ int main_guarded(int argc, char **argv) {
     double Epnuc = arma::trace(Pp*Vpc);
     double Ecoul = 0.5*arma::trace(J*Pe);
     double Epcoul = 0.5*arma::trace(Jp*Pp);
-    double Eexch = 0.25*arma::trace(K*Pe);
+    double Eexch = 0.25*kfrac*arma::trace(K*Pe);
     double Epexch = 0.5*arma::trace(Kp*Pp);
     double Eepcoul = arma::trace(Jep*Pp);
-    double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Ecnucr;
+    double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Ecnucr+Exce+Eepc;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
@@ -746,6 +844,10 @@ int main_guarded(int argc, char **argv) {
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("p-p Coulomb energy       % .10f\n",Epcoul);
       printf("e-p Coulomb energy       % .10f\n",Eepcoul);
+      if(do_exc)
+        printf("e exchange-correlation   % .10f\n",Exce);
+      if(do_epc)
+        printf("e-p correlation energy   % .10f\n",Eepc);
       printf("e-e exchange energy      % .10f\n",Eexch);
       printf("p-p exchange energy      % .10f\n",Epexch);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
@@ -786,10 +888,15 @@ int main_guarded(int argc, char **argv) {
     Jep = electron_proton_coulomb(Pa+Pb);
     Jpe = proton_electron_coulomb(Pp);
 
+    // Electronic exchange-correlation and electron-proton correlation
+    arma::mat Vxca, Vxcb, Vepce, Vepcp;
+    double Exce = electronic_xc_u(Pa, Pb, Vxca, Vxcb);
+    double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp);
+
     // Form the Fock matrices
-    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + Ka + Jpe) * X;
-    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + Kb + Jpe) * X;
-    arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Jep) * Xp;
+    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + Jpe) * X;
+    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + kfrac*Kb + Vxcb + Vepce + Jpe) * X;
+    arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Vepcp + Jep) * Xp;
     std::vector<arma::mat> fock({Fa,Fb,Fp});
 
     // Compute energy terms
@@ -799,10 +906,10 @@ int main_guarded(int argc, char **argv) {
     double Epnuc = arma::trace(Pp*Vpc);
     double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
     double Epcoul = 0.5*arma::trace(Jp*Pp);
-    double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
+    double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
     double Epexch = 0.5*arma::trace(Kp*Pp);
     double Eepcoul = arma::trace(Jep*Pp);
-    double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Ecnucr;
+    double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Ecnucr+Exce+Eepc;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
@@ -812,6 +919,10 @@ int main_guarded(int argc, char **argv) {
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("p-p Coulomb energy       % .10f\n",Epcoul);
       printf("e-p Coulomb energy       % .10f\n",Eepcoul);
+      if(do_exc)
+        printf("e exchange-correlation   % .10f\n",Exce);
+      if(do_epc)
+        printf("e-p correlation energy   % .10f\n",Eepc);
       printf("e-e exchange energy      % .10f\n",Eexch);
       printf("p-p exchange energy      % .10f\n",Epexch);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
@@ -1013,6 +1124,7 @@ int main_guarded(int argc, char **argv) {
     }
     if(quantum_protons.size()) {
       frozen_Jpe = proton_electron_coulomb(Pp);
+      frozen_Pp = Pp;
     }
 
     // Update the frozen proton energy
@@ -1066,6 +1178,7 @@ int main_guarded(int argc, char **argv) {
         }
       }
       frozen_Jep = electron_proton_coulomb(Pe);
+      frozen_Pe = Pe;
 
       // Update the frozen electron energy
       {
@@ -1093,8 +1206,10 @@ int main_guarded(int argc, char **argv) {
           double Ekin = arma::trace(Pe*T);
           double Enuc = arma::trace(Pe*Vc);
           double Ecoul = 0.5*arma::trace(J*Pe);
-          double Eexch = 0.25*arma::trace(K*Pe);
-          frozen_Ee = Ekin+Enuc+Ecoul+Eexch;
+          double Eexch = 0.25*kfrac*arma::trace(K*Pe);
+          arma::mat Vxc;
+          double Exc = electronic_xc(Pe, Vxc);
+          frozen_Ee = Ekin+Enuc+Ecoul+Eexch+Exc;
 
         } else {
           // Get the electronic and protonic orbital coefficients
@@ -1117,8 +1232,10 @@ int main_guarded(int argc, char **argv) {
           double Ekin = arma::trace(Pe*T);
           double Enuc = arma::trace(Pe*Vc);
           double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
-          double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
-          frozen_Ee = Ekin+Enuc+Ecoul+Eexch;
+          double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
+          arma::mat Vxca, Vxcb;
+          double Exc = electronic_xc_u(Pa, Pb, Vxca, Vxcb);
+          frozen_Ee = Ekin+Enuc+Ecoul+Eexch+Exc;
         }
       }
 
@@ -1139,8 +1256,12 @@ int main_guarded(int argc, char **argv) {
         arma::mat Jp, Kp;
         std::tie(Jp, Kp) = protonic_terms(Cp, occp);
 
+        // Electron-proton correlation with the frozen electrons
+        arma::mat Vepce, Vepcp;
+        double Eepc = ep_correlation(frozen_Pe, Pp, Vepce, Vepcp);
+
         // Form the Fock matrices
-        arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + frozen_Jep) * Xp;
+        arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Vepcp + frozen_Jep) * Xp;
         std::vector<arma::mat> fock({Fp});
 
         // Compute energy terms
@@ -1149,13 +1270,15 @@ int main_guarded(int argc, char **argv) {
         double Epcoul = 0.5*arma::trace(Jp*Pp);
         double Epexch = 0.5*arma::trace(Kp*Pp);
         double Eepcoul = arma::trace(frozen_Jep*Pp);
-        double Etot = Epkin+Epnuc+Epcoul+Epexch+Eepcoul+frozen_Ee+Ecnucr;
+        double Etot = Epkin+Epnuc+Epcoul+Epexch+Eepcoul+Eepc+frozen_Ee+Ecnucr;
 
         if(verbosity>=10)  {
           printf("p kinetic energy          % .10f\n",Epkin);
           printf("p nuclear repulsion       % .10f\n",Epnuc);
           printf("p-p Coulomb energy        % .10f\n",Epcoul);
           printf("e-p frozen attraction     % .10f\n",Eepcoul);
+          if(do_epc)
+            printf("e-p correlation energy    % .10f\n",Eepc);
           printf("p-p exchange energy       % .10f\n",Epexch);
           printf("frozen electron energy    % .10f\n",frozen_Ee);
           printf("nuclear repulsion energy  % .10f\n",Ecnucr);
