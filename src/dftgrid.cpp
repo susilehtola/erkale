@@ -22,6 +22,7 @@
 
 #include "dftfuncs.h"
 #include "dftgrid.h"
+#include "xcfunctional.h"
 #include "elements.h"
 #include "hirshfeld.h"
 #include "mathf.h"
@@ -799,17 +800,14 @@ void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & 
 }
 
 void AngularGrid::compute_xc(int func_id, bool pot) {
-  // Compute exchange-correlation functional
-
-  // Which functional is in question?
-  bool gga, mgga_t, mgga_l;
-  is_gga_mgga(func_id,gga,mgga_t,mgga_l);
+  // Compute exchange-correlation functional through a libxc wrapper.
+  XCFunctional xcf(func_id, polarized_);
 
   // Update controlling flags for eval_Fxc (exchange and correlation
   // parts might be of different type)
-  do_gga_=do_gga_ || gga || mgga_t || mgga_l;
-  do_mgga_t_=do_mgga_t_ || mgga_t;
-  do_mgga_l_=do_mgga_l_ || mgga_l;
+  do_gga_=do_gga_ || xcf.is_gga() || xcf.is_mgga();
+  do_mgga_t_=do_mgga_t_ || xcf.is_mgga_tau();
+  do_mgga_l_=do_mgga_l_ || xcf.is_mgga_lapl();
 
   // Amount of grid points
   const size_t N=grid_.size();
@@ -821,112 +819,55 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   arma::mat vlapl_wrk;
   arma::mat vtau_wrk;
 
-  if(has_exc(func_id))
+  if(xcf.has_exc())
     exc_wrk.zeros(exc_.n_elem);
   if(pot) {
     vxc_wrk.zeros(vxc_.n_rows,vxc_.n_cols);
-    if(gga || mgga_t || mgga_l)
+    if(xcf.is_gga() || xcf.is_mgga())
       vsigma_wrk.zeros(vsigma_.n_rows,vsigma_.n_cols);
-    if(mgga_t)
+    if(xcf.is_mgga_tau())
       vtau_wrk.zeros(vtau_.n_rows,vtau_.n_cols);
-    if(mgga_l)
+    if(xcf.is_mgga_lapl())
       vlapl_wrk.zeros(vlapl_.n_rows,vlapl_.n_cols);
   }
 
-  // Spin variable for libxc
-  int nspin;
-  if(!polarized_)
-    nspin=XC_UNPOLARIZED;
-  else
-    nspin=XC_POLARIZED;
-
-  // Initialize libxc worker
-  xc_func_type func;
-  if(xc_func_init(&func, func_id, nspin) != 0) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Functional "<<func_id<<" not found!";
-    throw std::runtime_error(oss.str());
-  }
   // Set density threshold
-  double thr=settings.get_double("DFTDensityThr");
-  xc_func_set_dens_threshold(&func, thr);
+  xcf.set_dens_threshold(settings.get_double("DFTDensityThr"));
 
-  // Set parameters
-  arma::vec pars;
-  std::string functype;
-  if(is_exchange(func_id)) {
-    pars=settings.get_vec("DFTXpars");
-    functype="exchange";
-  } else if(is_correlation(func_id)) {
-    pars=settings.get_vec("DFTCpars");
-    functype="correlation";
-  }
-  if(pars.n_elem) {
-    size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
-    if(npars != pars.n_elem) {
-      std::ostringstream oss;
-      oss << "Inconsistent number of parameters for the " << functype << " functional.\n";
-      oss << "Expected " << npars << ", got " << pars.n_elem << ".\n";
-      throw std::logic_error(oss.str());
-    }
-    xc_func_set_ext_params(&func, pars.memptr());
+  // Set external parameters
+  {
+    arma::vec pars;
+    if(is_exchange(func_id))
+      pars=settings.get_vec("DFTXpars");
+    else if(is_correlation(func_id))
+      pars=settings.get_vec("DFTCpars");
+    xcf.set_ext_params(pars);
   }
 
-  // Evaluate functionals.
-  if(has_exc(func_id)) {
-    if(pot) {
-      if(mgga_t || mgga_l) {// meta-GGA
-	double * laplp = mgga_l ? lapl_.memptr() : NULL;
-	double * taup = mgga_t ? tau_.memptr() : NULL;
-	double * vlaplp = mgga_l ? vlapl_wrk.memptr() : NULL;
-	double * vtaup = mgga_t ? vtau_wrk.memptr() : NULL;
-	xc_mgga_exc_vxc(&func, N, rho_.memptr(), sigma_.memptr(), laplp, taup, exc_wrk.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr(), vlaplp, vtaup);
-      } else if(gga) // GGA
-	xc_gga_exc_vxc(&func, N, rho_.memptr(), sigma_.memptr(), exc_wrk.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr());
-      else // LDA
-	xc_lda_exc_vxc(&func, N, rho_.memptr(), exc_wrk.memptr(), vxc_wrk.memptr());
-    } else {
-      if(mgga_t || mgga_l) { // meta-GGA
-	double * laplp = mgga_l ? lapl_.memptr() : NULL;
-	double * taup = mgga_t ? tau_.memptr() : NULL;
-	xc_mgga_exc(&func, N, rho_.memptr(), sigma_.memptr(), laplp, taup, exc_wrk.memptr());
-      } else if(gga) // GGA
-	xc_gga_exc(&func, N, rho_.memptr(), sigma_.memptr(), exc_wrk.memptr());
-      else // LDA
-	xc_lda_exc(&func, N, rho_.memptr(), exc_wrk.memptr());
-    }
-
-  } else {
-    if(pot) {
-      if(mgga_t || mgga_l) { // meta-GGA
-	double * laplp = mgga_l ? lapl_.memptr() : NULL;
-	double * taup = mgga_t ? tau_.memptr() : NULL;
-	double * vlaplp = mgga_l ? vlapl_wrk.memptr() : NULL;
-	double * vtaup = mgga_t ? vtau_wrk.memptr() : NULL;
-	xc_mgga_vxc(&func, N, rho_.memptr(), sigma_.memptr(), laplp, taup, vxc_wrk.memptr(), vsigma_wrk.memptr(), vlaplp, vtaup);
-      } else if(gga) // GGA
-	xc_gga_vxc(&func, N, rho_.memptr(), sigma_.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr());
-      else // LDA
-	xc_lda_vxc(&func, N, rho_.memptr(), vxc_wrk.memptr());
-    }
-  }
+  // Evaluate the functional. The laplacian / tau inputs and their
+  // potentials are referenced only for the matching meta-GGA rung.
+  xcf.eval(N, rho_.memptr(), sigma_.memptr(),
+           xcf.is_mgga_lapl() ? lapl_.memptr() : NULL,
+           xcf.is_mgga_tau()  ? tau_.memptr()  : NULL,
+           pot,
+           xcf.has_exc() ? exc_wrk.memptr() : NULL,
+           pot ? vxc_wrk.memptr() : NULL,
+           (pot && (xcf.is_gga() || xcf.is_mgga())) ? vsigma_wrk.memptr() : NULL,
+           (pot && xcf.is_mgga_lapl()) ? vlapl_wrk.memptr() : NULL,
+           (pot && xcf.is_mgga_tau())  ? vtau_wrk.memptr()  : NULL);
 
   // Sum to total arrays containing both exchange and correlation
-  if(has_exc(func_id))
+  if(xcf.has_exc())
     exc_+=exc_wrk;
   if(pot) {
-    if(mgga_l)
+    if(xcf.is_mgga_lapl())
       vlapl_+=vlapl_wrk;
-    if(mgga_t)
+    if(xcf.is_mgga_tau())
       vtau_+=vtau_wrk;
-    if(mgga_t || mgga_l || gga)
+    if(xcf.is_gga() || xcf.is_mgga())
       vsigma_+=vsigma_wrk;
     vxc_+=vxc_wrk;
   }
-
-  // Free functional
-  xc_func_end(&func);
 }
 
 void AngularGrid::init_VV10(double b, double C, bool pot) {
