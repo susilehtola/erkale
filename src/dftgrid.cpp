@@ -415,7 +415,7 @@ arma::uvec AngularGrid::screen_density() const {
 }
 
 
-void AngularGrid::update_density(const arma::mat & P0, bool force) {
+void AngularGrid::update_density(const arma::mat & P0, bool force, const BFTable * tab) {
   // Update values of density
 
   if(!P0.n_elem) {
@@ -423,29 +423,38 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     throw std::runtime_error("Error - density matrix is empty!\n");
   }
 
+  // Evaluate the density from the primary basis (members) or, for the
+  // projection-free guess, from a second basis supplied in tab.
+  const arma::mat  & BF  = tab ? tab->bf      : bf_;
+  const arma::mat  & BFx = tab ? tab->bf_x    : bf_x_;
+  const arma::mat  & BFy = tab ? tab->bf_y    : bf_y_;
+  const arma::mat  & BFz = tab ? tab->bf_z    : bf_z_;
+  const arma::mat  & BFl = tab ? tab->bf_lapl : bf_lapl_;
+  const arma::uvec & BFI = tab ? tab->bf_ind  : bf_ind_;
+
   // Non-polarized calculation.
   polarized_=false;
 
   // Update density vector
-  arma::mat P(P0.submat(bf_ind_,bf_ind_));
-  Pv=P*bf_;
+  arma::mat P(P0.submat(BFI,BFI));
+  Pv=P*BF;
   if(force && do_lapl_)
-    Plapl=P*bf_lapl_;
+    Plapl=P*BFl;
 
   // Calculate density. Each per-grid-point dot product is replaced
   // with a single column-wise reduction (Pv % bf), which arma can
   // dispatch as a fused vectorised pass over contiguous memory rather
   // than N separate length-Nbf dots.
   rho_.zeros(1,grid_.size());
-  rho_.row(0) = arma::sum(Pv % bf_, 0);
+  rho_.row(0) = arma::sum(Pv % BF, 0);
 
   // Calculate gradient
   if(do_grad_) {
     grho_.zeros(3,grid_.size());
     sigma_.zeros(1,grid_.size());
-    grho_.row(0) = 2.0 * arma::sum(Pv % bf_x_, 0);
-    grho_.row(1) = 2.0 * arma::sum(Pv % bf_y_, 0);
-    grho_.row(2) = 2.0 * arma::sum(Pv % bf_z_, 0);
+    grho_.row(0) = 2.0 * arma::sum(Pv % BFx, 0);
+    grho_.row(1) = 2.0 * arma::sum(Pv % BFy, 0);
+    grho_.row(2) = 2.0 * arma::sum(Pv % BFz, 0);
     sigma_.row(0) = arma::square(grho_.row(0)) + arma::square(grho_.row(1)) + arma::square(grho_.row(2));
   }
 
@@ -456,13 +465,13 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     tau_.zeros(1,grid_.size());
 
     // Update helpers
-    Pv_x=P*bf_x_;
-    Pv_y=P*bf_y_;
-    Pv_z_=P*bf_z_;
+    Pv_x=P*BFx;
+    Pv_y=P*BFy;
+    Pv_z_=P*BFz;
 
     // Vectorised column-wise reductions
-    const arma::rowvec lap_v(arma::sum(Pv % bf_lapl_, 0));
-    const arma::rowvec grad_v(arma::sum(Pv_x % bf_x_ + Pv_y % bf_y_ + Pv_z_ % bf_z_, 0));
+    const arma::rowvec lap_v(arma::sum(Pv % BFl, 0));
+    const arma::rowvec grad_v(arma::sum(Pv_x % BFx + Pv_y % BFy + Pv_z_ % BFz, 0));
     lapl_.row(0) = 2.0 * (lap_v + grad_v);
     tau_.row(0) = 0.5 * grad_v;
   } else if(do_tau_) {
@@ -470,52 +479,62 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     tau_.zeros(1,grid_.size());
 
     // Update helpers
-    Pv_x=P*bf_x_;
-    Pv_y=P*bf_y_;
-    Pv_z_=P*bf_z_;
+    Pv_x=P*BFx;
+    Pv_y=P*BFy;
+    Pv_z_=P*BFz;
 
     // Vectorised column-wise reduction
-    tau_.row(0) = 0.5 * arma::sum(Pv_x % bf_x_ + Pv_y % bf_y_ + Pv_z_ % bf_z_, 0);
+    tau_.row(0) = 0.5 * arma::sum(Pv_x % BFx + Pv_y % BFy + Pv_z_ % BFz, 0);
   } else if(do_lapl_) {
     // Adjust size of grid
     lapl_.zeros(1,grid_.size());
 
     // Update helpers
-    Pv_x=P*bf_x_;
-    Pv_y=P*bf_y_;
-    Pv_z_=P*bf_z_;
+    Pv_x=P*BFx;
+    Pv_y=P*BFy;
+    Pv_z_=P*BFz;
 
     // Vectorised column-wise reductions
-    const arma::rowvec lap_v(arma::sum(Pv % bf_lapl_, 0));
-    const arma::rowvec grad_v(arma::sum(Pv_x % bf_x_ + Pv_y % bf_y_ + Pv_z_ % bf_z_, 0));
+    const arma::rowvec lap_v(arma::sum(Pv % BFl, 0));
+    const arma::rowvec grad_v(arma::sum(Pv_x % BFx + Pv_y % BFy + Pv_z_ % BFz, 0));
     lapl_.row(0) = 2.0 * (lap_v + grad_v);
   }
 }
 
-void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, bool force) {
+void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, bool force, const BFTable * tab_b) {
   if(!Pa0.n_elem || !Pb0.n_elem) {
     ERROR_INFO();
     throw std::runtime_error("Error - density matrix is empty!\n");
   }
+
+  // Channel a is the primary basis (members); channel b is the primary
+  // basis too in ordinary unrestricted DFT, or a second basis (tab_b)
+  // for multicomponent (NEO) XC, where channel b is the proton density.
+  const arma::mat  & BFb  = tab_b ? tab_b->bf      : bf_;
+  const arma::mat  & BFbx = tab_b ? tab_b->bf_x    : bf_x_;
+  const arma::mat  & BFby = tab_b ? tab_b->bf_y    : bf_y_;
+  const arma::mat  & BFbz = tab_b ? tab_b->bf_z    : bf_z_;
+  const arma::mat  & BFbl = tab_b ? tab_b->bf_lapl : bf_lapl_;
+  const arma::uvec & BFIb = tab_b ? tab_b->bf_ind  : bf_ind_;
 
   // Polarized calculation.
   polarized_=true;
 
   // Update density vector
   arma::mat Pa(Pa0.submat(bf_ind_,bf_ind_));
-  arma::mat Pb(Pb0.submat(bf_ind_,bf_ind_));
+  arma::mat Pb(Pb0.submat(BFIb,BFIb));
 
   Pav=Pa*bf_;
-  Pbv=Pb*bf_;
+  Pbv=Pb*BFb;
   if(force && do_lapl_) {
     Palapl=Pa*bf_lapl_;
-    Pblapl_=Pb*bf_lapl_;
+    Pblapl_=Pb*BFbl;
   }
 
   // Calculate density
   rho_.zeros(2,grid_.size());
   rho_.row(0) = arma::sum(Pav % bf_, 0);
-  rho_.row(1) = arma::sum(Pbv % bf_, 0);
+  rho_.row(1) = arma::sum(Pbv % BFb, 0);
 
   // Calculate gradient
   if(do_grad_) {
@@ -524,9 +543,9 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
     grho_.row(0) = 2.0 * arma::sum(Pav % bf_x_, 0);
     grho_.row(1) = 2.0 * arma::sum(Pav % bf_y_, 0);
     grho_.row(2) = 2.0 * arma::sum(Pav % bf_z_, 0);
-    grho_.row(3) = 2.0 * arma::sum(Pbv % bf_x_, 0);
-    grho_.row(4) = 2.0 * arma::sum(Pbv % bf_y_, 0);
-    grho_.row(5) = 2.0 * arma::sum(Pbv % bf_z_, 0);
+    grho_.row(3) = 2.0 * arma::sum(Pbv % BFbx, 0);
+    grho_.row(4) = 2.0 * arma::sum(Pbv % BFby, 0);
+    grho_.row(5) = 2.0 * arma::sum(Pbv % BFbz, 0);
     sigma_.row(0) = arma::square(grho_.row(0)) + arma::square(grho_.row(1)) + arma::square(grho_.row(2));
     sigma_.row(1) = grho_.row(0)%grho_.row(3) + grho_.row(1)%grho_.row(4) + grho_.row(2)%grho_.row(5);
     sigma_.row(2) = arma::square(grho_.row(3)) + arma::square(grho_.row(4)) + arma::square(grho_.row(5));
@@ -545,29 +564,29 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
     Pav_y=Pa*bf_y_;
     Pav_z_=Pa*bf_z_;
 
-    Pbv_x=Pb*bf_x_;
-    Pbv_y=Pb*bf_y_;
-    Pbv_z_=Pb*bf_z_;
+    Pbv_x=Pb*BFbx;
+    Pbv_y=Pb*BFby;
+    Pbv_z_=Pb*BFbz;
 
     // Vectorised column-wise reductions across all grid points,
     // replacing the per-ip arma::dot loops above.
     if(do_tau_ && do_lapl_) {
       const arma::rowvec lapa(arma::sum(Pav % bf_lapl_, 0));
-      const arma::rowvec lapb(arma::sum(Pbv % bf_lapl_, 0));
+      const arma::rowvec lapb(arma::sum(Pbv % BFbl, 0));
       const arma::rowvec grada(arma::sum(Pav_x % bf_x_ + Pav_y % bf_y_ + Pav_z_ % bf_z_, 0));
-      const arma::rowvec gradb(arma::sum(Pbv_x % bf_x_ + Pbv_y % bf_y_ + Pbv_z_ % bf_z_, 0));
+      const arma::rowvec gradb(arma::sum(Pbv_x % BFbx + Pbv_y % BFby + Pbv_z_ % BFbz, 0));
       lapl_.row(0) = 2.0 * (lapa + grada);
       lapl_.row(1) = 2.0 * (lapb + gradb);
       tau_.row(0)  = 0.5 * grada;
       tau_.row(1)  = 0.5 * gradb;
     } else if(do_tau_) {
       tau_.row(0) = 0.5 * arma::sum(Pav_x % bf_x_ + Pav_y % bf_y_ + Pav_z_ % bf_z_, 0);
-      tau_.row(1) = 0.5 * arma::sum(Pbv_x % bf_x_ + Pbv_y % bf_y_ + Pbv_z_ % bf_z_, 0);
+      tau_.row(1) = 0.5 * arma::sum(Pbv_x % BFbx + Pbv_y % BFby + Pbv_z_ % BFbz, 0);
     } else if(do_lapl_) {
       const arma::rowvec lapa(arma::sum(Pav % bf_lapl_, 0));
-      const arma::rowvec lapb(arma::sum(Pbv % bf_lapl_, 0));
+      const arma::rowvec lapb(arma::sum(Pbv % BFbl, 0));
       const arma::rowvec grada(arma::sum(Pav_x % bf_x_ + Pav_y % bf_y_ + Pav_z_ % bf_z_, 0));
-      const arma::rowvec gradb(arma::sum(Pbv_x % bf_x_ + Pbv_y % bf_y_ + Pbv_z_ % bf_z_, 0));
+      const arma::rowvec gradb(arma::sum(Pbv_x % BFbx + Pbv_y % BFby + Pbv_z_ % BFbz, 0));
       lapl_.row(0) = 2.0 * (lapa + grada);
       lapl_.row(1) = 2.0 * (lapb + gradb);
     }
@@ -1794,11 +1813,21 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
   }
 }
 
-void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
+void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BFTable * tab_b) const {
   if(!polarized_) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
+
+  // Channel a is assembled against the primary basis (members); channel
+  // b against tab_b when given (the proton basis in multicomponent XC),
+  // otherwise against the primary basis (ordinary unrestricted DFT).
+  const arma::mat  & BFb  = tab_b ? tab_b->bf      : bf_;
+  const arma::mat  & BFbx = tab_b ? tab_b->bf_x    : bf_x_;
+  const arma::mat  & BFby = tab_b ? tab_b->bf_y    : bf_y_;
+  const arma::mat  & BFbz = tab_b ? tab_b->bf_z    : bf_z_;
+  const arma::mat  & BFbl = tab_b ? tab_b->bf_lapl : bf_lapl_;
+  const arma::uvec & BFIb = tab_b ? tab_b->bf_ind  : bf_ind_;
 
   // Screen quadrature points by small densities
   arma::uvec screen(screen_density());
@@ -1809,7 +1838,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
   arma::mat Ha, Hb;
   Ha.zeros(bf_ind_.n_elem,bf_ind_.n_elem);
   if(beta)
-    Hb.zeros(bf_ind_.n_elem,bf_ind_.n_elem);
+    Hb.zeros(BFIb.n_elem,BFIb.n_elem);
 
   {
     // LDA potential
@@ -1822,7 +1851,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     if(beta) {
       arma::rowvec vrhob(vxc_.row(1));
       vrhob%=w_;
-      increment_lda<double>(Hb,vrhob,bf_,screen);
+      increment_lda<double>(Hb,vrhob,BFb,screen);
     }
   }
   if(Ha.has_nan() || (beta && Hb.has_nan()))
@@ -1853,7 +1882,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
       for(size_t i=0;i<gr_b.n_rows;i++)
 	for(size_t ic=0;ic<gr_b.n_cols;ic++)
 	  gr_b(i,ic)=w_(i)*(2.0*vs_bb(i)*gr_b0(i,ic) + vs_ab(i)*gr_a0(i,ic));
-      increment_gga<double>(Hb,gr_b,bf_,bf_x_,bf_y_,bf_z_,screen);
+      increment_gga<double>(Hb,gr_b,BFb,BFbx,BFby,BFbz,screen);
     }
   }
 
@@ -1877,8 +1906,8 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
       arma::rowvec vl_b(vlapl_.row(1));
       vt_b%=w_;
       vl_b%=w_;
-      increment_mgga_kin<double>(Hb,0.5*vt_b + 2.0*vl_b,bf_x_,bf_y_,bf_z_,screen);
-      increment_mgga_lapl<double>(Hb,vl_b,bf_,bf_lapl_,screen);
+      increment_mgga_kin<double>(Hb,0.5*vt_b + 2.0*vl_b,BFbx,BFby,BFbz,screen);
+      increment_mgga_lapl<double>(Hb,vl_b,BFb,BFbl,screen);
     }
   } else if(do_mgga_t_) {
     arma::rowvec vt_a(vtau_.row(0));
@@ -1887,7 +1916,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     if(beta) {
       arma::rowvec vt_b(vtau_.row(1));
       vt_b%=w_;
-      increment_mgga_kin<double>(Hb,0.5*vt_b,bf_x_,bf_y_,bf_z_,screen);
+      increment_mgga_kin<double>(Hb,0.5*vt_b,BFbx,BFby,BFbz,screen);
     }
   } else if(do_mgga_l_) {
     arma::rowvec vl_a(vlapl_.row(0));
@@ -1898,14 +1927,14 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     if(beta) {
       arma::rowvec vl_b(vlapl_.row(1));
       vl_b%=w_;
-      increment_mgga_kin<double>(Hb,2.0*vl_b,bf_x_,bf_y_,bf_z_,screen);
-      increment_mgga_lapl<double>(Hb,vl_b,bf_,bf_lapl_,screen);
+      increment_mgga_kin<double>(Hb,2.0*vl_b,BFbx,BFby,BFbz,screen);
+      increment_mgga_lapl<double>(Hb,vl_b,BFb,BFbl,screen);
     }
   }
 
   Hao(bf_ind_,bf_ind_)+=Ha;
   if(beta)
-    Hbo(bf_ind_,bf_ind_)+=Hb;
+    Hbo(BFIb,BFIb)+=Hb;
 }
 
 void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
@@ -2915,133 +2944,135 @@ void AngularGrid::form_hirshfeld_grid(const Hirshfeld & hirsh) {
 }
 
 void AngularGrid::update_shell_list() {
+  update_shell_list_for(*basp_, pot_shells_, pot_bf_ind_);
+}
+
+void AngularGrid::update_shell_list_for(const BasisSet & basis, std::vector<size_t> & pot_shells_out, arma::uvec & pot_bf_ind_out) const {
   // Form list of important basis functions. Shell ranges
-  std::vector<double> shran=basp_->shell_ranges();
-  if(shran.size() != basp_->Nshells())
+  std::vector<double> shran=basis.shell_ranges();
+  if(shran.size() != basis.Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
   // Distances to other nuclei
-  std::vector<double> nucdist=basp_->nuclear_distances(info_.atind);
+  std::vector<double> nucdist=basis.nuclear_distances(info_.atind);
 
   // Current radius
   double rad=info_.R;
   // Shells that might contribute, and the amount of functions
-  pot_shells_.clear();
+  pot_shells_out.clear();
   size_t Nbf=0;
-  for(size_t inuc=0;inuc<basp_->Nnuc();inuc++) {
+  for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
     // Closest distance of shell to nucleus. Covers both nucleus
     // inside shell, and nucleus outside the shell.
     double dist=fabs(nucdist[inuc]-rad);
     // Get indices of shells centered on nucleus
-    std::vector<size_t> shellinds=basp_->shell_inds(inuc);
+    std::vector<size_t> shellinds=basis.shell_inds(inuc);
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
       // Shell is relevant if range is larger than minimal distance
       if(dist<=shran[shellinds[ish]]) {
 	// Add shell to list of shells to compute
-	pot_shells_.push_back(shellinds[ish]);
+	pot_shells_out.push_back(shellinds[ish]);
 	// Increment amount of important functions
-	Nbf+=basp_->Nbf(shellinds[ish]);
+	Nbf+=basis.Nbf(shellinds[ish]);
       }
     }
   }
 
   // Store indices of functions
-  pot_bf_ind_.zeros(Nbf);
+  pot_bf_ind_out.zeros(Nbf);
   size_t ioff=0;
-  for(size_t i=0;i<pot_shells_.size();i++) {
+  for(size_t i=0;i<pot_shells_out.size();i++) {
     // Amount of functions on shell is
-    size_t Nsh=basp_->Nbf(pot_shells_[i]);
+    size_t Nsh=basis.Nbf(pot_shells_out[i]);
     // Shell offset
-    size_t sh0=basp_->first_ind(pot_shells_[i]);
+    size_t sh0=basis.first_ind(pot_shells_out[i]);
     // Indices
     arma::uvec ls=(arma::linspace<arma::uvec>(sh0,sh0+Nsh-1,Nsh));
-    pot_bf_ind_.subvec(ioff,ioff+Nsh-1)=ls;
+    pot_bf_ind_out.subvec(ioff,ioff+Nsh-1)=ls;
     ioff+=Nsh;
   }
 }
 
-void AngularGrid::compute_bf() {
+BFTable AngularGrid::build_table(const BasisSet & basis, const std::vector<size_t> & pot_shells_in, bool grad, bool lapl, bool hess, bool lgrad) const {
+  BFTable t;
+
   // Create list of shells that actually contribute. Shell ranges
-  std::vector<double> shran=basp_->shell_ranges();
-  if(shran.size() != basp_->Nshells())
+  std::vector<double> shran=basis.shell_ranges();
+  if(shran.size() != basis.Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
 
-  shells_.clear();
   size_t Nbf=0;
-  for(size_t is=0;is<pot_shells_.size();is++) {
+  for(size_t is=0;is<pot_shells_in.size();is++) {
     // Shell center is
-    coords_t cen(basp_->shell_center(pot_shells_[is]));
+    coords_t cen(basis.shell_center(pot_shells_in[is]));
     // Shell range is
-    double rangesq(std::pow(shran[pot_shells_[is]],2));
+    double rangesq(std::pow(shran[pot_shells_in[is]],2));
 
     // Check if the function is important on at least one point in the
     // pruned grid
     for(size_t ip=0;ip<grid_.size();ip++) {
       if(normsq(grid_[ip].r-cen)<=rangesq) {
 	// Shell is important!
-	shells_.push_back(pot_shells_[is]);
-	Nbf+=basp_->Nbf(pot_shells_[is]);
+	t.shells.push_back(pot_shells_in[is]);
+	Nbf+=basis.Nbf(pot_shells_in[is]);
 	break;
       }
     }
   }
 
-  bf_i0_.zeros(shells_.size());
-  bf_N_.zeros(shells_.size());
+  t.bf_i0.zeros(t.shells.size());
+  t.bf_N.zeros(t.shells.size());
 
   // Store indices of functions
-  bf_ind_.zeros(Nbf);
+  t.bf_ind.zeros(Nbf);
   size_t ioff=0;
-  for(size_t i=0;i<shells_.size();i++) {
+  for(size_t i=0;i<t.shells.size();i++) {
     // Amount of functions on shell is
-    size_t Nsh=basp_->Nbf(shells_[i]);
-    bf_N_(i)=Nsh;
+    size_t Nsh=basis.Nbf(t.shells[i]);
+    t.bf_N(i)=Nsh;
     // Shell offset
-    size_t sh0=basp_->first_ind(shells_[i]);
+    size_t sh0=basis.first_ind(t.shells[i]);
     // Local offset
-    bf_i0_(i)=ioff;
+    t.bf_i0(i)=ioff;
     // Indices
     arma::uvec ls=(arma::linspace<arma::uvec>(sh0,sh0+Nsh-1,Nsh));
-    bf_ind_.subvec(ioff,ioff+Nsh-1)=ls;
+    t.bf_ind.subvec(ioff,ioff+Nsh-1)=ls;
     ioff+=Nsh;
   }
 
   // Store indices of functions on the potentials list
-  bf_potind_.zeros(Nbf);
+  t.bf_potind.zeros(Nbf);
   size_t j=0;
   ioff=0;
   size_t joff=0;
-  for(size_t i=0;i<pot_shells_.size() && j<shells_.size();i++) {
+  for(size_t i=0;i<pot_shells_in.size() && j<t.shells.size();i++) {
     // Amount of functions on shell is
-    size_t Nsh=basp_->Nbf(pot_shells_[i]);
+    size_t Nsh=basis.Nbf(pot_shells_in[i]);
     // Store indices?
-    if(pot_shells_[i]==shells_[j]) {
+    if(pot_shells_in[i]==t.shells[j]) {
       arma::uvec ls=(arma::linspace<arma::uvec>(joff,joff+Nsh-1,Nsh));
-      bf_potind_.subvec(ioff,ioff+Nsh-1)=ls;
+      t.bf_potind.subvec(ioff,ioff+Nsh-1)=ls;
       ioff+=Nsh;
       j++;
     }
     joff+=Nsh;
   }
 
-  // Store number of function values
-  info_.nfunc=Nbf*grid_.size();
-
-  bf_.zeros(bf_ind_.n_elem,grid_.size());
-  if(do_grad_) {
-    bf_x_.zeros(bf_ind_.n_elem,grid_.size());
-    bf_y_.zeros(bf_ind_.n_elem,grid_.size());
-    bf_z_.zeros(bf_ind_.n_elem,grid_.size());
+  t.bf.zeros(t.bf_ind.n_elem,grid_.size());
+  if(grad) {
+    t.bf_x.zeros(t.bf_ind.n_elem,grid_.size());
+    t.bf_y.zeros(t.bf_ind.n_elem,grid_.size());
+    t.bf_z.zeros(t.bf_ind.n_elem,grid_.size());
   }
-  if(do_lapl_)
-    bf_lapl_.zeros(bf_ind_.n_elem,grid_.size());
-  if(do_hess_)
-    bf_hess_.zeros(9*bf_ind_.n_elem,grid_.size());
-  if(do_lgrad_) {
-    bf_lx_.zeros(bf_ind_.n_elem,grid_.size());
-    bf_ly_.zeros(bf_ind_.n_elem,grid_.size());
-    bf_lz_.zeros(bf_ind_.n_elem,grid_.size());
+  if(lapl)
+    t.bf_lapl.zeros(t.bf_ind.n_elem,grid_.size());
+  if(hess)
+    t.bf_hess.zeros(9*t.bf_ind.n_elem,grid_.size());
+  if(lgrad) {
+    t.bf_lx.zeros(t.bf_ind.n_elem,grid_.size());
+    t.bf_ly.zeros(t.bf_ind.n_elem,grid_.size());
+    t.bf_lz.zeros(t.bf_ind.n_elem,grid_.size());
   }
 
   // One pass over (ip, ish) that fuses the func / grad / lapl / hess /
@@ -3053,35 +3084,69 @@ void AngularGrid::compute_bf() {
   arma::mat gval, hval, lgval;
   for(size_t ip=0;ip<grid_.size();ip++) {
     ioff=0;
-    for(size_t ish=0;ish<shells_.size();ish++) {
-      basp_->eval_bf_derivs(shells_[ish],
+    for(size_t ish=0;ish<t.shells.size();ish++) {
+      basis.eval_bf_derivs(t.shells[ish],
                            grid_[ip].r.x, grid_[ip].r.y, grid_[ip].r.z,
                            fval, gval, lval, hval, lgval,
-                           do_grad_, do_lapl_, do_hess_, do_lgrad_);
+                           grad, lapl, hess, lgrad);
       const size_t Nf = fval.n_elem;
-      bf_.submat(ioff, ip, ioff+Nf-1, ip) = fval;
-      if(do_grad_) {
-        bf_x_.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(0);
-        bf_y_.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(1);
-        bf_z_.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(2);
+      t.bf.submat(ioff, ip, ioff+Nf-1, ip) = fval;
+      if(grad) {
+        t.bf_x.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(0);
+        t.bf_y.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(1);
+        t.bf_z.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(2);
       }
-      if(do_lapl_)
-        bf_lapl_.submat(ioff, ip, ioff+Nf-1, ip) = lval;
-      if(do_hess_) {
-        // hval is (Nf, 9) row-major (3x3); bf_hess is (9*Nbf, npts)
-        // packed as (cart, c) -> 9*ioff + 9*f + c.
+      if(lapl)
+        t.bf_lapl.submat(ioff, ip, ioff+Nf-1, ip) = lval;
+      if(hess) {
         for(size_t f=0;f<Nf;f++)
           for(int c=0;c<9;c++)
-            bf_hess_(9*ioff + 9*f + c, ip) = hval(f, c);
+            t.bf_hess(9*ioff + 9*f + c, ip) = hval(f, c);
       }
-      if(do_lgrad_) {
-        bf_lx_.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(0);
-        bf_ly_.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(1);
-        bf_lz_.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(2);
+      if(lgrad) {
+        t.bf_lx.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(0);
+        t.bf_ly.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(1);
+        t.bf_lz.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(2);
       }
       ioff += Nf;
     }
   }
+
+  return t;
+}
+
+void AngularGrid::compute_bf() {
+  // Evaluate the primary basis into a table and move the fields into the
+  // members (the screening already populated pot_shells via
+  // update_shell_list). The move is O(1) per array.
+  BFTable t = build_table(*basp_, pot_shells_, do_grad_, do_lapl_, do_hess_, do_lgrad_);
+  shells_     = std::move(t.shells);
+  bf_i0_      = std::move(t.bf_i0);
+  bf_N_       = std::move(t.bf_N);
+  bf_ind_     = std::move(t.bf_ind);
+  bf_potind_  = std::move(t.bf_potind);
+  bf_         = std::move(t.bf);
+  bf_x_       = std::move(t.bf_x);
+  bf_y_       = std::move(t.bf_y);
+  bf_z_       = std::move(t.bf_z);
+  bf_lapl_    = std::move(t.bf_lapl);
+  bf_hess_    = std::move(t.bf_hess);
+  bf_lx_      = std::move(t.bf_lx);
+  bf_ly_      = std::move(t.bf_ly);
+  bf_lz_      = std::move(t.bf_lz);
+
+  // Store number of function values
+  info_.nfunc = bf_ind_.n_elem*grid_.size();
+}
+
+BFTable AngularGrid::compute_bf_table(const BasisSet & basis) const {
+  // Screen the second basis against this radial shell, then evaluate it
+  // on the existing grid points. Only the energy / Fock rungs are needed
+  // (no Hessian / laplacian-gradient force terms).
+  std::vector<size_t> pshells;
+  arma::uvec pbfind;
+  update_shell_list_for(basis, pshells, pbfind);
+  return build_table(basis, pshells, do_grad_, do_lapl_, false, false);
 }
 
 void AngularGrid::eval_SAP(const SAP & sap, arma::mat & Vo) const {
