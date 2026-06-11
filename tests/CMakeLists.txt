@@ -64,6 +64,11 @@ run_neo(neo_proton "-75.98665")
 run_neo(neo_negative "-75.32345")
 run_neo(neo_deuteron "-75.99781")
 run_neo(neo_two_particles "-76.34112")
+# Multicomponent DFT with electron-proton correlation (restricted and
+# unrestricted electrons); the EPC functional contributes to both the
+# electronic and the protonic Fock matrices.
+run_neo(neo_dft_epc "-75.84436")
+run_neo(neo_dft_epc_u "-75.38644")
 
 # Generate list with genlist.sh
 include(TestList.txt)

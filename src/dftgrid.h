@@ -601,7 +601,13 @@ class DFTGrid {
   /// basis). dens_basis = nullptr is ordinary single-basis DFT.
   void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel, const BasisSet * dens_basis=nullptr);
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case
-  void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
+  /// Unrestricted XC matrices and energy. With basis_b given, channel b
+  /// (the density Pb) is evaluated and assembled through that basis while
+  /// channel a uses the grid's primary basis -- the two channels live on
+  /// different bases (multicomponent / NEO: electron and proton). The
+  /// supplied functional is then a two-channel coupling functional (EPC).
+  /// basis_b = nullptr is ordinary unrestricted DFT.
+  void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr);
 
   /**
    * Compute Fock matrix, exchange-correlation energy and integrated

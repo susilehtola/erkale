@@ -1,0 +1,12 @@
+# Multicomponent DFT: LDA electrons with the epc17-2 electron-proton
+# correlation functional, one quantum proton.
+System H2O.xyz
+Basis cc-pVDZ
+ProtonBasis PB4-D
+QuantumProtons 2
+Method lda_x-lda_c_vwn
+EPCFunctional lda_c_epc17_2
+Charge 0
+Multiplicity 1
+DFTGrid 75 -302
+SaveChk neo_dft_epc.chk

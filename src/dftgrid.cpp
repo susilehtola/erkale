@@ -2952,8 +2952,15 @@ void AngularGrid::update_shell_list_for(const BasisSet & basis, std::vector<size
   std::vector<double> shran=basis.shell_ranges();
   if(shran.size() != basis.Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
-  // Distances to other nuclei
-  std::vector<double> nucdist=basis.nuclear_distances(info_.atind);
+  // Distances from this radial shell's centre to the nuclei of `basis`.
+  // Computed geometrically (not via info_.atind, which indexes the primary
+  // basis) so a second basis -- e.g. the NEO proton basis, whose nuclei
+  // and indexing differ from the grid's electron basis -- is screened
+  // correctly. For the primary basis info_.cen is atom info_.atind, so this
+  // reproduces nuclear_distances(info_.atind).
+  std::vector<double> nucdist(basis.Nnuc());
+  for(size_t i=0;i<basis.Nnuc();i++)
+    nucdist[i]=norm(info_.cen - basis.nucleus(i).r);
 
   // Current radius
   double rad=info_.R;
@@ -4410,10 +4417,14 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 }
 
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv) {
-  // Clear Hamiltonian
-  Ha.zeros(Pa.n_rows,Pa.n_cols);
-  Hb.zeros(Pb.n_rows,Pb.n_cols);
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b) {
+  // Clear Hamiltonian. Channel a is the primary basis; channel b is the
+  // primary basis too in ordinary unrestricted DFT, or a second basis
+  // (basis_b) for multicomponent (NEO) XC, where channel b is the proton
+  // density and Hb is sized by the proton basis.
+  Ha.zeros(basp_->Nbf(),basp_->Nbf());
+  const size_t Nb = basis_b ? basis_b->Nbf() : Pb.n_rows;
+  Hb.zeros(Nb,Nb);
   // Clear exchange-correlation energy
   double Ex=0.0, Ec=0.0;
   // Clear number of electrons
@@ -4455,8 +4466,17 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       wrk_[ith].set_shell(grids_[i]);
       wrk_[ith].form_grid();
 
+      // Channel-b (proton) basis on these points, if a second basis is
+      // in play; otherwise channel b uses the primary basis.
+      BFTable dtab_b;
+      const BFTable * tab_b = nullptr;
+      if(basis_b) {
+        dtab_b = wrk_[ith].compute_bf_table(*basis_b);
+        tab_b = &dtab_b;
+      }
+
       // Update density
-      wrk_[ith].update_density(Pa,Pb);
+      wrk_[ith].update_density(Pa,Pb,false,tab_b);
       // Update number of electrons
       Nel+=wrk_[ith].compute_Nel();
 
@@ -4480,9 +4500,9 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 
       // and construct the Fock matrices
 #ifdef _OPENMP
-      wrk_[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
+      wrk_[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith],true,tab_b);
 #else
-      wrk_[ith].eval_Fxc(Ha,Hb);
+      wrk_[ith].eval_Fxc(Ha,Hb,true,tab_b);
 #endif
 
       // Free memory
