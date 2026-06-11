@@ -166,6 +166,32 @@ typedef struct {
  * \date 2011/05/11 22:35
  */
 
+/**
+ * \struct BFTable
+ *
+ * \brief Basis-function values (and their derivatives) for one basis set
+ * evaluated on a radial shell's pruned grid points.
+ *
+ * AngularGrid stores its primary basis's table directly as members; this
+ * bundles the same per-basis grid data so that a *second* basis (the
+ * proton basis in NEO multicomponent XC, or the old basis in the
+ * projection-free initial guess) can be evaluated on the same points and
+ * fed to update_density / eval_Fxc, decoupling the basis used to build the
+ * density from the basis used to assemble the exchange-correlation matrix.
+ */
+struct BFTable {
+  /// Important shells, and the first-function offset / count per shell
+  std::vector<size_t> shells;
+  arma::uvec bf_i0, bf_N;
+  /// Global indices of the important functions, and their indices within
+  /// the potentially-important (pot_bf_ind) list
+  arma::uvec bf_ind, bf_potind;
+  /// Function values (Nimportant x Npts) and derivatives
+  arma::mat bf, bf_x, bf_y, bf_z, bf_lapl;
+  /// Hessian / gradient-of-laplacian (force terms; empty for a 2nd basis)
+  arma::mat bf_hess, bf_lx, bf_ly, bf_lz;
+};
+
 class AngularGrid {
  protected:
   /// Shell info
@@ -296,6 +322,16 @@ class AngularGrid {
   void lebedev_shell();
   /// Update list of important basis functions
   void update_shell_list();
+  /// Determine the potentially-important shells / functions of an
+  /// arbitrary basis on this radial shell (the screening part of
+  /// update_shell_list, parameterised by basis and outputs).
+  void update_shell_list_for(const BasisSet & basis, std::vector<size_t> & pot_shells_out, arma::uvec & pot_bf_ind_out) const;
+  /// Evaluate the functions of basis (and the requested derivatives) on
+  /// the current pruned grid points into a BFTable (the evaluation part
+  /// of compute_bf, parameterised by basis / pot_shells / rung flags).
+  /// Shared by compute_bf (primary, moved into the members) and
+  /// compute_bf_table (a second basis).
+  BFTable build_table(const BasisSet & basis, const std::vector<size_t> & pot_shells_in, bool grad, bool lapl, bool hess, bool lgrad) const;
   /// Collect weights from grid into w array
   void compute_weights();
 
@@ -365,6 +401,11 @@ class AngularGrid {
   void prune_points();
   /// Compute basis functions on grid points
   void compute_bf();
+  /// Evaluate a second basis on the current grid points (used for the
+  /// decoupled density / assembly basis: NEO proton basis, or the old
+  /// basis in the projection-free guess). Gradients / laplacian follow
+  /// the grid's current do_grad / do_lapl flags.
+  BFTable compute_bf_table(const BasisSet & basis) const;
   /// Free memory
   void free();
 
@@ -372,9 +413,9 @@ class AngularGrid {
   arma::uvec screen_density() const;
 
   /// Update values of density, restricted calculation
-  void update_density(const arma::mat & P, bool lapl=false);
+  void update_density(const arma::mat & P, bool lapl=false, const BFTable * tab=nullptr);
   /// Update values of density, unrestricted calculation
-  void update_density(const arma::mat & Pa, const arma::mat & Pb, bool lapl=false);
+  void update_density(const arma::mat & Pa, const arma::mat & Pb, bool lapl=false, const BFTable * tab_b=nullptr);
   /// Update values of density, self-interaction correction
   void update_density(const arma::cx_vec & C);
 
@@ -456,7 +497,7 @@ class AngularGrid {
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
   /// Evaluate Fock matrix, unrestricted calculation
-  void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool beta=true) const;
+  void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool beta=true, const BFTable * tab_b=nullptr) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
