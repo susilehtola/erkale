@@ -4310,9 +4310,9 @@ arma::vec DFTGrid::compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat &
   return Nel;
 }
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Excv, double & Nelv) {
-  // Clear Hamiltonian
-  H.zeros(P.n_rows,P.n_cols);
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Excv, double & Nelv, const BasisSet * dens_basis) {
+  // Clear Hamiltonian (in the primary / assembly basis)
+  H.zeros(basp_->Nbf(),basp_->Nbf());
   // Clear exchange-correlation energy
   double Ex=0.0, Ec=0.0;
   // Clear number of electrons
@@ -4350,9 +4350,16 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       wrk_[ith].set_shell(grids_[i]);
       wrk_[ith].form_grid();
 
-      // Update density
+      // Update density. With a separate density basis (projection-free
+      // guess) the density is built from that basis on these points; the
+      // XC matrix below is still assembled in the primary basis.
       Timer tp;
-      wrk_[ith].update_density(P);
+      if(dens_basis) {
+        BFTable dtab(wrk_[ith].compute_bf_table(*dens_basis));
+        wrk_[ith].update_density(P, false, &dtab);
+      } else {
+        wrk_[ith].update_density(P);
+      }
       // Update number of electrons
       Nel+=wrk_[ith].compute_Nel();
 
