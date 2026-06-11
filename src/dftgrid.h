@@ -592,7 +592,14 @@ class DFTGrid {
   arma::vec compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat & P);
 
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, restricted case
-  void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel);
+  /// Evaluate the XC matrix and energy for a restricted density. When
+  /// dens_basis is given, the density P is interpreted in that basis and
+  /// evaluated on the grid through a second basis-function table, while
+  /// the XC matrix H is still assembled in the grid's primary basis --
+  /// i.e. the density and the assembly use different bases (the
+  /// projection-free initial guess: old density basis, new assembly
+  /// basis). dens_basis = nullptr is ordinary single-basis DFT.
+  void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel, const BasisSet * dens_basis=nullptr);
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
 
