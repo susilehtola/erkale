@@ -90,6 +90,204 @@ arma::cx_mat JKBuilder::calcK_short(const arma::cx_mat & C, const std::vector<do
   return occ_rik ? dfit_rs.calcK_occ(C, occ, S) : dfit_rs.calcK(C, occ);
 }
 
+// decfock helpers: the conversion matrix decconv maps contracted ->
+// decontracted, so a density transforms as D P D^T and a built matrix
+// transforms back as D^T M D.
+arma::mat JKBuilder::decontract(const arma::mat & P) const {
+  return decconv*P*arma::trans(decconv);
+}
+arma::cx_mat JKBuilder::decontract(const arma::cx_mat & P) const {
+  return decconv*P*arma::trans(decconv);
+}
+arma::mat JKBuilder::recontract(const arma::mat & M) const {
+  return arma::trans(decconv)*M*decconv;
+}
+arma::cx_mat JKBuilder::recontract(const arma::cx_mat & M) const {
+  return arma::trans(decconv)*M*decconv;
+}
+
+// --- Unified full-range J/K build (restricted) -------------------------
+
+void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
+                       const arma::mat & S, bool want_K, arma::mat & J, arma::mat & K) const {
+  if(uses_dfit()) {
+    J = dfit.calcJ(Ptot);
+    if(want_K)
+      K = calcK(C, occ, S);
+  } else if(direct) {
+    if(want_K) {
+      if(decfock) {
+        arma::mat Jd, Kd;
+        scr.calcJK(decontract(Ptot), Jd, Kd, intthr);
+        J = recontract(Jd);
+        K = recontract(Kd);
+      } else
+        scr.calcJK(Ptot, J, K, intthr);
+    } else {
+      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
+    }
+  } else {
+    J = tab.calcJ(Ptot);
+    if(want_K)
+      K = tab.calcK(Ptot);
+  }
+}
+
+void JKBuilder::formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
+                       const std::vector<double> & occ, const arma::mat & S, bool want_K,
+                       arma::mat & J, arma::cx_mat & K) const {
+  if(uses_dfit()) {
+    J = dfit.calcJ(Ptot);
+    if(want_K)
+      K = calcK(cC, occ, S);
+  } else if(direct) {
+    if(want_K) {
+      if(decfock) {
+        arma::mat Jd;
+        arma::cx_mat Kd;
+        scr.calcJK(decontract(cP), Jd, Kd, intthr);
+        J = recontract(Jd);
+        K = recontract(Kd);
+      } else
+        scr.calcJK(cP, J, K, intthr);
+    } else {
+      // J only: built from the real total density.
+      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
+    }
+  } else {
+    J = tab.calcJ(Ptot);
+    if(want_K)
+      K = tab.calcK(cP);
+  }
+}
+
+// --- Unified full-range J/K build (unrestricted) -----------------------
+
+void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                       const arma::mat & Ca, const arma::mat & Cb,
+                       const std::vector<double> & occa, const std::vector<double> & occb,
+                       const arma::mat & S, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const {
+  if(uses_dfit()) {
+    J = dfit.calcJ(Ptot);
+    if(want_K) {
+      Ka = calcK(Ca, occa, S);
+      Kb = calcK(Cb, occb, S);
+    }
+  } else if(direct) {
+    if(want_K) {
+      if(decfock) {
+        arma::mat Jd, Kad, Kbd;
+        scr.calcJK(decontract(Pa), decontract(Pb), Jd, Kad, Kbd, intthr);
+        J = recontract(Jd);
+        Ka = recontract(Kad);
+        Kb = recontract(Kbd);
+      } else
+        scr.calcJK(Pa, Pb, J, Ka, Kb, intthr);
+    } else {
+      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
+    }
+  } else {
+    J = tab.calcJ(Ptot);
+    if(want_K) {
+      Ka = tab.calcK(Pa);
+      Kb = tab.calcK(Pb);
+    }
+  }
+}
+
+void JKBuilder::formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
+                       const arma::cx_mat & cCa, const arma::cx_mat & cCb,
+                       const std::vector<double> & occa, const std::vector<double> & occb,
+                       const arma::mat & S, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const {
+  if(uses_dfit()) {
+    J = dfit.calcJ(Ptot);
+    if(want_K) {
+      Ka = calcK(cCa, occa, S);
+      Kb = calcK(cCb, occb, S);
+    }
+  } else if(direct) {
+    if(want_K) {
+      if(decfock) {
+        arma::mat Jd;
+        arma::cx_mat Kad, Kbd;
+        scr.calcJK(decontract(cPa), decontract(cPb), Jd, Kad, Kbd, intthr);
+        J = recontract(Jd);
+        Ka = recontract(Kad);
+        Kb = recontract(Kbd);
+      } else
+        scr.calcJK(cPa, cPb, J, Ka, Kb, intthr);
+    } else {
+      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
+    }
+  } else {
+    J = tab.calcJ(Ptot);
+    if(want_K) {
+      Ka = tab.calcK(cPa);
+      Kb = tab.calcK(cPb);
+    }
+  }
+}
+
+// --- Unified short-range exchange (range separation) -------------------
+
+arma::mat JKBuilder::formKshort(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const {
+  if(uses_dfit())
+    return calcK_short(C, occ, S);
+  else if(direct)
+    return decfock ? recontract(scr_rs.calcK(decontract(P), intthr)) : scr_rs.calcK(P, intthr);
+  else
+    return tab_rs.calcK(P);
+}
+
+arma::cx_mat JKBuilder::formKshort(const arma::cx_mat & cP, const arma::cx_mat & cC, const std::vector<double> & occ, const arma::mat & S) const {
+  if(uses_dfit())
+    return calcK_short(cC, occ, S);
+  else if(direct)
+    return decfock ? recontract(scr_rs.calcK(decontract(cP), intthr)) : scr_rs.calcK(cP, intthr);
+  else
+    return tab_rs.calcK(cP);
+}
+
+void JKBuilder::formKshort(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Ca, const arma::mat & Cb,
+                           const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
+                           arma::mat & Ka, arma::mat & Kb) const {
+  if(uses_dfit()) {
+    Ka = calcK_short(Ca, occa, S);
+    Kb = calcK_short(Cb, occb, S);
+  } else if(direct) {
+    if(decfock) {
+      arma::mat Kad, Kbd;
+      scr_rs.calcK(decontract(Pa), decontract(Pb), Kad, Kbd, intthr);
+      Ka = recontract(Kad);
+      Kb = recontract(Kbd);
+    } else
+      scr_rs.calcK(Pa, Pb, Ka, Kb, intthr);
+  } else {
+    Ka = tab_rs.calcK(Pa);
+    Kb = tab_rs.calcK(Pb);
+  }
+}
+
+void JKBuilder::formKshort(const arma::cx_mat & cPa, const arma::cx_mat & cPb, const arma::cx_mat & cCa, const arma::cx_mat & cCb,
+                           const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
+                           arma::cx_mat & Ka, arma::cx_mat & Kb) const {
+  if(uses_dfit()) {
+    Ka = calcK_short(cCa, occa, S);
+    Kb = calcK_short(cCb, occb, S);
+  } else if(direct) {
+    if(decfock) {
+      arma::cx_mat Kad, Kbd;
+      scr_rs.calcK(decontract(cPa), decontract(cPb), Kad, Kbd, intthr);
+      Ka = recontract(Kad);
+      Kb = recontract(Kbd);
+    } else
+      scr_rs.calcK(cPa, cPb, Ka, Kb, intthr);
+  } else {
+    Ka = tab_rs.calcK(cPa);
+    Kb = tab_rs.calcK(cPb);
+  }
+}
+
 bool JKBuilder::is_cholesky() const {
   return dfit.is_cholesky();
 }

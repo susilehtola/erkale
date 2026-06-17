@@ -98,475 +98,119 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   // Initialize energy
   memset(&sol.en, 0, sizeof(energy_t));
 
-  // Form Coulomb and exchange matrices
-  if(densityfit) {
+  // Form Coulomb and exchange matrices through the unified J/K driver.
+  // JKBuilder::formJK / formKshort dispatch the resolved method (DF/CD,
+  // direct four-index or in-core four-index) and handle the decfock
+  // decontraction internally, so this code is engine-agnostic. J is built
+  // from the real total density; K is gated by the exact-exchange fraction.
+  {
+#ifdef DFT
+    bool want_K = (kfull!=0.0);
+#else
+    bool want_K = true;
+#endif
+
+#ifdef RESTRICTED
+    bool cmplx = (sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols);
 
     if(verbose) {
-      printf("Forming density fitted Coulomb matrix ... ");
+      printf("Forming Coulomb and exchange matrices ... ");
       fflush(stdout);
       t.set();
     }
-    sol.J=jk.calcJ(sol.P);
-
+    if(cmplx) {
+      arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
+      arma::cx_mat cK;
+      jk.formJK(sol.P, cP, sol.cC, occs, S, want_K, sol.J, cK);
+      if(want_K) {
+        Kfull=arma::real(cK);
+        Kfull_im=arma::imag(cK);
+      }
+    } else {
+      jk.formJK(sol.P, sol.C, occs, S, want_K, sol.J, Kfull);
+    }
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
     }
 
 #ifdef DFT
-    if(kfull!=0.0) {
-#endif
+    if(kshort!=0.0) {
       if(verbose) {
-	printf("Forming density fitted exchange matrix ... ");
-	fflush(stdout);
-	t.set();
+        printf("Forming short-range exchange matrix ... ");
+        fflush(stdout);
+        t.set();
       }
-
-#ifdef RESTRICTED
-      if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	// Complex exchange matrix is
-	arma::cx_mat cK(jk.calcK(sol.cC,occs, S));
-	Kfull=arma::real(cK);
-	Kfull_im=arma::imag(cK);
-      } else
-	Kfull=jk.calcK(sol.C,occs, S);
-#else
-      if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	// Complex exchange matrix is
-	arma::cx_mat cKa(jk.calcK(sol.cCa,occa, S));
-	Kafull=arma::real(cKa);
-	Kafull_im=arma::imag(cKa);
-      } else
-	Kafull=jk.calcK(sol.Ca,occa, S);
-
-      if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
-	// Complex exchange matrix is
-	arma::cx_mat cKb(jk.calcK(sol.cCb,occb, S));
-	Kbfull=arma::real(cKb);
-	Kbfull_im=arma::imag(cKb);
-      } else
-	Kbfull=jk.calcK(sol.Cb,occb, S);
-#endif
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-
-#ifdef DFT
-      if(kshort!=0.0) {
-
-	if(verbose) {
-	  printf("Forming density fitted short-range exchange matrix ... ");
-	  fflush(stdout);
-	  t.set();
-	}
-
-#ifdef RESTRICTED
-	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	  arma::cx_mat cK(jk.calcK_short(sol.cC,occs, S));
-	  Kshort=arma::real(cK);
-	  Kshort_im=arma::imag(cK);
-	} else
-	  Kshort=jk.calcK_short(sol.C,occs, S);
-#else
-	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	  arma::cx_mat cKa(jk.calcK_short(sol.cCa,occa, S));
-	  Kashort=arma::real(cKa);
-	  Kashort_im=arma::imag(cKa);
-	} else
-	  Kashort=jk.calcK_short(sol.Ca,occa, S);
-
-	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
-	  arma::cx_mat cKb(jk.calcK_short(sol.cCb,occb, S));
-	  Kbshort=arma::real(cKb);
-	  Kbshort_im=arma::imag(cKb);
-	} else
-	  Kbshort=jk.calcK_short(sol.Cb,occb, S);
-#endif
-
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
-      }
-#endif
-
-
-#ifdef DFT
-    }
-#endif
-
-  } else { // No density fitting / Cholesky (CD now routes through dfit)
-
-    {
-      if(direct) {
-#ifdef RESTRICTED
-
-#ifdef DFT
-	if(kfull!=0.0) {
-#endif
-	  if(verbose) {
-	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",intthr);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
-	    arma::cx_mat cK;
-
-	    if(!decfock) {
-	      jk.eriscreen().calcJK(cP,sol.J,cK,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::cx_mat Phlp=jk.decontraction()*cP*arma::trans(jk.decontraction());
-	      // Calculate
-	      jk.eriscreen().calcJK(Phlp,sol.J,cK,intthr);
-	      // Convert back to contracted basis
-	      sol.J=arma::trans(jk.decontraction())*sol.J*jk.decontraction();
-	      cK=arma::trans(jk.decontraction())*cK*jk.decontraction();
-	    }
-
-	    Kfull=arma::real(cK);
-	    Kfull_im=arma::imag(cK);
-	  } else {
-	    if(!decfock) {
-	      jk.eriscreen().calcJK(sol.P,sol.J,Kfull,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::mat Phlp=jk.decontraction()*sol.P*arma::trans(jk.decontraction());
-	      // Calculate
-	      jk.eriscreen().calcJK(Phlp,sol.J,Kfull,intthr);
-	      // Convert back to contracted basis
-	      sol.J=arma::trans(jk.decontraction())*sol.J*jk.decontraction();
-	      Kfull=arma::trans(jk.decontraction())*Kfull*jk.decontraction();
-	    }
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-
-#ifdef DFT
-	} else {
-
-	  if(verbose) {
-	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(!decfock)
-	    sol.J=jk.eriscreen().calcJ(sol.P,intthr);
-	  else {
-	    arma::mat Phlp=jk.decontraction()*sol.P*arma::trans(jk.decontraction());
-	    arma::mat Jhlp=jk.eriscreen().calcJ(Phlp,intthr);
-	    sol.J=arma::trans(jk.decontraction())*Jhlp*jk.decontraction();
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-
-	}
-
-	if(kshort!=0.0) {
-	  if(verbose) {
-	    printf("Computing screened exchange matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
-	    arma::cx_mat cK;
-
-	    if(!decfock) {
-	      cK=jk.eriscreen_rs().calcK(cP,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::cx_mat Phlp=jk.decontraction()*cP*arma::trans(jk.decontraction());
-	      // Calculate
-	      cK=jk.eriscreen_rs().calcK(Phlp,intthr);
-	      // Convert back to contracted basis
-	      cK=arma::trans(jk.decontraction())*cK*jk.decontraction();
-	    }
-
-	    Kshort=arma::real(cK);
-	    Kshort_im=arma::imag(cK);
-
-	  } else {
-	    if(!decfock) {
-	      Kshort=jk.eriscreen_rs().calcK(sol.P,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::mat Phlp=jk.decontraction()*sol.P*arma::trans(jk.decontraction());
-	      // Calculate
-	      Kshort=jk.eriscreen_rs().calcK(Phlp,intthr);
-	      // Convert back to contracted basis
-	      Kshort=arma::trans(jk.decontraction())*Kshort*jk.decontraction();
-	    }
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-	}
-#endif
-
-
-#else
-	// Unrestricted case
-#ifdef DFT
-	if(kfull!=0.0) {
-#endif
-	  if(verbose) {
-	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",intthr);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
-	    arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
-	    arma::cx_mat cKa, cKb;
-
-	    if(!decfock) {
-	      jk.eriscreen().calcJK(cPa,cPb,sol.J,cKa,cKb,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::cx_mat Pahlp=jk.decontraction()*cPa*arma::trans(jk.decontraction());
-	      arma::cx_mat Pbhlp=jk.decontraction()*cPb*arma::trans(jk.decontraction());
-	      // Calculate
-	      jk.eriscreen().calcJK(Pahlp,Pbhlp,sol.J,cKa,cKb,intthr);
-	      // Convert back to contracted basis
-	      sol.J=arma::trans(jk.decontraction())*sol.J*jk.decontraction();
-	      cKa=arma::trans(jk.decontraction())*cKa*jk.decontraction();
-	      cKb=arma::trans(jk.decontraction())*cKb*jk.decontraction();
-	    }
-
-	    Kafull=arma::real(cKa);
-	    Kafull_im=arma::imag(cKa);
-	    Kbfull=arma::real(cKb);
-	    Kbfull_im=arma::imag(cKb);
-
-	  } else {
-	    if(!decfock) {
-	      jk.eriscreen().calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::mat Pahlp=jk.decontraction()*sol.Pa*arma::trans(jk.decontraction());
-	      arma::mat Pbhlp=jk.decontraction()*sol.Pb*arma::trans(jk.decontraction());
-	      // Calculate
-	      jk.eriscreen().calcJK(Pahlp,Pbhlp,sol.J,Kafull,Kbfull,intthr);
-	      // Convert back to contracted basis
-	      sol.J=arma::trans(jk.decontraction())*sol.J*jk.decontraction();
-	      Kafull=arma::trans(jk.decontraction())*Kafull*jk.decontraction();
-	      Kbfull=arma::trans(jk.decontraction())*Kbfull*jk.decontraction();
-	    }
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-
-
-#ifdef DFT
-	} else {
-
-	  if(verbose) {
-	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(!decfock)
-	    sol.J=jk.eriscreen().calcJ(sol.P,intthr);
-	  else {
-	    arma::mat Phlp=jk.decontraction()*sol.P*arma::trans(jk.decontraction());
-	    arma::mat Jhlp=jk.eriscreen().calcJ(Phlp,intthr);
-	    sol.J=arma::trans(jk.decontraction())*Jhlp*jk.decontraction();
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-
-	}
-
-
-	if(kshort!=0.0) {
-	  if(verbose) {
-	    printf("Computing screened exchange matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
-	    arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
-	    arma::cx_mat cKa, cKb;
-
-	    if(!decfock) {
-	      jk.eriscreen_rs().calcK(cPa,cPb,cKa,cKb,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::cx_mat Pahlp=jk.decontraction()*cPa*arma::trans(jk.decontraction());
-	      arma::cx_mat Pbhlp=jk.decontraction()*cPb*arma::trans(jk.decontraction());
-	      // Calculate
-	      jk.eriscreen_rs().calcK(Pahlp,Pbhlp,cKa,cKb,intthr);
-	      // Convert back to contracted basis
-	      cKa=arma::trans(jk.decontraction())*cKa*jk.decontraction();
-	      cKb=arma::trans(jk.decontraction())*cKb*jk.decontraction();
-	    }
-
-	    Kashort=arma::real(cKa);
-	    Kashort_im=arma::imag(cKa);
-	    Kbshort=arma::real(cKb);
-	    Kbshort_im=arma::imag(cKb);
-
-	  } else {
-	    if(!decfock) {
-	      jk.eriscreen_rs().calcK(sol.Pa,sol.Pb,Kashort,Kbshort,intthr);
-	    } else {
-	      // Helper matrices
-	      arma::mat Pahlp=jk.decontraction()*sol.Pa*arma::trans(jk.decontraction());
-	      arma::mat Pbhlp=jk.decontraction()*sol.Pb*arma::trans(jk.decontraction());
-	      // Calculate
-	      jk.eriscreen_rs().calcK(Pahlp,Pbhlp,Kashort,Kbshort,intthr);
-	      // Convert back to contracted basis
-	      Kashort=arma::trans(jk.decontraction())*Kashort*jk.decontraction();
-	      Kbshort=arma::trans(jk.decontraction())*Kbshort*jk.decontraction();
-	    }
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-	}
-#endif
-
-#endif
+      if(cmplx) {
+        arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
+        arma::cx_mat cK(jk.formKshort(cP, sol.cC, occs, S));
+        Kshort=arma::real(cK);
+        Kshort_im=arma::imag(cK);
       } else {
-
-	// Conventional mode - use tabled integrals
-
-	if(verbose) {
-	  printf("Forming HF Coulomb matrix ... ");
-	  fflush(stdout);
-	  t.set();
-	}
-
-	sol.J=jk.eritable().calcJ(sol.P);
-
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
-
-#ifdef DFT
-	if(kfull!=0.0) {
-#endif
-
-	  if(verbose) {
-	    printf("Forming HF exchange matrix ... ");
-	    fflush(stdout);
-	    t.set();
-	  }
-
-#ifdef RESTRICTED
-	  if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
-	    arma::cx_mat cK(jk.eritable().calcK(cP));
-	    Kfull=arma::real(cK);
-	    Kfull_im=arma::imag(cK);
-	  } else
-	    Kfull=jk.eritable().calcK(sol.P);
-#else
-	  if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
-	    arma::cx_mat cKa(jk.eritable().calcK(cPa));
-	    Kafull=arma::real(cKa);
-	    Kafull_im=arma::imag(cKa);
-	  } else
-	    Kafull=jk.eritable().calcK(sol.Pa);
-
-	  if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
-	    arma::cx_mat cKb(jk.eritable().calcK(cPb));
-	    Kbfull=arma::real(cKb);
-	    Kbfull_im=arma::imag(cKb);
-	  } else
-	    Kbfull=jk.eritable().calcK(sol.Pb);
-#endif
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-#ifdef DFT
-	}
-#endif
-
-#ifdef DFT
-	if(kshort!=0.0) {
-
-	  if(verbose) {
-	    printf("Forming short-range HF exchange matrix ... ");
-	    fflush(stdout);
-	    t.set();
-	  }
-
-#ifdef RESTRICTED
-	  if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
-	    arma::cx_mat cK(jk.eritable_rs().calcK(cP));
-	    Kshort=arma::real(cK);
-	    Kshort_im=arma::imag(cK);
-	  } else
-	    Kshort=jk.eritable_rs().calcK(sol.P);
-#else
-	  if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
-	    arma::cx_mat cKa(jk.eritable_rs().calcK(cPa));
-	    Kashort=arma::real(cKa);
-	    Kashort_im=arma::imag(cKa);
-	  } else
-	    Kashort=jk.eritable_rs().calcK(sol.Pa);
-
-	  if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
-	    // Complex density matrix is
-	    arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
-	    arma::cx_mat cKb(jk.eritable_rs().calcK(cPb));
-	    Kbshort=arma::real(cKb);
-	    Kbshort_im=arma::imag(cKb);
-	  } else
-	    Kbshort=jk.eritable_rs().calcK(sol.Pb);
-#endif
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
-	}
-#endif
+        Kshort=jk.formKshort(sol.P, sol.C, occs, S);
+      }
+      if(verbose) {
+        printf("done (%s)\n",t.elapsed().c_str());
+        fflush(stdout);
       }
     }
+#endif
+
+#else
+    // Unrestricted: two density matrices, two exchange matrices.
+    bool cmplx = (sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols);
+
+    if(verbose) {
+      printf("Forming Coulomb and exchange matrices ... ");
+      fflush(stdout);
+      t.set();
+    }
+    if(cmplx) {
+      arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
+      arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
+      arma::cx_mat cKa, cKb;
+      jk.formJK(sol.P, cPa, cPb, sol.cCa, sol.cCb, occa, occb, S, want_K, sol.J, cKa, cKb);
+      if(want_K) {
+        Kafull=arma::real(cKa);
+        Kafull_im=arma::imag(cKa);
+        Kbfull=arma::real(cKb);
+        Kbfull_im=arma::imag(cKb);
+      }
+    } else {
+      jk.formJK(sol.P, sol.Pa, sol.Pb, sol.Ca, sol.Cb, occa, occb, S, want_K, sol.J, Kafull, Kbfull);
+    }
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+#ifdef DFT
+    if(kshort!=0.0) {
+      if(verbose) {
+        printf("Forming short-range exchange matrix ... ");
+        fflush(stdout);
+        t.set();
+      }
+      if(cmplx) {
+        arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
+        arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
+        arma::cx_mat cKa, cKb;
+        jk.formKshort(cPa, cPb, sol.cCa, sol.cCb, occa, occb, S, cKa, cKb);
+        Kashort=arma::real(cKa);
+        Kashort_im=arma::imag(cKa);
+        Kbshort=arma::real(cKb);
+        Kbshort_im=arma::imag(cKb);
+      } else {
+        jk.formKshort(sol.Pa, sol.Pb, sol.Ca, sol.Cb, occa, occb, S, Kashort, Kbshort);
+      }
+      if(verbose) {
+        printf("done (%s)\n",t.elapsed().c_str());
+        fflush(stdout);
+      }
+    }
+#endif
+
+#endif
   }
 
 

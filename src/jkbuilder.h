@@ -117,6 +117,13 @@ class JKBuilder {
   /// True for the DF/CD methods that route through DensityFit.
   bool uses_dfit() const;
 
+  /// decfock: map a contracted density to the decontracted basis (D P D^T).
+  arma::mat    decontract(const arma::mat & P) const;
+  arma::cx_mat decontract(const arma::cx_mat & P) const;
+  /// decfock: map a decontracted matrix back to the contracted basis (D^T M D).
+  arma::mat    recontract(const arma::mat & M) const;
+  arma::cx_mat recontract(const arma::cx_mat & M) const;
+
  public:
   JKBuilder();
   ~JKBuilder();
@@ -174,6 +181,42 @@ class JKBuilder {
   /// Same, for the range-separated (short-range) exchange operator.
   arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const;
   arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const;
+
+  /// Unified full-range Coulomb + exchange build. Dispatches the resolved
+  /// method: DF/CD (calcJ + orbital-based calcK above), direct four-index
+  /// (single-pass ERIscreen::calcJK, with decfock decontraction handled
+  /// internally) or in-core four-index (ERItable). J is always real --
+  /// built from the real total density Ptot, since the imaginary density
+  /// does not contribute to the Coulomb term -- and K is gated by want_K
+  /// (false for pure DFT). The complex overloads return a complex K for the
+  /// caller to split into real/imaginary parts.
+  ///
+  /// Restricted, real / complex density:
+  void formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
+              const arma::mat & S, bool want_K, arma::mat & J, arma::mat & K) const;
+  void formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
+              const std::vector<double> & occ, const arma::mat & S, bool want_K,
+              arma::mat & J, arma::cx_mat & K) const;
+  /// Unrestricted, real / complex density (J from Ptot; Ka, Kb per channel):
+  void formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+              const arma::mat & Ca, const arma::mat & Cb,
+              const std::vector<double> & occa, const std::vector<double> & occb,
+              const arma::mat & S, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const;
+  void formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
+              const arma::cx_mat & cCa, const arma::cx_mat & cCb,
+              const std::vector<double> & occa, const std::vector<double> & occb,
+              const arma::mat & S, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const;
+
+  /// Short-range (range-separated) exchange only; J is unaffected by the
+  /// range split. Same engine dispatch as formJK's K path, via the _rs twins.
+  arma::mat   formKshort(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const;
+  arma::cx_mat formKshort(const arma::cx_mat & cP, const arma::cx_mat & cC, const std::vector<double> & occ, const arma::mat & S) const;
+  void formKshort(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Ca, const arma::mat & Cb,
+                  const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
+                  arma::mat & Ka, arma::mat & Kb) const;
+  void formKshort(const arma::cx_mat & cPa, const arma::cx_mat & cPb, const arma::cx_mat & cCa, const arma::cx_mat & cCb,
+                  const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
+                  arma::cx_mat & Ka, arma::cx_mat & Kb) const;
 
   /// Engine accessors. Transitional: the Fock / force dispatch reaches
   /// the owned engines through these until the build/force methods
