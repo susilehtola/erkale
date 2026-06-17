@@ -158,6 +158,11 @@ class JKBuilder {
   /// Decontracted basis (decfock).
   const BasisSet & decontracted_basis() const { return decbas; }
 
+  /// Density-fitted / Cholesky Coulomb matrix from the density P.
+  /// Symmetric with calcK: the builder owns the engine, so callers
+  /// build J through it rather than reaching into densityfit().
+  arma::mat   calcJ(const arma::mat & P) const;
+
   /// Density-fitted / Cholesky exchange matrix from the occupied
   /// orbitals C (occupations occ), for the full-range operator. Routes
   /// to occ-RI-K (DensityFit::calcK_occ) when OccRIK is set, otherwise

@@ -73,6 +73,10 @@ bool JKBuilder::uses_dfit() const {
   return method != Method::FourIndex;
 }
 
+arma::mat JKBuilder::calcJ(const arma::mat & P) const {
+  return dfit.calcJ(P);
+}
+
 arma::mat JKBuilder::calcK(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const {
   return occ_rik ? dfit.calcK_occ(C, occ, S) : dfit.calcK(C, occ);
 }
@@ -94,7 +98,7 @@ JKBuilder::Method JKBuilder::resolve_method(const Settings & set) {
   const std::string m = set.get_string("JKMethod");
   if(stricmp(m,"4index")==0 || stricmp(m,"Exact")==0)
     return Method::FourIndex;
-  if(stricmp(m,"RI")==0 || stricmp(m,"DensityFitting")==0)
+  if(stricmp(m,"RI")==0 || stricmp(m,"DF")==0 || stricmp(m,"DensityFitting")==0)
     return Method::DensityFitting;
   if(stricmp(m,"Cholesky")==0 || stricmp(m,"TwoStep")==0)
     return Method::CholeskyTwoStep;

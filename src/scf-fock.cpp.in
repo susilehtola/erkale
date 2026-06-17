@@ -106,7 +106,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       fflush(stdout);
       t.set();
     }
-    sol.J=jk.densityfit().calcJ(sol.P);
+    sol.J=jk.calcJ(sol.P);
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
