@@ -2354,6 +2354,22 @@ void BasisSetLibrary::truncate_shells(const std::map<int, int> & maxorbam) {
     elements[i].truncate_shells(maxorbam);
 }
 
+int aux_lmax_occ(int Z) {
+  // Occupied-shell l_max per element row (Lehtola JCTC 19, 6242 (2023)).
+  if(Z>=55)
+    return 3;
+  if(Z>=19)
+    return 2;
+  if(Z>=3)
+    return 1;
+  return 0;
+}
+
+int aux_lmax_keep(int Z, int lobs, int linc) {
+  int locc=aux_lmax_occ(Z);
+  return std::max(2*locc, lobs+locc+linc);
+}
+
 void BasisSetLibrary::print() const {
   for(size_t i=0;i<elements.size();i++)
     elements[i].print();

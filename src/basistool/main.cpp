@@ -759,19 +759,10 @@ int main_guarded(int argc, char **argv) {
     for(size_t iel=0;iel<elements.size();iel++) {
       int Z = get_Z(elements[iel].get_symbol());
 
-      // Occupied angular momentum
-      int locc = 0;
-      if(Z>=3)
-        locc=1;
-      if(Z>=19)
-        locc=2;
-      if(Z>=55)
-        locc=3;
-
       // Orbital angular momentum
       int lobs = bas.get_element(elements[iel].get_symbol()).get_max_am();
 
-      maxam[Z] = std::max(2*locc,lobs+locc+linc);
+      maxam[Z] = aux_lmax_keep(Z, lobs, linc);
     }
     auxbas.truncate_shells(maxam);
     auxbas.save_gaussian94(fileout);

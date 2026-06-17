@@ -13,3 +13,4 @@ XRSMethod XCH
 BasisRotate false
 ConvThr 1e-6
 DFTGrid 50 -194
+FittingBasis AutoABS

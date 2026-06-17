@@ -140,7 +140,8 @@ void Settings::add_scf_settings() {
   add_int("CholeskyMode", "Save/load the DF/CD integral cache? 0 no, 1 save after fill, -1 load before fill (falls back to fill on mismatch). Useful for repeated runs that share orbital + auxiliary basis. Ignored when Direct=true.", 0, true);
   add_string("CholeskyFile", "Filename for the DF/CD integral cache (used when CholeskyMode != 0). Plain and range-separated entries coexist in the same file under distinct keys.", "cholesky.chk");
   // Which basis to use as density fitting basis
-  add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
+  add_string("FittingBasis", "Basis to use for density fitting / RI: a basis-set name, Auto (CD-derived auto-aux, Lehtola JCTC 17, 6886 (2021); uncontracted, lmax-pruned per FittingLmaxInc) or AutoABS (Eichkorn-style automatic aux, J-only)","def2-universal-jkfit");
+  add_int("FittingLmaxInc", "Angular-momentum pruning increment for the CD-derived auto-aux: keep l <= max(2*l_occ, l_obs+l_occ+FittingLmaxInc) (Lehtola JCTC 19, 6242 (2023)); negative keeps all shells", 1, true);
   // Threshold for screening eigenvectors
   add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-7);
   add_double("FittingCholeskyThreshold", "Linear dependence threshold for pivoted Cholesky of Coulomb integrals in density fitting",1e-8);

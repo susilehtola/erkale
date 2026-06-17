@@ -12,3 +12,4 @@ Logfile decanol.log
 SaveChk decanol.chk
 BasisRotate false
 DFTGrid 50 -194
+FittingBasis AutoABS

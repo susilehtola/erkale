@@ -62,8 +62,8 @@ namespace {
 JKBuilder::JKBuilder() :
   method(Method::CholeskyTwoStep), direct(false), decfock(false), occ_rik(false),
   verbose(true), intthr(1e-10), fitthr(1e-7), fitcholthr(1e-8), cholthr(1e-7),
-  cholshthr(0.01), cholmode(0), cholfile("cholesky.chk"), fittingbasis("Auto"),
-  basisp(nullptr) {
+  cholshthr(0.01), cholmode(0), cholfile("cholesky.chk"),
+  fittingbasis("def2-universal-jkfit"), fitlmaxinc(1), basisp(nullptr) {
 }
 
 JKBuilder::~JKBuilder() {
@@ -333,6 +333,7 @@ void JKBuilder::configure(const Settings & set) {
   cholmode    = set.get_int("CholeskyMode");
   cholfile    = set.get_string("CholeskyFile");
   fittingbasis= set.get_string("FittingBasis");
+  fitlmaxinc  = set.get_int("FittingLmaxInc");
 }
 
 void JKBuilder::set_fitting(const BasisSet & fitbas) {
@@ -362,11 +363,17 @@ void JKBuilder::init(const BasisSet & basis, bool verb) {
     }
 
     if(stricmp(fittingbasis.c_str(),"Auto")==0) {
-      // Check used method
+      // Default automatic aux basis: the per-atom CD-derived basis
+      // (Lehtola JCTC 17, 6886 (2021)), uncontracted and lmax-pruned
+      // (JCTC 19, 6242 (2023)) via FittingLmaxInc. Unlike the Eichkorn
+      // construction it spans the orbital products, so it is valid for
+      // exact exchange as well -- no RI-K restriction.
+      dfitbas=basis.cholesky_aux_basis(cholthr, fitlmaxinc);
+    } else if(stricmp(fittingbasis.c_str(),"AutoABS")==0) {
+      // Eichkorn-style automatic auxiliary basis. J-only: not built for
+      // exact exchange.
       if(rik)
-        throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nSet the FittingBasis.\n");
-
-      // DFT, OK for now (will be checked again later on)
+        throw std::runtime_error("FittingBasis AutoABS is not implemented for exact exchange.\nUse Auto (CD-derived) or set an explicit FittingBasis.\n");
       dfitbas=basis.density_fitting();
     } else {
       // Load basis library
@@ -415,7 +422,7 @@ void JKBuilder::init(const BasisSet & basis, bool verb) {
       printf("Building auxiliary basis from pivoted Cholesky decomposition (CDFit) ... ");
       fflush(stdout);
     }
-    dfitbas = basis.cholesky_aux_basis(cholthr);
+    dfitbas = basis.cholesky_aux_basis(cholthr, fitlmaxinc);
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
       printf("Auxiliary basis contains %i functions.\n",(int) dfitbas.get_Nbf());

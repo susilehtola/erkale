@@ -10,3 +10,4 @@ Logfile H2O_tz_pbe_fitdir.log
 SaveChk H2O_tz_pbe_fitdir.chk
 BasisRotate false
 DFTGrid 50 -194
+FittingBasis AutoABS

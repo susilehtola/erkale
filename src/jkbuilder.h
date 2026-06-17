@@ -84,8 +84,12 @@ class JKBuilder {
   int cholmode;
   /// Cholesky integral-cache filename
   std::string cholfile;
-  /// Density-fitting auxiliary basis name (or "Auto")
+  /// Density-fitting auxiliary basis name ("Auto" = CD-derived aux,
+  /// "AutoABS" = Eichkorn-style automatic aux, or a basis-set name)
   std::string fittingbasis;
+  /// lmax-pruning increment for the CD-derived auto-aux (FittingLmaxInc;
+  /// < 0 keeps all shells)
+  int fitlmaxinc;
 
   /// Integral engines. Marked mutable: they are computational caches
   /// (integral tables / fitted tensors), so the const Fock and force

@@ -290,9 +290,15 @@ public:
    * within `thr` while operating through the three-center
    * machinery rather than the four-index pivot path.
    *
-   * @param thr  Cholesky / aux-pivot threshold (typical 1e-7).
+   * The auxiliary basis is left uncontracted. When @a linc >= 0 the
+   * high-angular-momentum shells are pruned per Lehtola, J. Chem. Theory
+   * Comput. 19, 6242 (2023): on each center, shells with l above
+   * aux_lmax_keep(Z, l_obs, linc) are dropped. @a linc < 0 disables pruning.
+   *
+   * @param thr   Cholesky / aux-pivot threshold (typical 1e-7).
+   * @param linc  lmax-pruning increment, or < 0 to keep all shells.
    */
-  BasisSet cholesky_aux_basis(double thr) const;
+  BasisSet cholesky_aux_basis(double thr, int linc=-1) const;
 
   /// Decontract basis set, m gives mapping from old functions to new ones
   BasisSet decontract(arma::mat & m) const;
