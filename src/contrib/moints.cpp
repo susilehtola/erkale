@@ -479,14 +479,11 @@ int main_guarded(int argc, char **argv) {
   // Parse settings
   settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   settings.add_string("SaveChk","Checkpoint file to save data to","");
-  settings.add_string("JKMethod","Coulomb/exchange build method: RI (density fitting), Cholesky or CDFit","Cholesky");
-  settings.add_string("FittingBasis","Fitting basis to use","");
-  settings.add_double("FittingThr","Linear dependency threshold for fitting basis",1e-7);
-  settings.add_double("CholeskyThr","Cholesky threshold to use",1e-7);
-  settings.add_double("CholeskyShThr","Cholesky shell threshold to use",0.01);
-  settings.add_double("IntegralThresh","Integral threshold",1e-10);
-  settings.add_int("CholeskyMode","Cholesky cache mode: 0 off, 1 save, -1 load",0,true);
-  settings.add_string("CholeskyFile","Cholesky cache filename","cholesky.chk");
+  // Register the full SCF settings: the J/K driver (JKMethod, fitting basis,
+  // thresholds) and the basis-construction settings that the auxiliary-basis
+  // build reads from the global object. moints loads an SCF checkpoint, so
+  // the run-specific extras are inert.
+  settings.add_scf_settings();
   settings.add_bool("Localize","Localize orbitals?",false);
   settings.add_string("LocGroups","List of groups to localize","");
   settings.add_string("LocMethod","Localization method to use","IAO2");
@@ -504,16 +501,13 @@ int main_guarded(int argc, char **argv) {
   // Load checkpoint
   std::string loadchk(settings.get_string("LoadChk"));
   std::string savechk(settings.get_string("SaveChk"));
-  JKBuilder::Method jkmethod=JKBuilder::resolve_method(settings);
-  if(jkmethod==JKBuilder::Method::FourIndex)
+  // Drive the density-fitting / Cholesky tensor through the unified J/K
+  // builder. moints needs the 3-index B tensor (materialised below), so a
+  // density-fitting method is required.
+  JKBuilder jk;
+  jk.configure(settings);
+  if(!jk.is_densityfit())
     throw std::runtime_error("erkale_moints needs a density-fitting JKMethod (RI, Cholesky or CDFit).\n");
-  bool densityfit=(jkmethod==JKBuilder::Method::DensityFitting);
-  std::string fittingbasis=settings.get_string("FittingBasis");
-  double fitthr=settings.get_double("FittingThr");
-  double intthr=settings.get_double("IntegralThresh");
-  int cholmode=settings.get_int("CholeskyMode");
-  double cholthr=settings.get_double("CholeskyThr");
-  double cholshthr=settings.get_double("CholeskyShThr");
   bool binary=settings.get_bool("Binary");
   bool loc=settings.get_bool("Localize");
   enum locmet locmethod(parse_locmet(settings.get_string("LocMethod")));
@@ -535,6 +529,15 @@ int main_guarded(int argc, char **argv) {
   BasisSet basis;
   chkpt.read(basis);
 
+  // Carry over the method from the checkpoint: jk.init's RI path inspects
+  // Method to decide whether exact exchange is in play (vs the default
+  // "Dummy", which is not a valid functional).
+  if(chkpt.exist("Method")) {
+    std::string chkmethod;
+    chkpt.read("Method",chkmethod);
+    settings.set_string("Method",chkmethod);
+  }
+
   // Restricted calculation?
   int restr;
   chkpt.read("Restricted",restr);
@@ -551,52 +554,12 @@ int main_guarded(int argc, char **argv) {
   // File type
   arma::file_type atype = binary ? arma::arma_binary : arma::raw_ascii;
 
-  // The merged DensityFit class drives both regular DF and CD modes;
-  // which mode is in play is decided by the fill_*() call below.
-  DensityFit dfit;
-
-  if(densityfit) {
-    // Construct fitting basis
-    BasisSetLibrary fitlib;
-    fitlib.load_basis(fittingbasis);
-
-    // Dummy settings
-    Settings settings0(settings);
-    settings=Settings();
-    settings.add_string("Decontract","","");
-    settings.add_bool("BasisRotate","",true);
-    settings.add_bool("UseLM","",true);
-    settings.add_double("BasisCutoff","",1e-8);
-
-    // Construct fitting basis
-    BasisSet dfitbas;
-    construct_basis(dfitbas,basis.get_nuclei(),fitlib);
-    printf("Auxiliary basis set has %i functions.\n",(int) dfitbas.get_Nbf());
-
-    settings=settings0;
-
-    // Calculate fitting integrals. In-core, with RI-K
-    dfit.fill(basis,dfitbas,false,intthr,fitthr,true);
-  } else {
-    // Two-step CD via the merged DensityFit. moints materialises the
-    // full B tensor below (dfit.B_matrix), so direct mode would just
-    // recompute every block at dump time -- always run cached here.
-    // CholeskyMode -1/+1 hits the same CholeskyFile the SCF driver
-    // uses, so an MO integral dump on top of a previous SCF skips
-    // the CD fill.
-    std::string cholfile = settings.get_string("CholeskyFile");
-    bool loaded = false;
-    if(cholmode == -1)
-      loaded = dfit.load(basis, /*auxbas*/nullptr, cholfile);
-    if(!loaded) {
-      // Re-use cholthr for both the CD threshold and the two-step
-      // metric cleanup -- moints.cpp uses one user-facing knob
-      // (CholeskyThr); pre-merge there was no separate metric step.
-      dfit.fill_cholesky(basis, /*direct*/false, cholthr, cholshthr, intthr, cholthr, true);
-      if(cholmode == 1)
-        dfit.save(cholfile);
-    }
-  }
+  // Build the fitting / Cholesky integrals (RI, two-step Cholesky or the
+  // CD-derived aux basis -- the builder picks the right fill and honours the
+  // CholeskyMode cache). moints materialises the full B tensor below, so it
+  // runs in-core. The same B tensor backs all three methods.
+  jk.init(basis, true);
+  DensityFit & dfit = jk.densityfit();
 
   // Data dump
   arma::mat Hcore;
