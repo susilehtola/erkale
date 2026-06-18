@@ -128,6 +128,18 @@ class JKBuilder {
                   const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
                   arma::cx_mat & Ka, arma::cx_mat & Kb) const;
 
+  /// Coulomb + exact-exchange contribution to the force gradient: J always,
+  /// plus kfull-scaled exchange, plus kshort-scaled short-range exchange when
+  /// omega != 0. Restricted uses the total density P with orbitals C;
+  /// unrestricted uses the total density Ptot for J and the spin channels for
+  /// exchange. (For HF pass kfull=1, kshort=0, omega=0.)
+  arma::vec formForce(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ,
+                      double kfull, double kshort, double omega, double tol) const;
+  arma::vec formForce(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                      const arma::mat & Ca, const arma::mat & Cb,
+                      const std::vector<double> & occa, const std::vector<double> & occb,
+                      double kfull, double kshort, double omega, double tol) const;
+
   /// Engine accessors. Transitional: the force / PZ-SIC / contrib code reaches
   /// the owned engine through these (the backend that does not own the
   /// requested engine throws). They are removed as those call sites move to

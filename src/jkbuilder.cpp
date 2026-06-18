@@ -74,6 +74,43 @@ namespace {
     arma::Col<typename T::elem_type> o(arma::conv_to< arma::Col<typename T::elem_type> >::from(occ));
     return C * arma::diagmat(o) * C.t();
   }
+
+  /// Four-index Coulomb + exact-exchange force gradient via the screener.
+  /// ERItable has no force kernels, so both four-index backends route forces
+  /// through an ERIscreen, ensured filled on the (contracted) orbital basis
+  /// -- this also re-fills a decfock screener that was built on the
+  /// decontracted basis. Restricted: J(+K) from the total density.
+  arma::vec fourindex_force(ERIscreen & scr, ERIscreen & scr_rs, const BasisSet * basisp,
+                            double intthr, bool verbose, const arma::mat & Ptot,
+                            double kfull, double kshort, double omega, double tol) {
+    if(scr.get_N() != basisp->get_Nbf())
+      scr.fill(basisp, intthr, verbose);
+    arma::vec f = (kfull != 0.0) ? scr.forceJK(Ptot, tol, kfull) : scr.forceJ(Ptot, tol);
+    if(omega != 0.0) {
+      scr_rs.set_range_separation({omega, 0.0, 1.0});
+      if(scr_rs.get_N() != basisp->get_Nbf())
+        scr_rs.fill(basisp, intthr, verbose);
+      f += scr_rs.forceK(Ptot, tol, kshort);
+    }
+    return f;
+  }
+  /// Unrestricted: J from the total density; exact exchange from the spin
+  /// channels.
+  arma::vec fourindex_force(ERIscreen & scr, ERIscreen & scr_rs, const BasisSet * basisp,
+                            double intthr, bool verbose, const arma::mat & Ptot,
+                            const arma::mat & Pa, const arma::mat & Pb,
+                            double kfull, double kshort, double omega, double tol) {
+    if(scr.get_N() != basisp->get_Nbf())
+      scr.fill(basisp, intthr, verbose);
+    arma::vec f = (kfull != 0.0) ? scr.forceJK(Pa, Pb, tol, kfull) : scr.forceJ(Ptot, tol);
+    if(omega != 0.0) {
+      scr_rs.set_range_separation({omega, 0.0, 1.0});
+      if(scr_rs.get_N() != basisp->get_Nbf())
+        scr_rs.fill(basisp, intthr, verbose);
+      f += scr_rs.forceK(Pa, Pb, tol, kshort);
+    }
+    return f;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -139,6 +176,14 @@ class JKBackend {
     virtual arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const = 0;
     virtual arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const = 0;
 
+    // Coulomb + exact-exchange force gradient.
+    virtual arma::vec formForce(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ,
+                                double kfull, double kshort, double omega, double tol) const = 0;
+    virtual arma::vec formForce(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                                const arma::mat & Ca, const arma::mat & Cb,
+                                const std::vector<double> & occa, const std::vector<double> & occb,
+                                double kfull, double kshort, double omega, double tol) const = 0;
+
     // Transitional engine accessors (the backend that does not own the
     // requested engine throws).
     virtual ERItable & eritable() const { wrong_engine("in-core ERItable"); }
@@ -154,6 +199,9 @@ class JKBackend {
   // ----------------------------------------------------------------------
   class InCoreJK : public JKBackend {
     mutable ERItable tab, tab_rs;
+    /// Force-only screeners: ERItable has no force kernels, so gradients go
+    /// through an ERIscreen, filled lazily on the first force evaluation.
+    mutable ERIscreen fscr, fscr_rs;
    public:
     explicit InCoreJK(const JKConfig & c) : JKBackend(c) {}
 
@@ -224,6 +272,16 @@ class JKBackend {
     arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat &) const override { return tab.calcK(form_density(C,occ)); }
     arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat &) const override { return tab_rs.calcK(form_density(C,occ)); }
     arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat &) const override { return tab_rs.calcK(form_density(C,occ)); }
+
+    arma::vec formForce(const arma::mat & P, const arma::mat &, const std::vector<double> &,
+                        double kfull, double kshort, double omega, double tol) const override {
+      return fourindex_force(fscr, fscr_rs, basisp, cfg.intthr, verbose, P, kfull, kshort, omega, tol);
+    }
+    arma::vec formForce(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                        const arma::mat &, const arma::mat &, const std::vector<double> &, const std::vector<double> &,
+                        double kfull, double kshort, double omega, double tol) const override {
+      return fourindex_force(fscr, fscr_rs, basisp, cfg.intthr, verbose, Ptot, Pa, Pb, kfull, kshort, omega, tol);
+    }
 
     ERItable & eritable() const override { return tab; }
     ERItable & eritable_rs() const override { return tab_rs; }
@@ -355,6 +413,16 @@ class JKBackend {
     }
     arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat &) const override { return directKshort(form_density(C,occ)); }
     arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat &) const override { return directKshort(form_density(C,occ)); }
+
+    arma::vec formForce(const arma::mat & P, const arma::mat &, const std::vector<double> &,
+                        double kfull, double kshort, double omega, double tol) const override {
+      return fourindex_force(scr, scr_rs, basisp, cfg.intthr, verbose, P, kfull, kshort, omega, tol);
+    }
+    arma::vec formForce(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                        const arma::mat &, const arma::mat &, const std::vector<double> &, const std::vector<double> &,
+                        double kfull, double kshort, double omega, double tol) const override {
+      return fourindex_force(scr, scr_rs, basisp, cfg.intthr, verbose, Ptot, Pa, Pb, kfull, kshort, omega, tol);
+    }
 
     ERIscreen & eriscreen() const override { return scr; }
     ERIscreen & eriscreen_rs() const override { return scr_rs; }
@@ -535,6 +603,26 @@ class JKBackend {
     arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const override { return k_orb_short(C, occ, S); }
     arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const override { return k_orb_short(C, occ, S); }
 
+    // DF/CD gradients: algebraic Coulomb (forceJ / forceJ_cholesky) plus the
+    // scaled exchange gradient. The short-range dfit_rs is filled by the SCF
+    // (init_rs) before forces, as in the unscreened case.
+    arma::vec formForce(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ,
+                        double kfull, double kshort, double omega, double /*tol*/) const override {
+      arma::vec f = dfit.is_cholesky() ? dfit.forceJ_cholesky(*basisp, P) : dfit.forceJ(P);
+      if(kfull != 0.0) f += dfit.forceK(*basisp, C, occ, kfull);
+      if(omega != 0.0) f += dfit_rs.forceK(*basisp, C, occ, kshort);
+      return f;
+    }
+    arma::vec formForce(const arma::mat & Ptot, const arma::mat &, const arma::mat &,
+                        const arma::mat & Ca, const arma::mat & Cb,
+                        const std::vector<double> & occa, const std::vector<double> & occb,
+                        double kfull, double kshort, double omega, double /*tol*/) const override {
+      arma::vec f = dfit.is_cholesky() ? dfit.forceJ_cholesky(*basisp, Ptot) : dfit.forceJ(Ptot);
+      if(kfull != 0.0) { f += dfit.forceK(*basisp, Ca, occa, kfull); f += dfit.forceK(*basisp, Cb, occb, kfull); }
+      if(omega != 0.0) { f += dfit_rs.forceK(*basisp, Ca, occa, kshort); f += dfit_rs.forceK(*basisp, Cb, occb, kshort); }
+      return f;
+    }
+
     DensityFit & densityfit() const override { return dfit; }
     DensityFit & densityfit_rs() const override { return dfit_rs; }
   };
@@ -659,6 +747,17 @@ void JKBuilder::formKshort(const arma::cx_mat & cPa, const arma::cx_mat & cPb, c
                            const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
                            arma::cx_mat & Ka, arma::cx_mat & Kb) const {
   impl->formKshort(cPa, cPb, cCa, cCb, occa, occb, S, Ka, Kb);
+}
+
+arma::vec JKBuilder::formForce(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ,
+                               double kfull, double kshort, double omega, double tol) const {
+  return impl->formForce(P, C, occ, kfull, kshort, omega, tol);
+}
+arma::vec JKBuilder::formForce(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                               const arma::mat & Ca, const arma::mat & Cb,
+                               const std::vector<double> & occa, const std::vector<double> & occb,
+                               double kfull, double kshort, double omega, double tol) const {
+  return impl->formForce(Ptot, Pa, Pb, Ca, Cb, occa, occb, kfull, kshort, omega, tol);
 }
 
 ERItable & JKBuilder::eritable() const { return impl->eritable(); }

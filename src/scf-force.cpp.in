@@ -60,96 +60,21 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
 #else
-  double kfull=1.0;
+  double kfull=1.0, kshort=0.0, omega=0.0;
 #endif
 
-  // Exact exchange and Coulomb
-  arma::vec fx_full;
-  fx_full.zeros(fnuc.n_elem);
+  // Coulomb + exact exchange (and, for range-separated hybrids, the
+  // short-range exchange) via the unified J/K driver. The backend dispatches
+  // DF/CD vs four-index internally; J is taken from the total density, the
+  // exact-exchange fraction kfull from the orbitals / spin densities, and the
+  // short-range exchange (kshort) when omega != 0.
+#ifdef RESTRICTED
+  arma::vec fx_full = jk.formForce(sol.P, sol.C, occs, kfull, kshort, omega, tol);
+#else
+  arma::vec fx_full = jk.formForce(sol.P, sol.Pa, sol.Pb, sol.Ca, sol.Cb, occa, occb, kfull, kshort, omega, tol);
+#endif
 
 #ifdef DFT
-  // Short-range exchange
-  arma::vec fx_short;
-  fx_short.zeros(fnuc.n_elem);
-
-  if(kfull==0.0) {
-
-    if(densityfit) {
-      if(jk.densityfit().is_cholesky()) {
-        // Two-step CD via DensityFit: pivot orbital pairs are a
-        // fitting basis with a stashed metric, so the algebraic
-        // gradient is available.
-        fx_full=jk.densityfit().forceJ_cholesky(*basisp, sol.P);
-      } else {
-        fx_full=jk.densityfit().forceJ(sol.P);
-      }
-    } else {
-      // scr is filled in scf-base.cpp only on the four-index path
-      // (direct or table). On the Cholesky / DF paths it stays
-      // unfilled; ensure it's ready before any forceJ/forceJK call.
-      if(jk.eriscreen().get_N() != basisp->get_Nbf())
-	jk.eriscreen().fill(basisp,intthr,verbose);
-
-      fx_full=jk.eriscreen().forceJ(sol.P,tol);
-    }
-  } else {
-#endif
-
-    if(densityfit) {
-      // DF/CD: split into Coulomb and exchange gradients (no
-      // combined forceJK -- the J and K paths use different
-      // intermediaries). jk.densityfit().forceJ{,_cholesky} handles Coulomb;
-      // jk.densityfit().forceK adds the kfull-scaled exchange gradient.
-      arma::vec fxJ;
-      if(jk.densityfit().is_cholesky())
-        fxJ = jk.densityfit().forceJ_cholesky(*basisp, sol.P);
-      else
-        fxJ = jk.densityfit().forceJ(sol.P);
-#ifdef RESTRICTED
-      const arma::vec fxK = jk.densityfit().forceK(*basisp, sol.C, occs, kfull);
-      fx_full = fxJ + fxK;
-#else
-      const arma::vec fxKa = jk.densityfit().forceK(*basisp, sol.Ca, occa, kfull);
-      const arma::vec fxKb = jk.densityfit().forceK(*basisp, sol.Cb, occb, kfull);
-      fx_full = fxJ + fxKa + fxKb;
-#endif
-    } else {
-      if(jk.eriscreen().get_N() != basisp->get_Nbf())
-        jk.eriscreen().fill(basisp,intthr,verbose);
-#ifdef RESTRICTED
-      fx_full=jk.eriscreen().forceJK(sol.P,tol,kfull);
-#else
-      fx_full=jk.eriscreen().forceJK(sol.Pa,sol.Pb,tol,kfull);
-#endif
-    }
-
-#ifdef DFT
-  }
-
-  if(omega != 0.0) {
-    if(densityfit) {
-      // Short-range exchange gradient on the range-separated dfit
-      // (built by SCF::fill_rs at the chosen omega).
-#ifdef RESTRICTED
-      fx_short = jk.densityfit_rs().forceK(*basisp, sol.C, occs, kshort);
-#else
-      const arma::vec fxKa = jk.densityfit_rs().forceK(*basisp, sol.Ca, occa, kshort);
-      const arma::vec fxKb = jk.densityfit_rs().forceK(*basisp, sol.Cb, occb, kshort);
-      fx_short = fxKa + fxKb;
-#endif
-    } else {
-      // Four-index fallback: set range separation and fill (low-cost
-      // compared to forces anyway).
-      jk.eriscreen_rs().set_range_separation({omega, 0.0, 1.0});
-      jk.eriscreen_rs().fill(basisp,intthr,verbose);
-
-#ifdef RESTRICTED
-      fx_short=jk.eriscreen_rs().forceK(sol.P,tol,kshort);
-#else
-      fx_short=jk.eriscreen_rs().forceK(sol.Pa,sol.Pb,tol,kshort);
-#endif
-    }
-  }
 
   // Get the DFT contribution
   arma::vec fxc;
@@ -175,7 +100,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   arma::vec ffull=ftot+fx_full;
 #ifdef DFT
   // DFT contribution
-  ffull+=fxc+fx_short;
+  ffull+=fxc;
 #endif
 
   if(lincalc) {
