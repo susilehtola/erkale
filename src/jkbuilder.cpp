@@ -106,6 +106,10 @@ arma::cx_mat JKBuilder::recontract(const arma::cx_mat & M) const {
   return arma::trans(decconv)*M*decconv;
 }
 
+arma::mat JKBuilder::directJ(const arma::mat & P) const {
+  return decfock ? recontract(scr.calcJ(decontract(P), intthr)) : scr.calcJ(P, intthr);
+}
+
 // --- Unified full-range J/K build (restricted) -------------------------
 
 void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
@@ -115,17 +119,10 @@ void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & C, const std::v
     if(want_K)
       K = calcK(C, occ, S);
   } else if(direct) {
-    if(want_K) {
-      if(decfock) {
-        arma::mat Jd, Kd;
-        scr.calcJK(decontract(Ptot), Jd, Kd, intthr);
-        J = recontract(Jd);
-        K = recontract(Kd);
-      } else
-        scr.calcJK(Ptot, J, K, intthr);
-    } else {
-      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
-    }
+    if(want_K)
+      directJK(Ptot, J, K);
+    else
+      J = directJ(Ptot);
   } else {
     J = tab.calcJ(Ptot);
     if(want_K)
@@ -141,19 +138,11 @@ void JKBuilder::formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const ar
     if(want_K)
       K = calcK(cC, occ, S);
   } else if(direct) {
-    if(want_K) {
-      if(decfock) {
-        arma::mat Jd;
-        arma::cx_mat Kd;
-        scr.calcJK(decontract(cP), Jd, Kd, intthr);
-        J = recontract(Jd);
-        K = recontract(Kd);
-      } else
-        scr.calcJK(cP, J, K, intthr);
-    } else {
+    if(want_K)
+      directJK(cP, J, K);
+    else
       // J only: built from the real total density.
-      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
-    }
+      J = directJ(Ptot);
   } else {
     J = tab.calcJ(Ptot);
     if(want_K)
@@ -174,18 +163,10 @@ void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma:
       Kb = calcK(Cb, occb, S);
     }
   } else if(direct) {
-    if(want_K) {
-      if(decfock) {
-        arma::mat Jd, Kad, Kbd;
-        scr.calcJK(decontract(Pa), decontract(Pb), Jd, Kad, Kbd, intthr);
-        J = recontract(Jd);
-        Ka = recontract(Kad);
-        Kb = recontract(Kbd);
-      } else
-        scr.calcJK(Pa, Pb, J, Ka, Kb, intthr);
-    } else {
-      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
-    }
+    if(want_K)
+      directJK(Pa, Pb, J, Ka, Kb);
+    else
+      J = directJ(Ptot);
   } else {
     J = tab.calcJ(Ptot);
     if(want_K) {
@@ -206,19 +187,10 @@ void JKBuilder::formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const a
       Kb = calcK(cCb, occb, S);
     }
   } else if(direct) {
-    if(want_K) {
-      if(decfock) {
-        arma::mat Jd;
-        arma::cx_mat Kad, Kbd;
-        scr.calcJK(decontract(cPa), decontract(cPb), Jd, Kad, Kbd, intthr);
-        J = recontract(Jd);
-        Ka = recontract(Kad);
-        Kb = recontract(Kbd);
-      } else
-        scr.calcJK(cPa, cPb, J, Ka, Kb, intthr);
-    } else {
-      J = decfock ? recontract(scr.calcJ(decontract(Ptot), intthr)) : scr.calcJ(Ptot, intthr);
-    }
+    if(want_K)
+      directJK(cPa, cPb, J, Ka, Kb);
+    else
+      J = directJ(Ptot);
   } else {
     J = tab.calcJ(Ptot);
     if(want_K) {
@@ -234,7 +206,7 @@ arma::mat JKBuilder::formKshort(const arma::mat & P, const arma::mat & C, const 
   if(uses_dfit())
     return calcK_short(C, occ, S);
   else if(direct)
-    return decfock ? recontract(scr_rs.calcK(decontract(P), intthr)) : scr_rs.calcK(P, intthr);
+    return directKshort(P);
   else
     return tab_rs.calcK(P);
 }
@@ -243,7 +215,7 @@ arma::cx_mat JKBuilder::formKshort(const arma::cx_mat & cP, const arma::cx_mat &
   if(uses_dfit())
     return calcK_short(cC, occ, S);
   else if(direct)
-    return decfock ? recontract(scr_rs.calcK(decontract(cP), intthr)) : scr_rs.calcK(cP, intthr);
+    return directKshort(cP);
   else
     return tab_rs.calcK(cP);
 }
@@ -255,13 +227,7 @@ void JKBuilder::formKshort(const arma::mat & Pa, const arma::mat & Pb, const arm
     Ka = calcK_short(Ca, occa, S);
     Kb = calcK_short(Cb, occb, S);
   } else if(direct) {
-    if(decfock) {
-      arma::mat Kad, Kbd;
-      scr_rs.calcK(decontract(Pa), decontract(Pb), Kad, Kbd, intthr);
-      Ka = recontract(Kad);
-      Kb = recontract(Kbd);
-    } else
-      scr_rs.calcK(Pa, Pb, Ka, Kb, intthr);
+    directKshort(Pa, Pb, Ka, Kb);
   } else {
     Ka = tab_rs.calcK(Pa);
     Kb = tab_rs.calcK(Pb);
@@ -275,13 +241,7 @@ void JKBuilder::formKshort(const arma::cx_mat & cPa, const arma::cx_mat & cPb, c
     Ka = calcK_short(cCa, occa, S);
     Kb = calcK_short(cCb, occb, S);
   } else if(direct) {
-    if(decfock) {
-      arma::cx_mat Kad, Kbd;
-      scr_rs.calcK(decontract(cPa), decontract(cPb), Kad, Kbd, intthr);
-      Ka = recontract(Kad);
-      Kb = recontract(Kbd);
-    } else
-      scr_rs.calcK(cPa, cPb, Ka, Kb, intthr);
+    directKshort(cPa, cPb, Ka, Kb);
   } else {
     Ka = tab_rs.calcK(cPa);
     Kb = tab_rs.calcK(cPb);

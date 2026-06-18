@@ -128,6 +128,52 @@ class JKBuilder {
   arma::mat    recontract(const arma::mat & M) const;
   arma::cx_mat recontract(const arma::cx_mat & M) const;
 
+  /// Direct four-index Coulomb from the (real) density, with the decfock
+  /// decontraction handled internally.
+  arma::mat directJ(const arma::mat & P) const;
+  /// Direct four-index single-pass J and K (restricted / unrestricted),
+  /// with decfock handled internally. Templated on the density/exchange
+  /// type so real and complex share one implementation.
+  template<typename Td, typename Tk>
+  void directJK(const Td & P, arma::mat & J, Tk & K) const {
+    if(decfock) {
+      arma::mat Jd;
+      Tk Kd;
+      scr.calcJK(decontract(P), Jd, Kd, intthr);
+      J = recontract(Jd);
+      K = recontract(Kd);
+    } else
+      scr.calcJK(P, J, K, intthr);
+  }
+  template<typename Td, typename Tk>
+  void directJK(const Td & Pa, const Td & Pb, arma::mat & J, Tk & Ka, Tk & Kb) const {
+    if(decfock) {
+      arma::mat Jd;
+      Tk Kad, Kbd;
+      scr.calcJK(decontract(Pa), decontract(Pb), Jd, Kad, Kbd, intthr);
+      J = recontract(Jd);
+      Ka = recontract(Kad);
+      Kb = recontract(Kbd);
+    } else
+      scr.calcJK(Pa, Pb, J, Ka, Kb, intthr);
+  }
+  /// Direct four-index short-range exchange (restricted / unrestricted),
+  /// with decfock handled internally.
+  template<typename T>
+  T directKshort(const T & P) const {
+    return decfock ? recontract(scr_rs.calcK(decontract(P), intthr)) : scr_rs.calcK(P, intthr);
+  }
+  template<typename T>
+  void directKshort(const T & Pa, const T & Pb, T & Ka, T & Kb) const {
+    if(decfock) {
+      T Kad, Kbd;
+      scr_rs.calcK(decontract(Pa), decontract(Pb), Kad, Kbd, intthr);
+      Ka = recontract(Kad);
+      Kb = recontract(Kbd);
+    } else
+      scr_rs.calcK(Pa, Pb, Ka, Kb, intthr);
+  }
+
  public:
   JKBuilder();
   ~JKBuilder();
