@@ -438,6 +438,11 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
   settings.add_string("Result","File to save optimized geometry in","optimized.xyz");
   settings.set_string("Logfile","erkale_geom.log");
+  // Default to density fitting for geometry optimization: it gives reliable
+  // analytic forces (validated to the fit accuracy), whereas the global
+  // default (two-step Cholesky) has an unreliable exchange gradient for
+  // HF/hybrids. Overridable by setting JKMethod in the input.
+  settings.set_string("JKMethod","RI");
   settings.add_bool("NumGrad","Use finite-difference gradient?",false);
   settings.add_int("Stencil","Order of finite-difference stencil for numgrad",2);
   settings.add_double("Stepsize","Finite-difference stencil step size",1e-6);
