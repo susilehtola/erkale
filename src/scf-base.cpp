@@ -1536,10 +1536,12 @@ void calculate(const BasisSet & basis, bool force) {
     initconvthr*=settings.get_double("DFTDelta");
   }
 
-  // Check consistency of parameters
+  // Check consistency of parameters. The AutoABS automatic auxiliary basis
+  // (Eichkorn) is J-only, so it cannot represent exact exchange; the CD-derived
+  // Auto basis spans the orbital products and handles exchange, so it is fine.
   if(!hf && !rohf && (exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-    if(JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting && (stricmp(settings.get_string("FittingBasis"),"Auto")==0)) {
-      throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
+    if(JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting && (stricmp(settings.get_string("FittingBasis"),"AutoABS")==0)) {
+      throw std::runtime_error("The AutoABS automatic auxiliary basis is J-only and cannot represent exact exchange.\nUse FittingBasis Auto (CD-derived) or an explicit JK-fitting basis.\n");
     }
 
   // Load starting guess?
