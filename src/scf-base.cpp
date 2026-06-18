@@ -123,9 +123,8 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   // contribution of each shell quartet by |(ij|kl)|*max|P| over the
   // coupled blocks; tol on the actual Fock contribution rather than on
   // the bare integral. Zero disables it.
-  const double screenthr=settings.get_double("ScreeningThresh");
-  jk.eriscreen().set_screen_thresh(screenthr);
-  jk.eriscreen_rs().set_screen_thresh(screenthr);
+  // (The density-weighted screening threshold is applied to the direct
+  // screener by JKBuilder::configure -> the direct backend's init.)
 
   doforce=false;
 
