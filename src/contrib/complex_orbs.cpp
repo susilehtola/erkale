@@ -57,7 +57,7 @@ arma::cx_mat basis_transform_mat(int l) {
       Lmat(l+m, l+m) = -std::complex<double>(0.0, std::sqrt(0.5));
       Lmat(l-m, l+m) = std::sqrt(0.5);
     } else if (m == 0)
-      Lmat(l, m) = 1.0;
+      Lmat(l, l) = 1.0;
     else {
       Lmat(l-m, l+m) = std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
       Lmat(l+m, l+m) = std::pow(-1.0, m) * std::sqrt(0.5);
@@ -86,7 +86,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
-  settings.add_bool("Complexbas", "Use complex basis?", false);
+  settings.add_bool("ComplexBasis", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
   settings.add_bool("ODA", "Use optimal damping algorithm?", false);
 
@@ -104,7 +104,7 @@ int main_guarded(int argc, char **argv) {
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
-  bool complexbas = settings.get_bool("Complexbas");
+  bool complexbas = settings.get_bool("ComplexBasis");
   int readlinocc = settings.get_int("LinearOccupations");
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
@@ -201,7 +201,7 @@ int main_guarded(int argc, char **argv) {
     D.eye();
 
   // Blocked matrices
-  arma::mat S_c = arma::real(D * S * D.t());
+  arma::mat S_c = arma::real(D.t() * S * D);
   size_t Nmo=0;
   std::vector<arma::mat> X(2*maxam+1);
   for (size_t m=0; m<X.size(); m++) {
@@ -276,17 +276,12 @@ int main_guarded(int argc, char **argv) {
     double cenx = 0.0, ceny = 0.0, cenz = 0.0;
     std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
     arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
-
+    const auto & Smat = complexbas ? S_c : S;
     if(complexbas) {
       xymat = arma::real(D.t()*xymat*D);
-      for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = -0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
-
-    } else {
-      for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = -0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
-
     }
+    for (size_t j = 0; j < Nbf; j++)
+      Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
   }
 
   std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
