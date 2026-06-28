@@ -156,7 +156,7 @@ endif()
 if(OPENORBITAL_HEADER)
   message(STATUS "openorbitaloptimizer headers: ${OPENORBITAL_HEADER}; building NEO targets")
 
-  add_executable (erkale_neo neo.cpp)
+  add_executable (erkale_neo neo.cpp neo_dump.cpp)
   set_target_properties(erkale_neo PROPERTIES OUTPUT_NAME "erkale_neo${SUFFIX}")
   target_include_directories(erkale_neo PUBLIC "${OPENORBITAL_HEADER}")
   target_link_libraries(erkale_neo liberkale_cmp)
