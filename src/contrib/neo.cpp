@@ -31,6 +31,7 @@
 #include "stringutil.h"
 #include "timer.h"
 #include "density_fitting.h"
+#include "neo_dump.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -109,6 +110,9 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
   settings.add_bool("vpp", "Include JK terms for protons?", true);
+  settings.add_string("NEODump", "Dump converged NEO-SCF to this HDF5 file for post-SCF correlation codes (empty = off)", "");
+  settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
+  settings.add_bool("NEODumpVerify", "Reconstruct the energy from the NEODump tensors and check it against the SCF energy", true);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -1137,6 +1141,69 @@ int main_guarded(int argc, char **argv) {
       save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0]}),std::vector<arma::vec>({dm.second[0]})), std::vector<arma::mat>({fock[0]}));
     } else {
       save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0],dm.first[1]}),std::vector<arma::vec>({dm.second[0],dm.second[1]})), std::vector<arma::mat>({fock[0],fock[1]}));
+    }
+
+    // Optional export of the converged NEO-SCF for an external correlation code
+    std::string neodump = settings.get_string("NEODump");
+    if(neodump.size()) {
+      if(!vpp)
+        throw std::runtime_error("NEODump requires vpp=true: the proton-proton integrals are part of the dump.\n");
+
+      bool restricted_e = (M==1);
+      size_t Nmat = fock.size();
+
+      // Proton block (last) in the AO basis
+      arma::mat Cp_ao = Xp * dm.first[Nmat-1];
+      arma::vec occp = dm.second[Nmat-1];
+      arma::vec Ep = arma::diagvec(dm.first[Nmat-1].t() * fock[Nmat-1] * dm.first[Nmat-1]);
+      arma::mat Dp = Cp_ao * arma::diagmat(occp) * Cp_ao.t();
+
+      // Electron block(s) in the AO basis + total electron density
+      std::vector<arma::mat> Ce, Focke;
+      std::vector<arma::vec> occe_v, Ee_v;
+      arma::mat De(X.n_rows, X.n_rows, arma::fill::zeros);
+      size_t nblk = restricted_e ? 1 : 2;
+      for(size_t s=0;s<nblk;s++) {
+        arma::mat Cs = X * dm.first[s];
+        arma::vec os = dm.second[s];
+        Ce.push_back(Cs);
+        occe_v.push_back(os);
+        Ee_v.push_back(arma::diagvec(dm.first[s].t() * fock[s] * dm.first[s]));
+        De += Cs * arma::diagmat(os) * Cs.t();
+      }
+
+      // AO Fock matrices, rebuilt from the converged densities with the same
+      // engine the SCF used (the lambdas carry the correct K and e-p signs).
+      arma::mat hcore_e = T + Vc;
+      arma::mat Jpe = proton_electron_coulomb(Dp);
+      if(restricted_e) {
+        arma::mat J, K;
+        std::tie(J, K) = electronic_terms(Ce[0], occe_v[0]);
+        Focke.push_back(hcore_e + J + 0.5*K + Jpe);
+      } else {
+        arma::mat Ja, Ka, Jb, Kb;
+        std::tie(Ja, Ka) = electronic_terms(Ce[0], occe_v[0]);
+        std::tie(Jb, Kb) = electronic_terms(Ce[1], occe_v[1]);
+        Focke.push_back(hcore_e + Ja + Jb + Ka + Jpe);
+        Focke.push_back(hcore_e + Ja + Jb + Kb + Jpe);
+      }
+      arma::mat hcore_p = Tp + Vpc;
+      arma::mat Jp, Kp;
+      std::tie(Jp, Kp) = protonic_terms(Cp_ao, occp);
+      arma::mat Jep = electron_proton_coulomb(De);
+      arma::mat Fock_p = hcore_p + Jp + Kp + Jep;
+
+#ifdef SVNRELEASE
+      std::string version(SVNREVISION);
+#else
+      std::string version("unknown");
+#endif
+      neo_dump(neodump, settings.get_string("NEODumpIntegrals"), settings.get_bool("NEODumpVerify"),
+               basis, dfit, restricted_e, Ce, occe_v, Ee_v, hcore_e, Focke,
+               pbasis, pfit, Cp_ao, occp, Ep, hcore_p, Fock_p,
+               Nel, (int) proton_indices.size(), proton_mass,
+               scfsolver.get_energy(), Ecnucr,
+               density_fitting, omega, alpha, beta, version);
     }
   }
 
