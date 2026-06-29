@@ -145,22 +145,76 @@ class JKBackend {
     bool is_decfock() const { return cfg.decfock; }
     bool is_occ_rik() const { return cfg.occ_rik; }
 
-    // Full-range J/K (restricted / unrestricted, real / complex).
-    virtual void formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
-                        const arma::mat & S, bool want_K, arma::mat & J, arma::mat & K) const = 0;
-    virtual void formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
-                        const std::vector<double> & occ, const arma::mat & S, bool want_K,
-                        arma::mat & J, arma::cx_mat & K) const = 0;
-    virtual void formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
-                        const arma::mat & Ca, const arma::mat & Cb,
-                        const std::vector<double> & occa, const std::vector<double> & occb,
-                        const arma::mat & S, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const = 0;
-    virtual void formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
-                        const arma::cx_mat & cCa, const arma::cx_mat & cCb,
-                        const std::vector<double> & occa, const std::vector<double> & occb,
-                        const arma::mat & S, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const = 0;
+    // Exact-exchange admixture, set once at fill time (set_range_separation):
+    // K = kfull_*K_full + kshort_*K_short(omega_). Defaults to Hartree-Fock.
+    double kfull_ = 1.0, kshort_ = 0.0, omega_ = 0.0;
+    void set_range_separation(double kfull, double kshort, double omega) {
+      kfull_ = kfull; kshort_ = kshort; omega_ = omega;
+      if(omega_ != 0.0) init_rs(omega_);
+    }
+    bool has_exact_exchange() const { return kfull_ != 0.0 || kshort_ != 0.0; }
 
-    // Short-range exchange.
+    // Coulomb + the combined exact exchange kfull_*K_full + kshort_*K_short(omega_).
+    // J is always the full Coulomb operator. Builds the full-range J/K and the
+    // short-range K through the per-backend primitives and combines them here,
+    // so callers never see the full/short split. (Restricted / unrestricted,
+    // real / complex.)
+    void formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
+                const arma::mat & S, arma::mat & J, arma::mat & K) const {
+      build_JKfull(Ptot, C, occ, S, kfull_ != 0.0, J, K);
+      if(kfull_ != 0.0) K *= kfull_; else K.zeros(J.n_rows, J.n_cols);
+      if(omega_ != 0.0) K += kshort_ * formKshort(Ptot, C, occ, S);
+    }
+    void formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
+                const std::vector<double> & occ, const arma::mat & S, arma::mat & J, arma::cx_mat & K) const {
+      build_JKfull(Ptot, cP, cC, occ, S, kfull_ != 0.0, J, K);
+      if(kfull_ != 0.0) K *= kfull_; else K.zeros(J.n_rows, J.n_cols);
+      if(omega_ != 0.0) K += kshort_ * formKshort(cP, cC, occ, S);
+    }
+    void formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                const arma::mat & Ca, const arma::mat & Cb,
+                const std::vector<double> & occa, const std::vector<double> & occb,
+                const arma::mat & S, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const {
+      build_JKfull(Ptot, Pa, Pb, Ca, Cb, occa, occb, S, kfull_ != 0.0, J, Ka, Kb);
+      if(kfull_ != 0.0) { Ka *= kfull_; Kb *= kfull_; }
+      else              { Ka.zeros(J.n_rows, J.n_cols); Kb.zeros(J.n_rows, J.n_cols); }
+      if(omega_ != 0.0) {
+        arma::mat Kas, Kbs;
+        formKshort(Pa, Pb, Ca, Cb, occa, occb, S, Kas, Kbs);
+        Ka += kshort_ * Kas; Kb += kshort_ * Kbs;
+      }
+    }
+    void formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
+                const arma::cx_mat & cCa, const arma::cx_mat & cCb,
+                const std::vector<double> & occa, const std::vector<double> & occb,
+                const arma::mat & S, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const {
+      build_JKfull(Ptot, cPa, cPb, cCa, cCb, occa, occb, S, kfull_ != 0.0, J, Ka, Kb);
+      if(kfull_ != 0.0) { Ka *= kfull_; Kb *= kfull_; }
+      else              { Ka.zeros(J.n_rows, J.n_cols); Kb.zeros(J.n_rows, J.n_cols); }
+      if(omega_ != 0.0) {
+        arma::cx_mat Kas, Kbs;
+        formKshort(cPa, cPb, cCa, cCb, occa, occb, S, Kas, Kbs);
+        Ka += kshort_ * Kas; Kb += kshort_ * Kbs;
+      }
+    }
+
+   protected:
+    // Per-backend primitives: full-range J (+ raw full-range K when want_K),
+    // and the raw short-range K. Combined by formJK above.
+    virtual void build_JKfull(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
+                              const arma::mat & S, bool want_K, arma::mat & J, arma::mat & K) const = 0;
+    virtual void build_JKfull(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
+                              const std::vector<double> & occ, const arma::mat & S, bool want_K,
+                              arma::mat & J, arma::cx_mat & K) const = 0;
+    virtual void build_JKfull(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+                              const arma::mat & Ca, const arma::mat & Cb,
+                              const std::vector<double> & occa, const std::vector<double> & occb,
+                              const arma::mat & S, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const = 0;
+    virtual void build_JKfull(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
+                              const arma::cx_mat & cCa, const arma::cx_mat & cCb,
+                              const std::vector<double> & occa, const std::vector<double> & occb,
+                              const arma::mat & S, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const = 0;
+
     virtual arma::mat   formKshort(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const = 0;
     virtual arma::cx_mat formKshort(const arma::cx_mat & cP, const arma::cx_mat & cC, const std::vector<double> & occ, const arma::mat & S) const = 0;
     virtual void formKshort(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Ca, const arma::mat & Cb,
@@ -169,6 +223,7 @@ class JKBackend {
     virtual void formKshort(const arma::cx_mat & cPa, const arma::cx_mat & cPb, const arma::cx_mat & cCa, const arma::cx_mat & cCb,
                             const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
                             arma::cx_mat & Ka, arma::cx_mat & Kb) const = 0;
+   public:
 
     virtual arma::mat   calcJ(const arma::mat & P) const = 0;
     virtual arma::mat   calcK(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const = 0;
@@ -234,24 +289,24 @@ class JKBackend {
       }
     }
 
-    void formJK(const arma::mat & Ptot, const arma::mat &, const std::vector<double> &,
+    void build_JKfull(const arma::mat & Ptot, const arma::mat &, const std::vector<double> &,
                 const arma::mat &, bool want_K, arma::mat & J, arma::mat & K) const override {
       J = tab.calcJ(Ptot);
       if(want_K) K = tab.calcK(Ptot);
     }
-    void formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat &,
+    void build_JKfull(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat &,
                 const std::vector<double> &, const arma::mat &, bool want_K,
                 arma::mat & J, arma::cx_mat & K) const override {
       J = tab.calcJ(Ptot);
       if(want_K) K = tab.calcK(cP);
     }
-    void formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+    void build_JKfull(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
                 const arma::mat &, const arma::mat &, const std::vector<double> &, const std::vector<double> &,
                 const arma::mat &, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const override {
       J = tab.calcJ(Ptot);
       if(want_K) { Ka = tab.calcK(Pa); Kb = tab.calcK(Pb); }
     }
-    void formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
+    void build_JKfull(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
                 const arma::cx_mat &, const arma::cx_mat &, const std::vector<double> &, const std::vector<double> &,
                 const arma::mat &, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const override {
       J = tab.calcJ(Ptot);
@@ -371,21 +426,21 @@ class JKBackend {
       }
     }
 
-    void formJK(const arma::mat & Ptot, const arma::mat &, const std::vector<double> &,
+    void build_JKfull(const arma::mat & Ptot, const arma::mat &, const std::vector<double> &,
                 const arma::mat &, bool want_K, arma::mat & J, arma::mat & K) const override {
       if(want_K) directJK(Ptot, J, K); else J = directJ(Ptot);
     }
-    void formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat &,
+    void build_JKfull(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat &,
                 const std::vector<double> &, const arma::mat &, bool want_K,
                 arma::mat & J, arma::cx_mat & K) const override {
       if(want_K) directJK(cP, J, K); else J = directJ(Ptot);
     }
-    void formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
+    void build_JKfull(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
                 const arma::mat &, const arma::mat &, const std::vector<double> &, const std::vector<double> &,
                 const arma::mat &, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const override {
       if(want_K) directJK(Pa, Pb, J, Ka, Kb); else J = directJ(Ptot);
     }
-    void formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
+    void build_JKfull(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
                 const arma::cx_mat &, const arma::cx_mat &, const std::vector<double> &, const std::vector<double> &,
                 const arma::mat &, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const override {
       if(want_K) directJK(cPa, cPb, J, Ka, Kb); else J = directJ(Ptot);
@@ -564,24 +619,24 @@ class JKBackend {
       }
     }
 
-    void formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
+    void build_JKfull(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
                 const arma::mat & S, bool want_K, arma::mat & J, arma::mat & K) const override {
       J = dfit.calcJ(Ptot);
       if(want_K) K = k_orb(C, occ, S);
     }
-    void formJK(const arma::mat & Ptot, const arma::cx_mat &, const arma::cx_mat & cC,
+    void build_JKfull(const arma::mat & Ptot, const arma::cx_mat &, const arma::cx_mat & cC,
                 const std::vector<double> & occ, const arma::mat & S, bool want_K,
                 arma::mat & J, arma::cx_mat & K) const override {
       J = dfit.calcJ(Ptot);
       if(want_K) K = k_orb(cC, occ, S);
     }
-    void formJK(const arma::mat & Ptot, const arma::mat &, const arma::mat &,
+    void build_JKfull(const arma::mat & Ptot, const arma::mat &, const arma::mat &,
                 const arma::mat & Ca, const arma::mat & Cb, const std::vector<double> & occa, const std::vector<double> & occb,
                 const arma::mat & S, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const override {
       J = dfit.calcJ(Ptot);
       if(want_K) { Ka = k_orb(Ca, occa, S); Kb = k_orb(Cb, occb, S); }
     }
-    void formJK(const arma::mat & Ptot, const arma::cx_mat &, const arma::cx_mat &,
+    void build_JKfull(const arma::mat & Ptot, const arma::cx_mat &, const arma::cx_mat &,
                 const arma::cx_mat & cCa, const arma::cx_mat & cCb, const std::vector<double> & occa, const std::vector<double> & occb,
                 const arma::mat & S, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const override {
       J = dfit.calcJ(Ptot);
@@ -710,63 +765,33 @@ arma::cx_mat JKBuilder::calcK(const arma::cx_mat & C, const std::vector<double> 
 arma::mat JKBuilder::calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const { return impl->calcK_short(C, occ, S); }
 arma::cx_mat JKBuilder::calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const { return impl->calcK_short(C, occ, S); }
 
+// The exact-exchange admixture and the full/short combination live in the
+// backend (set at fill time); the facade just forwards.
 void JKBuilder::set_range_separation(double kfull, double kshort, double omega) {
-  kfull_ = kfull;
-  kshort_ = kshort;
-  omega_ = omega;
-  if(omega_ != 0.0)
-    init_rs(omega_);
+  impl->set_range_separation(kfull, kshort, omega);
 }
+bool JKBuilder::has_exact_exchange() const { return impl->has_exact_exchange(); }
 
-// Coulomb + combined exact exchange kfull_*K_full + kshort_*K_short(omega_).
-// The backend builds J (always full Coulomb) and the raw full-range K; the
-// short-range part (when omega_ != 0) comes from the range-separated engine,
-// already built by set_range_separation. The exchange admixture is builder
-// state, so callers do not thread it through every J/K build.
 void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
                        const arma::mat & S, arma::mat & J, arma::mat & K) const {
-  impl->formJK(Ptot, C, occ, S, kfull_ != 0.0, J, K);
-  if(kfull_ != 0.0) K *= kfull_;
-  else              K.zeros(J.n_rows, J.n_cols);
-  if(omega_ != 0.0)
-    K += kshort_ * impl->formKshort(Ptot, C, occ, S);
+  impl->formJK(Ptot, C, occ, S, J, K);
 }
 void JKBuilder::formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
                        const std::vector<double> & occ, const arma::mat & S,
                        arma::mat & J, arma::cx_mat & K) const {
-  impl->formJK(Ptot, cP, cC, occ, S, kfull_ != 0.0, J, K);
-  if(kfull_ != 0.0) K *= kfull_;
-  else              K.zeros(J.n_rows, J.n_cols);
-  if(omega_ != 0.0)
-    K += kshort_ * impl->formKshort(cP, cC, occ, S);
+  impl->formJK(Ptot, cP, cC, occ, S, J, K);
 }
 void JKBuilder::formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
                        const arma::mat & Ca, const arma::mat & Cb,
                        const std::vector<double> & occa, const std::vector<double> & occb,
                        const arma::mat & S, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const {
-  impl->formJK(Ptot, Pa, Pb, Ca, Cb, occa, occb, S, kfull_ != 0.0, J, Ka, Kb);
-  if(kfull_ != 0.0) { Ka *= kfull_; Kb *= kfull_; }
-  else              { Ka.zeros(J.n_rows, J.n_cols); Kb.zeros(J.n_rows, J.n_cols); }
-  if(omega_ != 0.0) {
-    arma::mat Kas, Kbs;
-    impl->formKshort(Pa, Pb, Ca, Cb, occa, occb, S, Kas, Kbs);
-    Ka += kshort_ * Kas;
-    Kb += kshort_ * Kbs;
-  }
+  impl->formJK(Ptot, Pa, Pb, Ca, Cb, occa, occb, S, J, Ka, Kb);
 }
 void JKBuilder::formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
                        const arma::cx_mat & cCa, const arma::cx_mat & cCb,
                        const std::vector<double> & occa, const std::vector<double> & occb,
                        const arma::mat & S, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const {
-  impl->formJK(Ptot, cPa, cPb, cCa, cCb, occa, occb, S, kfull_ != 0.0, J, Ka, Kb);
-  if(kfull_ != 0.0) { Ka *= kfull_; Kb *= kfull_; }
-  else              { Ka.zeros(J.n_rows, J.n_cols); Kb.zeros(J.n_rows, J.n_cols); }
-  if(omega_ != 0.0) {
-    arma::cx_mat Kas, Kbs;
-    impl->formKshort(cPa, cPb, cCa, cCb, occa, occb, S, Kas, Kbs);
-    Ka += kshort_ * Kas;
-    Kb += kshort_ * Kbs;
-  }
+  impl->formJK(Ptot, cPa, cPb, cCa, cCb, occa, occb, S, J, Ka, Kb);
 }
 
 arma::vec JKBuilder::formForce(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ,

@@ -62,12 +62,9 @@ class JKBuilder {
  private:
   /// Resolved build method
   Method method;
-  /// The chosen backend (built in configure, filled in init).
+  /// The chosen backend (built in configure, filled in init). It owns the
+  /// exact-exchange admixture (set via set_range_separation at fill time).
   std::unique_ptr<JKBackend> impl;
-  /// Exact-exchange admixture used by formJK:
-  /// K = kfull_*K_full + kshort_*K_short(omega_). Set once at fill time via
-  /// set_range_separation; defaults to Hartree-Fock.
-  double kfull_ = 1.0, kshort_ = 0.0, omega_ = 0.0;
 
  public:
   JKBuilder();
@@ -112,7 +109,7 @@ class JKBuilder {
   /// parameter. Defaults to Hartree-Fock (kfull=1, kshort=0, omega=0).
   void set_range_separation(double kfull, double kshort, double omega);
   /// Whether any exact exchange is present (kfull or kshort nonzero).
-  bool has_exact_exchange() const { return kfull_ != 0.0 || kshort_ != 0.0; }
+  bool has_exact_exchange() const;
 
   /// Unified Coulomb + exact-exchange build (restricted / unrestricted, real /
   /// complex). J is always the full Coulomb operator, built from the real total
