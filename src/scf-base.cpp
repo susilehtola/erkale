@@ -368,6 +368,10 @@ void SCF::fill_rs(double omega) {
   jk.init_rs(omega);
 }
 
+void SCF::set_range_separation(double kfull, double kshort, double omega) {
+  jk.set_range_separation(kfull, kshort, omega);
+}
+
 arma::mat SCF::get_S() const {
   return S;
 }

@@ -377,6 +377,10 @@ public:
 
   /// Fill range-separated integrals
   void fill_rs(double omega);
+  /// Configure the exact-exchange admixture on the J/K builder (full- and
+  /// short-range fractions and the range-separation parameter), building the
+  /// range-separated integrals when omega != 0. Call at SCF setup time.
+  void set_range_separation(double kfull, double kshort, double omega);
 
   /// Do core guess
   void core_guess(rscf_t & sol) const;

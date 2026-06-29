@@ -64,6 +64,10 @@ class JKBuilder {
   Method method;
   /// The chosen backend (built in configure, filled in init).
   std::unique_ptr<JKBackend> impl;
+  /// Exact-exchange admixture used by formJK:
+  /// K = kfull_*K_full + kshort_*K_short(omega_). Set once at fill time via
+  /// set_range_separation; defaults to Hartree-Fock.
+  double kfull_ = 1.0, kshort_ = 0.0, omega_ = 0.0;
 
  public:
   JKBuilder();
@@ -101,32 +105,33 @@ class JKBuilder {
   arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const;
   arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const;
 
-  /// Unified full-range Coulomb + exchange build (restricted / unrestricted,
-  /// real / complex). J is built from the real total density Ptot; K is gated
-  /// by want_K.
+  /// Configure the exact-exchange admixture used by formJK and build the
+  /// range-separated (short-range) integrals when omega != 0. Call once at fill
+  /// time (SCF::set_range_separation): kfull / kshort are the full- and
+  /// short-range exact-exchange fractions, omega the range-separation
+  /// parameter. Defaults to Hartree-Fock (kfull=1, kshort=0, omega=0).
+  void set_range_separation(double kfull, double kshort, double omega);
+  /// Whether any exact exchange is present (kfull or kshort nonzero).
+  bool has_exact_exchange() const { return kfull_ != 0.0 || kshort_ != 0.0; }
+
+  /// Unified Coulomb + exact-exchange build (restricted / unrestricted, real /
+  /// complex). J is always the full Coulomb operator, built from the real total
+  /// density Ptot. K is the combined exact exchange
+  /// kfull*K_full + kshort*K_short(omega) for the admixture configured by
+  /// set_range_separation (K is zero when there is no exact exchange).
   void formJK(const arma::mat & Ptot, const arma::mat & C, const std::vector<double> & occ,
-              const arma::mat & S, bool want_K, arma::mat & J, arma::mat & K) const;
+              const arma::mat & S, arma::mat & J, arma::mat & K) const;
   void formJK(const arma::mat & Ptot, const arma::cx_mat & cP, const arma::cx_mat & cC,
-              const std::vector<double> & occ, const arma::mat & S, bool want_K,
+              const std::vector<double> & occ, const arma::mat & S,
               arma::mat & J, arma::cx_mat & K) const;
   void formJK(const arma::mat & Ptot, const arma::mat & Pa, const arma::mat & Pb,
               const arma::mat & Ca, const arma::mat & Cb,
               const std::vector<double> & occa, const std::vector<double> & occb,
-              const arma::mat & S, bool want_K, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const;
+              const arma::mat & S, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const;
   void formJK(const arma::mat & Ptot, const arma::cx_mat & cPa, const arma::cx_mat & cPb,
               const arma::cx_mat & cCa, const arma::cx_mat & cCb,
               const std::vector<double> & occa, const std::vector<double> & occb,
-              const arma::mat & S, bool want_K, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const;
-
-  /// Short-range (range-separated) exchange only.
-  arma::mat   formKshort(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const;
-  arma::cx_mat formKshort(const arma::cx_mat & cP, const arma::cx_mat & cC, const std::vector<double> & occ, const arma::mat & S) const;
-  void formKshort(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Ca, const arma::mat & Cb,
-                  const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
-                  arma::mat & Ka, arma::mat & Kb) const;
-  void formKshort(const arma::cx_mat & cPa, const arma::cx_mat & cPb, const arma::cx_mat & cCa, const arma::cx_mat & cCb,
-                  const std::vector<double> & occa, const std::vector<double> & occb, const arma::mat & S,
-                  arma::cx_mat & Ka, arma::cx_mat & Kb) const;
+              const arma::mat & S, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb) const;
 
   /// Coulomb + exact-exchange contribution to the force gradient: J always,
   /// plus kfull-scaled exchange, plus kshort-scaled short-range exchange when

@@ -245,9 +245,9 @@ void augmented_solution(const BasisSet & basis, const uscf_t & sol, size_t nocca
     // Range separated functional?
     double omega, kfull, kshort;
     range_separation(dft.x_func,omega,kfull,kshort);
-    // Evaluators for range separated part
-    if(omega!=0.0)
-      solver.fill_rs(omega);
+    // Configure the exact-exchange admixture on the solver's J/K builder
+    // (builds the range-separated integrals when omega != 0).
+    solver.set_range_separation(kfull, kshort, omega);
 
     switch(method) {
     case(TP):
