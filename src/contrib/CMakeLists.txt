@@ -171,7 +171,19 @@ if(OPENORBITAL_HEADER)
       PATH_SUFFIXES eigen3 include/eigen3)
   endif()
   if(NOT EIGEN3_INCLUDE_DIR)
-    message(FATAL_ERROR "Eigen3 headers not found, but needed by OpenOrbitalOptimizer for the NEO and complex-orbital targets. Set -DEIGEN3_INCLUDE_DIR=/path/to/eigen3")
+    # Header-only; fetch when no system copy is found, like openorbitaloptimizer
+    # and libwignernj. Populate-only -- we just need the include directory.
+    message(STATUS "Eigen3 not found locally; fetching v3.4.0 from GitLab (header-only).")
+    include(FetchContent)
+    FetchContent_Declare(eigen3
+      GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+      GIT_TAG        3.4.0
+      GIT_SHALLOW    TRUE)
+    FetchContent_GetProperties(eigen3)
+    if(NOT eigen3_POPULATED)
+      FetchContent_Populate(eigen3)
+    endif()
+    set(EIGEN3_INCLUDE_DIR "${eigen3_SOURCE_DIR}")
   endif()
   message(STATUS "Eigen3 headers for OpenOrbitalOptimizer targets: ${EIGEN3_INCLUDE_DIR}")
 
