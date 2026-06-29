@@ -145,20 +145,27 @@ constants.
 
 Common datasets:
 
-| Dataset | Shape         | Notes |
-|---------|---------------|-------|
-| `nbf`   | scalar int    | AO basis functions |
-| `B`     | `(naux,nbf,nbf)` | engine factor — `btensor` mode only (§1.3) |
+| Dataset   | Shape         | Notes |
+|-----------|---------------|-------|
+| `nbf`     | scalar int    | AO basis functions |
+| `overlap` | `(nbf,nbf)`   | AO overlap `S` — the metric this species' AO basis lives in |
+| `B`       | `(naux,nbf,nbf)` | engine factor — `btensor` mode only (§1.3) |
 
 Electron group, **RHF** (`restricted_electrons = true`):
 
 | Dataset | Shape        | Notes |
 |---------|--------------|-------|
 | `nmo`,`nocc` | scalar int | `nocc = n_electrons/2` |
-| `C`     | `(nbf,nmo)`  | AO→MO, energy-ordered |
-| `eps`   | `(nmo,)`     | MO energies |
+| `C`     | `(nbf,nmo)`  | canonical AO→MO, energy-ordered (§2.3) |
+| `eps`   | `(nmo,)`     | canonical MO energies |
 | `hcore` | `(nbf,nbf)`  | one-particle core (§2.3) |
 | `fock`  | `(nbf,nbf)`  | converged Fock (§2.3) |
+
+`C`/`eps` are the **canonical** orbitals: the writer diagonalizes the stored
+`fock` in the `overlap` metric, so they satisfy `F C = S C diag(eps)`,
+`Cᵀ S C = I`, `Cᵀ F C = diag(eps)` (validated at write time, residuals printed).
+`nocc` is the integer particle count of the block (occupied = lowest `nocc`
+canonical orbitals).
 
 Electron group, **UHF** (`restricted_electrons = false`): the same, suffixed `_a`/`_b`
 — `nmo_a/nmo_b`, `nocc_a/nocc_b`, `C_a/C_b`, `eps_a/eps_b`, `hcore` (spin-independent,
@@ -173,13 +180,20 @@ Proton group: `nmo`, `nocc` (`= n_quantum_protons`), `C`, `eps`, `hcore`, `fock`
   `eri_ep`).
 - **Proton `hcore`** `= T_p/m_p + V_p(classical)` — mass-scaled kinetic + repulsion
   from classical nuclei (`+` sign for the positive test charge), `m_p = proton_mass`.
-- **`fock`** is the converged self-consistent AO Fock with all mean-field two-particle
-  terms at their physical signs (including the `-` e-p attraction). Its generalized
-  eigenvalues with the AO overlap equal `eps`. Per species:
+- **Electron `fock`** is the converged self-consistent AO Fock with all mean-field
+  two-particle terms at their physical signs (including the `−` e-p attraction):
   `fock_e = hcore_e + J_ee[D^e] − ½K_ee[D^e] − J_ep[D^p]` (RHF; UHF uses
-  `J_ee[D^e] − K_ee[D^{σ}]` per spin), `fock_p = hcore_p + J_pp[D^p] − K_pp[D^p]
-  − J_pe[D^e]`, where `J_ep`/`J_pe` denote the (positive) Coulomb fields and the `−`
-  is the attraction.
+  `J_ee[D^e] − K_ee[D^{σ}]` per spin). Its generalized eigenvalues in `overlap`
+  equal `eps`, and `C` are the eigenvectors (§2.2).
+- **Proton `fock`** is the **self-interaction-free** one-particle-per-orbital
+  operator `fock_p = hcore_p − J_pe[D^e]` (kinetic + classical-nucleus repulsion +
+  the electron mean-field attraction `−J_pe`), with **no** proton–proton `J_p/K_p`.
+  A single quantum proton has no proton–proton interaction; including its own
+  Coulomb/exchange leaves the occupied orbital and the total SCF energy unchanged
+  but spuriously unbinds the proton virtuals. Excluding it gives a physically bound
+  proton spectrum (occupied + virtual `eps` below the free-proton dissociation
+  threshold), which is what the CC consumer needs. The proton–proton interaction,
+  if needed, is available exactly from `proton/B` (`eri_pp`).
 
 ---
 

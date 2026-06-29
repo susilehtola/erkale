@@ -13,9 +13,11 @@
 #include "basis.h"
 #include "density_fitting.h"
 #include "eriworker.h"
+#include "linalg.h"
 
 #include <hdf5.h>
 #include <cstdio>
+#include <cmath>
 #include <stdexcept>
 #include <sstream>
 
@@ -176,6 +178,32 @@ namespace {
     return C * arma::diagmat(occ) * C.t();
   }
 
+  // Canonical MOs of a Fock matrix F in the AO overlap metric S: solve the
+  // generalized eigenproblem F C = S C diag(eps) with C^T S C = I and
+  // C^T F C = diag(eps), eps ascending. Canonical (symmetric) orthonormalization
+  // via BasOrth projects out near-linear-dependent directions, so C is
+  // (Nbf x Nmo) with Nmo <= Nbf. The SCF solver returns occupation-ordered
+  // orbitals that do not in general diagonalize the converged Fock (DIIS
+  // extrapolation), so the dump recanonicalizes here.
+  arma::mat canonical_orbitals(const arma::mat & F, const arma::mat & S, arma::vec & eps) {
+    arma::mat X = BasOrth(S);                 // Nbf x Nmo
+    arma::mat Fmo = X.t() * F * X;            // Nmo x Nmo
+    Fmo = 0.5*(Fmo + Fmo.t());                // symmetrize against round-off
+    arma::mat U;
+    arma::eig_sym(eps, U, Fmo);
+    return X * U;                             // Nbf x Nmo, ascending in eps
+  }
+
+  // Max-norm residuals of the canonical conditions, for validation/printing.
+  void canonical_residuals(const arma::mat & C, const arma::mat & S,
+                           const arma::mat & F, const arma::vec & eps,
+                           double & orthonormality, double & eigres, double & offdiag) {
+    arma::mat I(C.n_cols, C.n_cols, arma::fill::eye);
+    orthonormality = arma::abs(C.t()*S*C - I).max();
+    eigres = arma::abs(F*C - S*C*arma::diagmat(eps)).max();
+    offdiag = arma::abs(C.t()*F*C - arma::diagmat(eps)).max();
+  }
+
 } // anonymous namespace
 
 void neo_dump(const std::string & filename,
@@ -229,6 +257,67 @@ void neo_dump(const std::string & filename,
     Gep = exact_ep(ebasis, pbasis, omega, alpha, beta);
   }
 
+  // ---- canonical MOs consistent with the dumped Fock + AO overlaps ----
+  // AO overlap is the metric each species' basis lives in (also dumped).
+  arma::mat S_e = ebasis.overlap();
+  arma::mat S_p = pbasis.overlap();
+
+  // Diagonalize the final converged Fock for each species so the stored MOs
+  // satisfy F C = S C diag(eps), C^T S C = I, C^T F C = diag(eps). The SCF
+  // solver returns occupation-ordered orbitals that do not diagonalize the
+  // rebuilt Fock; recanonicalize. The proton Fock passed in is already
+  // self-interaction-free (h_p + V_ep[D_e]), so its canonical virtuals are
+  // physically bound.
+  // Aufbau occupations on the canonical (energy-ordered) orbitals. The number
+  // of occupied orbitals is the integer particle count of the block (the sum of
+  // the SCF occupations, which may be spread fractionally over near-degenerate
+  // solver orbitals), NOT the count of nonzero entries -- otherwise a
+  // fractionally split orbital would be double-counted.
+  std::vector<arma::mat> Cc(Ce.size());
+  std::vector<arma::vec> epsc(Ce.size()), occc(Ce.size());
+  double occ_e = restricted_e ? 2.0 : 1.0;
+  for(size_t s=0;s<Ce.size();s++) {
+    Cc[s] = canonical_orbitals(focke[s], S_e, epsc[s]);
+    size_t nocc = (size_t) std::lround(arma::accu(occe[s]) / occ_e);
+    occc[s].zeros(Cc[s].n_cols);
+    if(nocc) occc[s].subvec(0,nocc-1).fill(occ_e);
+  }
+  arma::vec epsp_c;
+  arma::mat Cp_c = canonical_orbitals(fock_p, S_p, epsp_c);
+  size_t nocc_p = (size_t) std::lround(arma::accu(occp));
+  arma::vec occp_c(Cp_c.n_cols, arma::fill::zeros);
+  if(nocc_p) occp_c.subvec(0,nocc_p-1).ones();
+
+  // Validation: canonical conditions (a,b,c) and a bound proton spectrum.
+  printf("\nNEO dump canonicalization check (max-norm residuals):\n");
+  for(size_t s=0;s<Cc.size();s++) {
+    double rI,rFC,rOD;
+    canonical_residuals(Cc[s], S_e, focke[s], epsc[s], rI,rFC,rOD);
+    const char * lbl = (Ce.size()==1) ? "electron" : (s==0 ? "electron alpha" : "electron beta");
+    printf("  %-14s ||C'SC-I||=%.2e  ||FC-SCe||=%.2e  ||C'FC-diag||=%.2e\n", lbl, rI,rFC,rOD);
+    if(rI>1e-8 || rFC>1e-6 || rOD>1e-6)
+      throw std::runtime_error("neo_dump: electron canonicalization residual too large!\n");
+  }
+  {
+    double rI,rFC,rOD;
+    canonical_residuals(Cp_c, S_p, fock_p, epsp_c, rI,rFC,rOD);
+    printf("  %-14s ||C'SC-I||=%.2e  ||FC-SCe||=%.2e  ||C'FC-diag||=%.2e\n", "proton", rI,rFC,rOD);
+    if(rI>1e-8 || rFC>1e-6 || rOD>1e-6)
+      throw std::runtime_error("neo_dump: proton canonicalization residual too large!\n");
+    // Dissociation threshold for a quantum proton is 0 (free proton at rest,
+    // vanishing potential at infinity); bound orbitals have eps < 0.
+    const double thr = 0.0;
+    if(nocc_p < (size_t) Cp_c.n_cols) {
+      double lowest_virtual = epsp_c(nocc_p);
+      size_t nbound = (size_t) arma::accu(epsp_c.subvec(nocc_p, Cp_c.n_cols-1) < thr);
+      printf("  proton spectrum: highest occ %.4f, lowest virtual %.4f, %i bound virtual(s) below threshold %.1f\n",
+             epsp_c(nocc_p-1), lowest_virtual, (int) nbound, thr);
+      if(lowest_virtual >= thr)
+        throw std::runtime_error("neo_dump: lowest proton virtual is unbound -- proton self-interaction not removed?\n");
+    }
+  }
+  fflush(stdout);
+
   // ---- write the file ----
   hid_t file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
   if(file < 0)
@@ -258,19 +347,20 @@ void neo_dump(const std::string & filename,
   hid_t eg = H5Gcreate2(file, "/electron", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   write_int(eg, "nbf", (int) Ne);
   write_mat(eg, "hcore", hcore_e);
+  write_mat(eg, "overlap", S_e);
   if(restricted_e) {
-    write_int(eg, "nmo", (int) Ce[0].n_cols);
-    write_int(eg, "nocc", (int) arma::accu(occe[0] > 0.0));
-    write_mat(eg, "C", Ce[0]);
-    write_vec(eg, "eps", epse[0]);
+    write_int(eg, "nmo", (int) Cc[0].n_cols);
+    write_int(eg, "nocc", (int) arma::accu(occc[0] > 0.0));
+    write_mat(eg, "C", Cc[0]);
+    write_vec(eg, "eps", epsc[0]);
     write_mat(eg, "fock", focke[0]);
   } else {
     const char * suf[2] = {"_a", "_b"};
     for(int s=0;s<2;s++) {
-      write_int(eg, std::string("nmo")+suf[s], (int) Ce[s].n_cols);
-      write_int(eg, std::string("nocc")+suf[s], (int) arma::accu(occe[s] > 0.0));
-      write_mat(eg, std::string("C")+suf[s], Ce[s]);
-      write_vec(eg, std::string("eps")+suf[s], epse[s]);
+      write_int(eg, std::string("nmo")+suf[s], (int) Cc[s].n_cols);
+      write_int(eg, std::string("nocc")+suf[s], (int) arma::accu(occc[s] > 0.0));
+      write_mat(eg, std::string("C")+suf[s], Cc[s]);
+      write_vec(eg, std::string("eps")+suf[s], epsc[s]);
       write_mat(eg, std::string("fock")+suf[s], focke[s]);
     }
   }
@@ -280,12 +370,13 @@ void neo_dump(const std::string & filename,
   // /proton
   hid_t pg = H5Gcreate2(file, "/proton", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   write_int(pg, "nbf", (int) Np);
-  write_int(pg, "nmo", (int) Cp.n_cols);
-  write_int(pg, "nocc", (int) arma::accu(occp > 0.0));
-  write_mat(pg, "C", Cp);
-  write_vec(pg, "eps", epsp);
+  write_int(pg, "nmo", (int) Cp_c.n_cols);
+  write_int(pg, "nocc", (int) arma::accu(occp_c > 0.0));
+  write_mat(pg, "C", Cp_c);
+  write_vec(pg, "eps", epsp_c);
   write_mat(pg, "hcore", hcore_p);
   write_mat(pg, "fock", fock_p);
+  write_mat(pg, "overlap", S_p);
   if(!dense)
     write_B(pg, Bp, Np);
 
@@ -316,15 +407,16 @@ void neo_dump(const std::string & filename,
 
   // ---- verify: reconstruct the SCF energy from the dumped quantities ----
   if(do_verify) {
-    // electron density (total) and per-spin densities
+    // electron density (total) and per-spin densities, from the canonical
+    // occupied orbitals (same occupied subspace as the SCF solution).
     arma::mat De(Ne, Ne, arma::fill::zeros);
     std::vector<arma::mat> Dspin;
-    for(size_t s=0;s<Ce.size();s++) {
-      arma::mat Ds = density(Ce[s], occe[s]);
+    for(size_t s=0;s<Cc.size();s++) {
+      arma::mat Ds = density(Cc[s], occc[s]);
       Dspin.push_back(Ds);
       De += Ds;
     }
-    arma::mat Dp = density(Cp, occp);
+    arma::mat Dp = density(Cp_c, occp_c);
 
     arma::vec de_vec = arma::vectorise(De); // symmetric => pair index mu*Ne+nu
     arma::vec dp_vec = arma::vectorise(Dp);
