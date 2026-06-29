@@ -68,6 +68,8 @@ void Settings::add_scf_settings() {
   add_int("LinearOccupations", "Read in occupations for linear molecule calculations?", 0, true);
   add_string("LinearOccupationFile", "File to read linear occupations from", "linoccs.dat");
   add_double("LinearB", "Magnetic field along bond axis", 0.0, true);
+  add_double("LinearE", "Electric field along bond (z) axis", 0.0, true);
+  add_double("Confinement", "Harmonic confinement strength k (potential 1/2 k r^2), 0 = off", 0.0, true);
 
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");

@@ -108,6 +108,8 @@ int main_guarded(int argc, char **argv) {
   int readlinocc = settings.get_int("LinearOccupations");
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
+  double linE = settings.get_double("LinearE");
+  double confinement = settings.get_double("Confinement");
   bool unrestricted = !(settings.get_bool("Restricted"));
   bool density_fitting = settings.get_bool("DensityFitting");
   std::string guess = settings.get_string("Guess");
@@ -271,17 +273,33 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(C, occs);
   };
 
+  // One-electron field operator added to the Fock matrix. Collects the
+  // magnetic terms (orbital Zeeman -1/2 B L_z, diamagnetic 1/8 B^2 (x^2+y^2)),
+  // the electric dipole (E z along the bond axis), and an optional harmonic
+  // confinement (1/2 k r^2). z preserves L_z, so the m-block structure is kept;
+  // it mixes l within a block, which is what polarizes the density. The
+  // confinement is an artificial regulariser (a static field has no bound
+  // ground state) -- leave it off (k=0) for weak fields with a non-diffuse
+  // basis; turn it on to prevent variational collapse toward the continuum.
   arma::mat Bterms(Nbf, Nbf, arma::fill::zeros);
-  if (linB) {
+  if (linB || linE || confinement) {
     double cenx = 0.0, ceny = 0.0, cenz = 0.0;
+    std::vector<arma::mat> dip = basis.moment(1, cenx, ceny, cenz);
     std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
     arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
+    arma::mat zmat = dip[getind(0, 0, 1)];
+    arma::mat r2mat = xymat + momstack[getind(0, 0, 2)];
     const auto & Smat = complexbas ? S_c : S;
     if(complexbas) {
       xymat = arma::real(D.t()*xymat*D);
+      zmat = arma::real(D.t()*zmat*D);
+      r2mat = arma::real(D.t()*r2mat*D);
     }
     for (size_t j = 0; j < Nbf; j++)
-      Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
+      Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j)   // orbital Zeeman
+        + 0.125 * linB * linB * xymat.col(j)                 // diamagnetic
+        + linE * zmat.col(j)                                 // electric dipole
+        + 0.5 * confinement * r2mat.col(j);                  // harmonic confinement
   }
 
   std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
@@ -356,7 +374,7 @@ int main_guarded(int argc, char **argv) {
       printf("e-e Coulomb energy          % .10f\n", Ecoul);
       printf("e-e exchange energy         % .10f\n", Eexch);
       printf("nuclear repulsion energy    % .10f\n", Enucr);
-      printf("magnetic interaction energy % .10f\n", Emag);
+      printf("field interaction energy    % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
       fflush(stdout);
     }
@@ -437,7 +455,7 @@ int main_guarded(int argc, char **argv) {
       printf("e-e Coulomb energy          % .10f\n", Ecoul);
       printf("e-e exchange energy         % .10f\n", Eexch);
       printf("nuclear repulsion energy    % .10f\n", Enucr);
-      printf("magnetic interaction energy % .10f\n", Emag);
+      printf("field interaction energy    % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
       fflush(stdout);
     }
