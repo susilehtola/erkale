@@ -1188,10 +1188,16 @@ int main_guarded(int argc, char **argv) {
         Focke.push_back(hcore_e + Ja + Jb + Kb + Jpe);
       }
       arma::mat hcore_p = Tp + Vpc;
-      arma::mat Jp, Kp;
-      std::tie(Jp, Kp) = protonic_terms(Cp_ao, occp);
       arma::mat Jep = electron_proton_coulomb(De);
-      arma::mat Fock_p = hcore_p + Jp + Kp + Jep;
+      // Self-interaction-free proton Fock for the correlation consumer:
+      // kinetic + classical-nucleus attraction + the electron mean-field
+      // attraction only. The proton-proton J_p/K_p are deliberately excluded
+      // (a single quantum proton has no proton-proton interaction; including
+      // it leaves the occupied orbital unchanged but spuriously unbinds the
+      // proton virtuals). The total SCF energy and the dumped p-p B-tensor are
+      // unaffected -- this only sets the reference operator whose canonical
+      // orbitals/energies are written.
+      arma::mat Fock_p = hcore_p + Jep;
 
 #ifdef SVNRELEASE
       std::string version(SVNREVISION);
