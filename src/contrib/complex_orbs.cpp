@@ -58,7 +58,7 @@ arma::cx_mat basis_transform_mat(int l) {
       Lmat(l+m, l+m) = -std::complex<double>(0.0, std::sqrt(0.5));
       Lmat(l-m, l+m) = std::sqrt(0.5);
     } else if (m == 0)
-      Lmat(l, m) = 1.0;
+      Lmat(l, l) = 1.0;
     else {
       Lmat(l-m, l+m) = std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
       Lmat(l+m, l+m) = std::pow(-1.0, m) * std::sqrt(0.5);
@@ -87,7 +87,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
-  settings.add_bool("Complexbas", "Use complex basis?", false);
+  settings.add_bool("ComplexBasis", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
   settings.add_bool("ODA", "Use optimal damping algorithm?", false);
 
@@ -105,10 +105,12 @@ int main_guarded(int argc, char **argv) {
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
-  bool complexbas = settings.get_bool("Complexbas");
+  bool complexbas = settings.get_bool("ComplexBasis");
   int readlinocc = settings.get_int("LinearOccupations");
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
+  double linE = settings.get_double("LinearE");
+  double confinement = settings.get_double("Confinement");
   bool unrestricted = !(settings.get_bool("Restricted"));
   std::string guess = settings.get_string("Guess");
   bool oda = settings.get_bool("ODA");
@@ -182,7 +184,7 @@ int main_guarded(int argc, char **argv) {
     D.eye();
 
   // Blocked matrices
-  arma::mat S_c = arma::real(D * S * D.t());
+  arma::mat S_c = arma::real(D.t() * S * D);
   size_t Nmo=0;
   std::vector<arma::mat> X(2*maxam+1);
   for (size_t m=0; m<X.size(); m++) {
@@ -252,22 +254,33 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(C, occs);
   };
 
+  // One-electron field operator added to the Fock matrix. Collects the
+  // magnetic terms (orbital Zeeman -1/2 B L_z, diamagnetic 1/8 B^2 (x^2+y^2)),
+  // the electric dipole (E z along the bond axis), and an optional harmonic
+  // confinement (1/2 k r^2). z preserves L_z, so the m-block structure is kept;
+  // it mixes l within a block, which is what polarizes the density. The
+  // confinement is an artificial regulariser (a static field has no bound
+  // ground state) -- leave it off (k=0) for weak fields with a non-diffuse
+  // basis; turn it on to prevent variational collapse toward the continuum.
   arma::mat Bterms(Nbf, Nbf, arma::fill::zeros);
-  if (linB) {
+  if (linB || linE || confinement) {
     double cenx = 0.0, ceny = 0.0, cenz = 0.0;
+    std::vector<arma::mat> dip = basis.moment(1, cenx, ceny, cenz);
     std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
     arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
-
+    arma::mat zmat = dip[getind(0, 0, 1)];
+    arma::mat r2mat = xymat + momstack[getind(0, 0, 2)];
+    const auto & Smat = complexbas ? S_c : S;
     if(complexbas) {
       xymat = arma::real(D.t()*xymat*D);
-      for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = -0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
-
-    } else {
-      for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = -0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
-
+      zmat = arma::real(D.t()*zmat*D);
+      r2mat = arma::real(D.t()*r2mat*D);
     }
+    for (size_t j = 0; j < Nbf; j++)
+      Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j)   // orbital Zeeman
+        + 0.125 * linB * linB * xymat.col(j)                 // diamagnetic
+        + linE * zmat.col(j)                                 // electric dipole
+        + 0.5 * confinement * r2mat.col(j);                  // harmonic confinement
   }
 
   std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
@@ -305,7 +318,7 @@ int main_guarded(int argc, char **argv) {
     return P;
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -342,7 +355,7 @@ int main_guarded(int argc, char **argv) {
       printf("e-e Coulomb energy          % .10f\n", Ecoul);
       printf("e-e exchange energy         % .10f\n", Eexch);
       printf("nuclear repulsion energy    % .10f\n", Enucr);
-      printf("magnetic interaction energy % .10f\n", Emag);
+      printf("field interaction energy    % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
       fflush(stdout);
     }
@@ -351,7 +364,7 @@ int main_guarded(int argc, char **argv) {
   }; //restricted Fock builder
 
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
 
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
@@ -423,7 +436,7 @@ int main_guarded(int argc, char **argv) {
       printf("e-e Coulomb energy          % .10f\n", Ecoul);
       printf("e-e exchange energy         % .10f\n", Eexch);
       printf("nuclear repulsion energy    % .10f\n", Enucr);
-      printf("magnetic interaction energy % .10f\n", Emag);
+      printf("field interaction energy    % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
       fflush(stdout);
     }
@@ -432,7 +445,7 @@ int main_guarded(int argc, char **argv) {
   }; //unrestricted Fock builder
 
   // Save matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::FockMatrix<double> fock) {
+  std::function<void(const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> fock) {
 
     if(!unrestricted) {
       for (size_t m=0; m<X.size(); m++) {
@@ -482,7 +495,7 @@ int main_guarded(int argc, char **argv) {
   arma::vec number_of_particles;
   arma::vec number_of_particles_per_block;
   std::vector<std::string> block_descriptions;
-  OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> fock_builder;
 
   // Run SCF
   if (!unrestricted) {
@@ -514,7 +527,7 @@ int main_guarded(int argc, char **argv) {
 
   printf("\n\n\nSolving SCF\n");
   fflush(stdout);
-  OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+  OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
   if (readlinocc < 0)
     scfsolver.fixed_number_of_particles_per_block(number_of_particles_per_block);
   scfsolver.initialize_with_fock(Fguess);

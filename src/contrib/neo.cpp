@@ -32,6 +32,7 @@
 #include "timer.h"
 #include "density_fitting.h"
 #include "jkbuilder.h"
+#include "neo_dump.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -110,6 +111,9 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
   settings.add_bool("vpp", "Include JK terms for protons?", true);
+  settings.add_string("NEODump", "Dump converged NEO-SCF to this HDF5 file for post-SCF correlation codes (empty = off)", "");
+  settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
+  settings.add_bool("NEODumpVerify", "Reconstruct the energy from the NEODump tensors and check it against the SCF energy", true);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -494,7 +498,7 @@ int main_guarded(int argc, char **argv) {
     return density_fitting ? proton_electron_coulomb_ri(Pp) : proton_electron_coulomb_exact(Pp);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> restricted_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -536,7 +540,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> unrestricted_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -596,7 +600,7 @@ int main_guarded(int argc, char **argv) {
       }
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> restricted_neo_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -656,7 +660,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> unrestricted_neo_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -727,7 +731,7 @@ int main_guarded(int argc, char **argv) {
   arma::vec maximum_occupation;
   arma::vec number_of_particles;
   std::vector<std::string> block_descriptions;
-  OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> fock_builder;
 
   int Nel = basis.Ztot()-Q;
   int Nela = (Nel+M-1)/2;
@@ -740,8 +744,8 @@ int main_guarded(int argc, char **argv) {
     throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
 
   // We will need the density matrices in the calculation
-  OpenOrbitalOptimizer::DensityMatrix<double, double> electronic_dm;
-  OpenOrbitalOptimizer::DensityMatrix<double, double> protonic_dm;
+  OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> electronic_dm;
+  OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> protonic_dm;
 
   // Set up protonic guess
   if(quantum_protons.size()) {
@@ -786,18 +790,18 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Save the matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
-    const OpenOrbitalOptimizer::Orbitals<double> & porbitals = pdm.first;
-    const OpenOrbitalOptimizer::OrbitalOccupations<double> & poccupations = pdm.second;
+  std::function<void(const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> &)> save_proton_matrices = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> & pfock) {
+    const OpenOrbitalOptimizer::Armadillo::Orbitals<double> & porbitals = pdm.first;
+    const OpenOrbitalOptimizer::Armadillo::OrbitalOccupations<double> & poccupations = pdm.second;
     arma::mat Cp = Xp*porbitals[0];
     arma::vec Ep = arma::diagvec(porbitals[0].t()*pfock[0]*porbitals[0]);
     chkpt.write("Cp",Cp);
     chkpt.write("Ep",Ep);
   };
 
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_electron_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::FockMatrix<double> & elfock) {
-    const OpenOrbitalOptimizer::Orbitals<double> & eorbitals = eldm.first;
-    const OpenOrbitalOptimizer::OrbitalOccupations<double> & eoccupations = eldm.second;
+  std::function<void(const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> &)> save_electron_matrices = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> & elfock) {
+    const OpenOrbitalOptimizer::Armadillo::Orbitals<double> & eorbitals = eldm.first;
+    const OpenOrbitalOptimizer::Armadillo::OrbitalOccupations<double> & eoccupations = eldm.second;
     if(M==1) {
       arma::mat Ce = X*eorbitals[0];
       arma::vec Ee = arma::diagvec(eorbitals[0].t()*elfock[0]*eorbitals[0]);
@@ -904,8 +908,8 @@ int main_guarded(int argc, char **argv) {
     // Update protonic terms for electronic solution
     arma::mat Pp(Xp.n_rows,Xp.n_rows,arma::fill::zeros);
     {
-      const OpenOrbitalOptimizer::Orbitals<double> & orbitals = protonic_dm.first;
-      const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = protonic_dm.second;
+      const OpenOrbitalOptimizer::Armadillo::Orbitals<double> & orbitals = protonic_dm.first;
+      const OpenOrbitalOptimizer::Armadillo::OrbitalOccupations<double>  & occupations = protonic_dm.second;
       for(size_t i=0;i<orbitals.size();i++) {
         arma::mat Cp = Xp*orbitals[i];
         arma::vec occp = occupations[i];
@@ -918,8 +922,8 @@ int main_guarded(int argc, char **argv) {
 
     // Update the frozen proton energy
     if(quantum_protons.size()) {
-      const OpenOrbitalOptimizer::Orbitals<double> & orbitals = protonic_dm.first;
-      const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = protonic_dm.second;
+      const OpenOrbitalOptimizer::Armadillo::Orbitals<double> & orbitals = protonic_dm.first;
+      const OpenOrbitalOptimizer::Armadillo::OrbitalOccupations<double>  & occupations = protonic_dm.second;
 
       // Get the electronic and protonic orbital coefficients
       arma::mat Cp = Xp*orbitals[0];
@@ -941,7 +945,7 @@ int main_guarded(int argc, char **argv) {
     }
 
     printf("\n\n\nIteration %i: solving electronic SCF\n", istep);
-    OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+    OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
     scfsolver.initialize_with_orbitals(electronic_dm.first, electronic_dm.second);
     scfsolver.error_norm(error_norm);
     scfsolver.convergence_threshold(convergence_threshold); // use full threshold here since the electronic part is easy
@@ -958,8 +962,8 @@ int main_guarded(int argc, char **argv) {
       // Run protonic calculation.
       arma::mat Pe(X.n_rows,X.n_rows,arma::fill::zeros);
       {
-        const OpenOrbitalOptimizer::Orbitals<double> & orbitals = electronic_dm.first;
-        const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = electronic_dm.second;
+        const OpenOrbitalOptimizer::Armadillo::Orbitals<double> & orbitals = electronic_dm.first;
+        const OpenOrbitalOptimizer::Armadillo::OrbitalOccupations<double>  & occupations = electronic_dm.second;
         for(size_t i=0;i<orbitals.size();i++) {
           arma::mat Ce = X*orbitals[i];
           arma::vec occe = occupations[i];
@@ -1023,7 +1027,7 @@ int main_guarded(int argc, char **argv) {
         }
       }
 
-      OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+      OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> nuclear_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
         const auto & orbitals = dm.first;
         const auto & occupations = dm.second;
 
@@ -1074,7 +1078,7 @@ int main_guarded(int argc, char **argv) {
 
       // Run protonic SCF
       printf("\n\nContinuing with protonic SCF\n");
-      OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+      OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
       scfsolver.initialize_with_orbitals(protonic_dm.first, protonic_dm.second);
       scfsolver.error_norm(error_norm);
       scfsolver.convergence_threshold(init_convergence_threshold);
@@ -1102,8 +1106,8 @@ int main_guarded(int argc, char **argv) {
       printf("\n\nProceeding with simultaneous electron-proton SCF\n");
 
     // Proceed with nuclear-electronic calculation
-    OpenOrbitalOptimizer::Orbitals<double> guess_orbitals;
-    OpenOrbitalOptimizer::OrbitalOccupations<double> guess_occupations;
+    OpenOrbitalOptimizer::Armadillo::Orbitals<double> guess_orbitals;
+    OpenOrbitalOptimizer::Armadillo::OrbitalOccupations<double> guess_occupations;
     if(M==1) {
       guess_orbitals={electronic_dm.first[0], protonic_dm.first[0]};
       guess_occupations={electronic_dm.second[0], protonic_dm.second[0]};
@@ -1121,7 +1125,7 @@ int main_guarded(int argc, char **argv) {
       block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
       fock_builder = unrestricted_neo_builder;
     }
-    OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+    OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
     scfsolver.initialize_with_orbitals(guess_orbitals, guess_occupations);
     scfsolver.error_norm(error_norm);
     scfsolver.convergence_threshold(convergence_threshold);
@@ -1138,6 +1142,75 @@ int main_guarded(int argc, char **argv) {
       save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0]}),std::vector<arma::vec>({dm.second[0]})), std::vector<arma::mat>({fock[0]}));
     } else {
       save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0],dm.first[1]}),std::vector<arma::vec>({dm.second[0],dm.second[1]})), std::vector<arma::mat>({fock[0],fock[1]}));
+    }
+
+    // Optional export of the converged NEO-SCF for an external correlation code
+    std::string neodump = settings.get_string("NEODump");
+    if(neodump.size()) {
+      if(!vpp)
+        throw std::runtime_error("NEODump requires vpp=true: the proton-proton integrals are part of the dump.\n");
+
+      bool restricted_e = (M==1);
+      size_t Nmat = fock.size();
+
+      // Proton block (last) in the AO basis
+      arma::mat Cp_ao = Xp * dm.first[Nmat-1];
+      arma::vec occp = dm.second[Nmat-1];
+      arma::vec Ep = arma::diagvec(dm.first[Nmat-1].t() * fock[Nmat-1] * dm.first[Nmat-1]);
+      arma::mat Dp = Cp_ao * arma::diagmat(occp) * Cp_ao.t();
+
+      // Electron block(s) in the AO basis + total electron density
+      std::vector<arma::mat> Ce, Focke;
+      std::vector<arma::vec> occe_v, Ee_v;
+      arma::mat De(X.n_rows, X.n_rows, arma::fill::zeros);
+      size_t nblk = restricted_e ? 1 : 2;
+      for(size_t s=0;s<nblk;s++) {
+        arma::mat Cs = X * dm.first[s];
+        arma::vec os = dm.second[s];
+        Ce.push_back(Cs);
+        occe_v.push_back(os);
+        Ee_v.push_back(arma::diagvec(dm.first[s].t() * fock[s] * dm.first[s]));
+        De += Cs * arma::diagmat(os) * Cs.t();
+      }
+
+      // AO Fock matrices, rebuilt from the converged densities with the same
+      // engine the SCF used (the lambdas carry the correct K and e-p signs).
+      arma::mat hcore_e = T + Vc;
+      arma::mat Jpe = proton_electron_coulomb(Dp);
+      if(restricted_e) {
+        arma::mat J, K;
+        std::tie(J, K) = electronic_terms(Ce[0], occe_v[0]);
+        Focke.push_back(hcore_e + J + 0.5*K + Jpe);
+      } else {
+        arma::mat Ja, Ka, Jb, Kb;
+        std::tie(Ja, Ka) = electronic_terms(Ce[0], occe_v[0]);
+        std::tie(Jb, Kb) = electronic_terms(Ce[1], occe_v[1]);
+        Focke.push_back(hcore_e + Ja + Jb + Ka + Jpe);
+        Focke.push_back(hcore_e + Ja + Jb + Kb + Jpe);
+      }
+      arma::mat hcore_p = Tp + Vpc;
+      arma::mat Jep = electron_proton_coulomb(De);
+      // Self-interaction-free proton Fock for the correlation consumer:
+      // kinetic + classical-nucleus attraction + the electron mean-field
+      // attraction only. The proton-proton J_p/K_p are deliberately excluded
+      // (a single quantum proton has no proton-proton interaction; including
+      // it leaves the occupied orbital unchanged but spuriously unbinds the
+      // proton virtuals). The total SCF energy and the dumped p-p B-tensor are
+      // unaffected -- this only sets the reference operator whose canonical
+      // orbitals/energies are written.
+      arma::mat Fock_p = hcore_p + Jep;
+
+#ifdef SVNRELEASE
+      std::string version(SVNREVISION);
+#else
+      std::string version("unknown");
+#endif
+      neo_dump(neodump, settings.get_string("NEODumpIntegrals"), settings.get_bool("NEODumpVerify"),
+               basis, dfit, restricted_e, Ce, occe_v, Ee_v, hcore_e, Focke,
+               pbasis, pfit, Cp_ao, occp, Ep, hcore_p, Fock_p,
+               Nel, (int) proton_indices.size(), proton_mass,
+               scfsolver.get_energy(), Ecnucr,
+               density_fitting, omega, alpha, beta, version);
     }
   }
 

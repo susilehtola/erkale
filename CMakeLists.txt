@@ -128,11 +128,11 @@ message("")
 # Find libwignernj for Wigner 3j symbols. If a system install is not
 # present, fetch and build from source. Either path exposes the
 # wignernj::wignernj imported target.
-find_package(wignernj 0.5.0 QUIET CONFIG)
+find_package(wignernj 0.7.0 QUIET CONFIG)
 if(wignernj_FOUND)
  message("Found libwignernj ${wignernj_VERSION}: ${wignernj_DIR}")
 else()
- message("libwignernj not found; fetching v0.5.0 from GitHub.")
+ message("libwignernj not found; fetching v0.7.0 from GitHub.")
  include(FetchContent)
  # Disable libwignernj's own tests / examples / extra interfaces so the
  # subbuild only produces the C library we link against.
@@ -143,7 +143,7 @@ else()
  FetchContent_Declare(
    wignernj
    GIT_REPOSITORY https://github.com/susilehtola/libwignernj.git
-   GIT_TAG        v0.5.0
+   GIT_TAG        v0.7.0
  )
  FetchContent_MakeAvailable(wignernj)
  # FetchContent's add_subdirectory only exposes the bare "wignernj"

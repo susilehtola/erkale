@@ -156,7 +156,39 @@ endif()
 if(OPENORBITAL_HEADER)
   message(STATUS "openorbitaloptimizer headers: ${OPENORBITAL_HEADER}; building NEO targets")
 
-  add_executable (erkale_neo neo.cpp)
+  # OpenOrbitalOptimizer is Eigen-based, so the targets need Eigen3
+  # headers even though ERKALE uses Armadillo: the drivers use OOO's
+  # Armadillo compatibility shim (openorbitaloptimizer/armadillo_compat.hpp,
+  # OpenOrbitalOptimizer::Armadillo::), which converts at the solver
+  # boundary and pulls in Eigen.
+  find_package(Eigen3 QUIET NO_MODULE)
+  if(TARGET Eigen3::Eigen)
+    get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+  endif()
+  if(NOT EIGEN3_INCLUDE_DIR)
+    find_path(EIGEN3_INCLUDE_DIR Eigen/Core
+      HINTS ${EIGEN3_ROOT_DIR} ${EIGEN3_ROOT} /usr/include /usr/local/include
+      PATH_SUFFIXES eigen3 include/eigen3)
+  endif()
+  if(NOT EIGEN3_INCLUDE_DIR)
+    # Header-only; fetch when no system copy is found, like openorbitaloptimizer
+    # and libwignernj. Populate-only -- we just need the include directory.
+    message(STATUS "Eigen3 not found locally; fetching v3.4.0 from GitLab (header-only).")
+    include(FetchContent)
+    FetchContent_Declare(eigen3
+      GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+      GIT_TAG        3.4.0
+      GIT_SHALLOW    TRUE)
+    FetchContent_GetProperties(eigen3)
+    if(NOT eigen3_POPULATED)
+      FetchContent_Populate(eigen3)
+    endif()
+    set(EIGEN3_INCLUDE_DIR "${eigen3_SOURCE_DIR}")
+  endif()
+  message(STATUS "Eigen3 headers for OpenOrbitalOptimizer targets: ${EIGEN3_INCLUDE_DIR}")
+
+  add_executable (erkale_neo neo.cpp neo_dump.cpp)
+  target_include_directories(erkale_neo PUBLIC "${EIGEN3_INCLUDE_DIR}")
   set_target_properties(erkale_neo PROPERTIES OUTPUT_NAME "erkale_neo${SUFFIX}")
   target_include_directories(erkale_neo PUBLIC "${OPENORBITAL_HEADER}")
   target_link_libraries(erkale_neo liberkale_cmp)
@@ -174,6 +206,7 @@ if(OPENORBITAL_HEADER)
   add_executable (erkale_neosp neosp.cpp)
   set_target_properties(erkale_neosp PROPERTIES OUTPUT_NAME "erkale_neosp${SUFFIX}")
   target_include_directories(erkale_neosp PUBLIC "${OPENORBITAL_HEADER}")
+  target_include_directories(erkale_neosp PUBLIC "${EIGEN3_INCLUDE_DIR}")
   target_link_libraries(erkale_neosp liberkale_cmp)
   target_link_libraries(erkale_neosp liberkale_emd)
   target_link_libraries(erkale_neosp liberkale)
@@ -204,6 +237,7 @@ if(OPENORBITAL_HEADER)
   add_executable (erkale_complex_orbs complex_orbs.cpp)
   set_target_properties(erkale_complex_orbs PROPERTIES OUTPUT_NAME "erkale_complex_orbs${SUFFIX}")
   target_include_directories(erkale_complex_orbs PUBLIC "${OPENORBITAL_HEADER}")
+  target_include_directories(erkale_complex_orbs PUBLIC "${EIGEN3_INCLUDE_DIR}")
   target_link_libraries(erkale_complex_orbs liberkale_cmp)
   target_link_libraries(erkale_complex_orbs liberkale_emd)
   target_link_libraries(erkale_complex_orbs liberkale)
