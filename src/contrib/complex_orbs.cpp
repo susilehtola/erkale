@@ -319,7 +319,7 @@ int main_guarded(int argc, char **argv) {
     return P;
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -365,7 +365,7 @@ int main_guarded(int argc, char **argv) {
   }; //restricted Fock builder
 
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
 
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
@@ -446,7 +446,7 @@ int main_guarded(int argc, char **argv) {
   }; //unrestricted Fock builder
 
   // Save matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::FockMatrix<double> fock) {
+  std::function<void(const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::Armadillo::FockMatrix<double> fock) {
 
     if(!unrestricted) {
       for (size_t m=0; m<X.size(); m++) {
@@ -496,7 +496,7 @@ int main_guarded(int argc, char **argv) {
   arma::vec number_of_particles;
   arma::vec number_of_particles_per_block;
   std::vector<std::string> block_descriptions;
-  OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> fock_builder;
 
   // Run SCF
   if (!unrestricted) {
@@ -528,7 +528,7 @@ int main_guarded(int argc, char **argv) {
 
   printf("\n\n\nSolving SCF\n");
   fflush(stdout);
-  OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+  OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
   if (readlinocc < 0)
     scfsolver.fixed_number_of_particles_per_block(number_of_particles_per_block);
   scfsolver.initialize_with_fock(Fguess);
