@@ -2,8 +2,7 @@
 System water_cluster_xrs.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis aug-cc-pVDZ
-DensityFitting true
-Cholesky false
+JKMethod RI
 Direct true
 IntegralThresh 1e-14
 XRSMethod TP
@@ -15,3 +14,4 @@ SaveChk water_cluster_xrs.chk
 BasisRotate false
 ConvThr 1e-6
 DFTGrid 50 -194
+FittingBasis AutoABS

@@ -2,7 +2,6 @@
 System cd-cplx.xyz
 Method HF
 Basis 3-21G
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 

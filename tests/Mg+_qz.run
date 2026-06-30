@@ -2,7 +2,6 @@
 System Mg.xyz
 Method HF
 Basis cc-pVQZ
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 Charge 1

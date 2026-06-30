@@ -339,5 +339,15 @@ class BasisSetLibrary {
   void print() const;
 };
 
+/**
+ * Auxiliary-basis angular-momentum pruning, per Lehtola, J. Chem. Theory
+ * Comput. 19, 6242 (2023). \ref aux_lmax_occ returns the occupied-shell
+ * l_max for element \a Z (0 for H/He, 1 for Z<=18, 2 for Z<=54, 3
+ * otherwise); \ref aux_lmax_keep returns the cutoff
+ *   l_keep = max(2*l_occ, l_obs + l_occ + linc)
+ * where \a lobs is the orbital-basis l_max and \a linc the increment.
+ */
+int aux_lmax_occ(int Z);
+int aux_lmax_keep(int Z, int lobs, int linc);
 
 #endif

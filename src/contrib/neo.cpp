@@ -31,6 +31,7 @@
 #include "stringutil.h"
 #include "timer.h"
 #include "density_fitting.h"
+#include "jkbuilder.h"
 #include "neo_dump.h"
 
 // Needed for libint init
@@ -133,7 +134,7 @@ int main_guarded(int argc, char **argv) {
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
   bool finiteproton = settings.get_bool("FiniteProton");
-  bool density_fitting = settings.get_bool("DensityFitting");
+  bool density_fitting = (JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting);
   bool vpp = settings.get_bool("vpp");
 
   Checkpoint chkpt(savechk,true);

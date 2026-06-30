@@ -33,6 +33,30 @@ Settings::Settings() {
 Settings::~Settings() {
 }
 
+void Settings::add_jk_settings() {
+  // Every setting consumed by JKBuilder::configure, so any tool that drives
+  // a JKBuilder registers them with one call (add_scf_settings does this too).
+  add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
+  add_bool("DecFock", "Use decontracted basis to calculate Fock matrix (direct HF)", false);
+  add_double("IntegralThresh", "Integral screening threshold", 1e-10);
+  // Density-weighted Fock-contribution screening threshold. Bounds the
+  // contribution of each ERI quartet to J/K by the integral times the
+  // largest coupled density element. Set to 0 to disable.
+  add_double("ScreeningThresh", "Density-weighted Fock-contribution screening threshold", 1e-10);
+  // How to build the Coulomb and exchange matrices.
+  add_string("JKMethod", "Coulomb/exchange build method: 4index (exact ERIs, in-core or Direct), RI (density fitting with a Gaussian auxiliary basis -- set FittingBasis), Cholesky (two-step pivoted Cholesky decomposition; Folkestad/Kjonstad/Koch JCP 150, 194112 (2019); exact at threshold) or CDFit (density fitting on a per-atom CD-derived auxiliary basis; Lehtola JCTC 17, 6886 (2021); exact only as the orbital basis becomes complete).", "Cholesky");
+  add_bool("OccRIK", "Use the occ-RI-K algorithm (Manzer et al, JCP 143, 024113 (2015)) for density-fitted/Cholesky exchange? Gives the exact (RI) SCF energy and density but only approximate virtual orbital energies. Ignored for the four-index method.", false);
+  add_double("CholeskyThr", "Cholesky decomposition threshold", 1e-7);
+  add_double("CholeskyShThr", "Cholesky cache threshold", 0.01);
+  add_int("CholeskyMode", "Save/load the DF/CD integral cache? 0 no, 1 save after fill, -1 load before fill (falls back to fill on mismatch). Useful for repeated runs that share orbital + auxiliary basis. Ignored when Direct=true.", 0, true);
+  add_string("CholeskyFile", "Filename for the DF/CD integral cache (used when CholeskyMode != 0). Plain and range-separated entries coexist in the same file under distinct keys.", "cholesky.chk");
+  // Which basis to use as density fitting basis
+  add_string("FittingBasis", "Basis to use for density fitting / RI: a basis-set name, Auto (CD-derived auto-aux, Lehtola JCTC 17, 6886 (2021); uncontracted, lmax-pruned per FittingLmaxInc) or AutoABS (Eichkorn-style automatic aux, J-only)","def2-universal-jkfit");
+  add_int("FittingLmaxInc", "Angular-momentum pruning increment for the CD-derived auto-aux: keep l <= max(2*l_occ, l_obs+l_occ+FittingLmaxInc) (Lehtola JCTC 19, 6242 (2023)); negative keeps all shells", 1, true);
+  add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-7);
+  add_double("FittingCholeskyThreshold", "Linear dependence threshold for pivoted Cholesky of Coulomb integrals in density fitting",1e-8);
+}
+
 void Settings::add_scf_settings() {
   // Dummy functional: this will be set to HF or a X-C combination
   add_string("Method", "Method used in calculation (HF or a DFT functional)", "Dummy");
@@ -108,16 +132,9 @@ void Settings::add_scf_settings() {
   // Verbose run?
   add_bool("Verbose", "Verbose calculation?", true);
 
-  // Direct calculation?
-  add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
-  // Compute Fock matrix in decontracted basis
-  add_bool("DecFock", "Use decontracted basis to calculate Fock matrix (direct HF)", false);
-  // Integral threshold
-  add_double("IntegralThresh", "Integral screening threshold", 1e-10);
-  // Density-weighted Fock-contribution screening threshold. Bounds the
-  // contribution of each ERI quartet to J/K by the integral times the
-  // largest coupled density element. Set to 0 to disable.
-  add_double("ScreeningThresh", "Density-weighted Fock-contribution screening threshold", 1e-10);
+  // Coulomb/exchange build + integral-screening settings (everything
+  // JKBuilder::configure consumes).
+  add_jk_settings();
 
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
@@ -133,21 +150,6 @@ void Settings::add_scf_settings() {
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
   // Level shift
   add_double("Shift", "Level shift to use in Hartree", 0.0);
-
-  // Use density fitting if possible?
-  add_bool("DensityFitting", "Use density fitting / RI?", false);
-  // Use Cholesky?
-  add_bool("Cholesky", "Use Cholesky decomposition?", true);
-  add_double("CholeskyThr", "Cholesky decomposition threshold", 1e-7);
-  add_double("CholeskyShThr", "Cholesky cache threshold", 0.01);
-  add_int("CholeskyMode", "Save/load the DF/CD integral cache? 0 no, 1 save after fill, -1 load before fill (falls back to fill on mismatch). Useful for repeated runs that share orbital + auxiliary basis. Ignored when Direct=true.", 0, true);
-  add_string("CholeskyFile", "Filename for the DF/CD integral cache (used when CholeskyMode != 0). Plain and range-separated entries coexist in the same file under distinct keys.", "cholesky.chk");
-  add_string("CholeskyAlgorithm", "Cholesky/RI algorithm. TwoStep (default): orbital-pair pivots on atom pairs evaluated via three-center machinery (Folkestad/Kjonstad/Koch JCP 150, 194112 (2019)); exact at threshold. CDFit: density fitting with an atom-centered aux basis built by per-atom pivoted Cholesky on the orbital primitives (Lehtola JCTC 17, 6886 (2021)); only converges to the exact ERI tensor as the orbital basis becomes complete.", "TwoStep");
-  // Which basis to use as density fitting basis
-  add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
-  // Threshold for screening eigenvectors
-  add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-7);
-  add_double("FittingCholeskyThreshold", "Linear dependence threshold for pivoted Cholesky of Coulomb integrals in density fitting",1e-8);
 
   // SAP basis
   add_string("SAPBasis", "Tabulated atomic effective potential \"basis set\"","helfem_large.gbs");
@@ -454,23 +456,13 @@ void Settings::parse(std::string filename, bool scf) {
       }
 
       if(scf && stricmp(words[0],"Method")==0) {
-	// Hartree-Fock or DFT?
-	if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
+	// Normalise the method name (Hartree-Fock or DFT).
+	if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0)
 	  set_string("Method","HF");
-	  // Turn of density fitting by default
-	  set_bool("DensityFitting",false);
-	} else if(stricmp(words[1],"ROHF")==0) {
+	else if(stricmp(words[1],"ROHF")==0)
 	  set_string("Method","ROHF");
-	  set_bool("DensityFitting",false);
-	} else {
+	else
 	  set_string("Method",words[1]);
-
-	  // Hybrid functional? Do we turn off density fitting by default?
-	  int xfunc, cfunc;
-	  parse_xc_func(xfunc,cfunc,words[1]);
-	  if(exact_exchange(xfunc)!=0.0 || is_range_separated(xfunc))
-	    set_bool("DensityFitting",false);
-	}
 
       } else {
 	if(is_double(words[0])) {
@@ -513,6 +505,16 @@ void Settings::parse(std::string filename, bool scf) {
 	    val+=" "+words[i];
 	  // Store value
 	  set_string(words[0],val);
+	} else if(stricmp(words[0],"DensityFitting")==0 || stricmp(words[0],"Cholesky")==0 || stricmp(words[0],"CholeskyAlgorithm")==0) {
+	  // The method selectors were unified into JKMethod.
+	  std::ostringstream oss;
+	  oss << "\nThe keyword " << words[0] << " has been removed. Choose the Coulomb/exchange\n"
+	      << "build method with JKMethod instead: 4index, RI, Cholesky or CDFit.\n"
+	      << "  DensityFitting true        -> JKMethod RI\n"
+	      << "  Cholesky false             -> JKMethod 4index\n"
+	      << "  CholeskyAlgorithm CDFit    -> JKMethod CDFit\n"
+	      << "  (the default is JKMethod Cholesky)\n";
+	  throw std::runtime_error(oss.str());
 	} else {
 	  ERROR_INFO();
 	  print();

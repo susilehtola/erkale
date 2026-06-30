@@ -1,4 +1,4 @@
-# **** Mon May 11 01:57:36 AM EEST 2026 ****
+# **** Thu Jun 18 11:21:13 AM EEST 2026 ****
 run_test(H_dz) 
 run_test(He_dz) 
 run_test(H2_dz) 
@@ -45,7 +45,9 @@ run_test(water_dimer_b97m_v)
 run_test(water_dimer_lda) 
 run_test(water_dimer_pbe) 
 run_test(water_dimer_pbe0) 
+run_test(water_dimer_pbe0_cdaux) 
 run_test(water_dimer_rihf) 
+run_test(water_dimer_rihf_occk) 
 run_test(water_dimer_tpssh) 
 run_test(water_dimer_wb97) 
 run_test(water_dimer_wb97m_v) 

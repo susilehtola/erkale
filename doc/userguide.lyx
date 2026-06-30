@@ -660,7 +660,41 @@ Charge The charge of the system, in units of elementary charge.
 \end_layout
 
 \begin_layout Description
-Cholesky Use the Cholesky decomposition 
+Confinement Harmonic confinement potential
+\begin_inset Formula $V(\mathbf{r})=V_{x}x^{2}+V_{y}y^{2}+V_{z}z^{2}$
+\end_inset
+
+, given as the three coefficients
+\begin_inset Formula $V_{x}\,V_{y}\,V_{z}$
+\end_inset
+
+ (atomic units).
+ Zero by default.
+\end_layout
+
+\begin_layout Description
+JKMethod How the Coulomb and exchange matrices are built.
+ The options are
+\emph on
+4index
+\emph default
+ (exact four-center integrals, evaluated in-core or on-the-fly with
+\emph on
+Direct
+\emph default
+),
+\emph on
+RI
+\emph default
+ (density fitting against the auxiliary basis
+\emph on
+FittingBasis
+\emph default
+),
+\emph on
+Cholesky
+\emph default
+ (the default; two-step pivoted Cholesky decomposition
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Beebe1977"
@@ -668,7 +702,39 @@ literal "true"
 
 \end_inset
 
- to treat two-electron integrals?
+ of the two-electron integrals, exact at the
+\emph on
+CholeskyThr
+\emph default
+ threshold) or
+\emph on
+CDFit
+\emph default
+ (density fitting against an auxiliary basis built by atomic Cholesky decomposition).
+ This keyword replaces the former separate
+\emph on
+DensityFitting
+\emph default
+ and
+\emph on
+Cholesky
+\emph default
+ switches.
+\end_layout
+
+\begin_layout Description
+OccRIK Use the occ-RI-K algorithm
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Manzer2015"
+literal "true"
+
+\end_inset
+
+ for the density-fitted/Cholesky exchange matrix? Gives the exact (RI) SCF
+ energy and density, but only approximate virtual orbital energies; ignored
+ for the four-index method.
+ The default is false.
 \end_layout
 
 \begin_layout Description
@@ -757,25 +823,6 @@ Decontract Indices of the atoms to decontract the basis set for, for example
 \emph default
 , or * for all atoms.
  Empty by default, meaning no decontraction.
-\end_layout
-
-\begin_layout Description
-DensityFitting Use density fitting to evaluate the Coulomb term (and exact
- exchange if needed)? Default is 
-\emph on
-true
-\emph default
- for DFT calculations and 
-\emph on
-false
-\emph default
- for HF calculations.
- When calculation of the exact exchange is needed, you need to define the
- 
-\emph on
-FittingBasis
-\emph default
- explicitly.
 \end_layout
 
 \begin_layout Description
@@ -2542,6 +2589,31 @@ Method
 \end_layout
 
 \begin_layout Description
+DFTQuadThresh Prune integration-grid points whose quadrature weight is smaller
+ than this threshold.
+\end_layout
+
+\begin_layout Description
+DFTDensityThr Threshold below which the density on a grid point is screened
+ out of the exchange-correlation evaluation.
+\end_layout
+
+\begin_layout Description
+DFTBasisThr Threshold below which a basis function is treated as zero on
+ a grid point.
+\end_layout
+
+\begin_layout Description
+DFTXpars Expert option: override the internal parameters of the exchange
+ functional (a space-separated list passed to libxc).
+\end_layout
+
+\begin_layout Description
+DFTCpars Expert option: override the internal parameters of the correlation
+ functional.
+\end_layout
+
+\begin_layout Description
 DIISEps Start to mix in a DIIS update when the error is smaller than this
  threshold.
  By default 
@@ -2558,7 +2630,7 @@ DIISOrder When DIIS is used, how many Fock matrices to use for the interpolation
 
 \begin_layout Description
 DIISThr Error threshold for using DIIS interpolated Fock matrices exclusively.
- By default 
+ By default
 \begin_inset Formula $10^{-2}$
 \end_inset
 
@@ -2566,7 +2638,13 @@ DIISThr Error threshold for using DIIS interpolated Fock matrices exclusively.
 \end_layout
 
 \begin_layout Description
-DimerSymmetry If running on a diatomic molecule placed along the 
+DIISComb In unrestricted calculations, combine the alpha and beta DIIS error
+ vectors into a single error instead of treating them separately.
+ False by default.
+\end_layout
+
+\begin_layout Description
+LinearSymmetry If running on a linear molecule placed along the
 \begin_inset Formula $z$
 \end_inset
 
@@ -2602,9 +2680,59 @@ HelFEM
 \end_layout
 
 \begin_layout Description
+LinearFreeze When
+\emph on
+LinearSymmetry
+\emph default
+ is used, freeze the symmetry assignment to that of the initial guess instead
+ of redetermining it each iteration.
+ False by default.
+\end_layout
+
+\begin_layout Description
+LinearB Strength of a magnetic field along the bond axis, used in the
+ complex-orbital calculations (
+\emph on
+erkale_complex_orbs
+\emph default
+).
+ Zero by default.
+\end_layout
+
+\begin_layout Description
+LinearOccupations Read the per-
+\begin_inset Formula $m$
+\end_inset
+
+ orbital occupations for a linear-symmetry calculation from a file?
+\end_layout
+
+\begin_layout Description
+LinearOccupationFile File to read the linear-symmetry occupations from when
+\emph on
+LinearOccupations
+\emph default
+ is set.
+ The default is
+\emph on
+linoccs.dat
+\emph default
+.
+\end_layout
+
+\begin_layout Description
 Direct Compute two-electron integrals on-the-fly? You need to enable this
  in order to compute large systems.
  False by default.
+\end_layout
+
+\begin_layout Description
+EField Uniform external electric field as three components
+\begin_inset Formula $E_{x}\,E_{y}\,E_{z}$
+\end_inset
+
+ (atomic units).
+ Zero by default.
 \end_layout
 
 \begin_layout Description
@@ -2623,7 +2751,7 @@ N.B.
  automatical formation is only supported for pure DFT calculations, as exchange
  fitting necessary for HF and hybrid DFT has more stringent requirements
  for the auxiliary basis set.
- The default is 
+ The default is
 \emph on
 Auto
 \emph default
@@ -2631,7 +2759,73 @@ Auto
 \end_layout
 
 \begin_layout Description
-Guess (If an initial wavefunction was not given to the solver via 
+FittingThreshold Linear-dependence threshold for the Coulomb metric in
+ density fitting (
+\emph on
+JKMethod RI
+\emph default
+ /
+\emph on
+CDFit
+\emph default
+).
+ The default is
+\begin_inset Formula $10^{-7}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+FittingCholeskyThreshold Threshold for the pivoted Cholesky decomposition
+ of the Coulomb metric used in density fitting.
+ The default is
+\begin_inset Formula $10^{-8}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+CholeskyFile Filename for the Cholesky/density-fitting integral cache used
+ when
+\emph on
+CholeskyMode
+\emph default
+ is non-zero.
+ The default is
+\emph on
+cholesky.chk
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+CholDepThresh Threshold for the partial Cholesky orthonormalization of the
+ basis set (
+\emph on
+BasisOrth PartialCholesky
+\emph default
+).
+ The default is
+\begin_inset Formula $10^{-7}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+LinDepThresh Threshold below which basis-set eigenvectors are treated as
+ linearly dependent and dropped in the canonical/symmetric orthonormalization.
+ The default is
+\begin_inset Formula $10^{-5}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+Guess (If an initial wavefunction was not given to the solver via
 \emph on
 LoadChk
 \emph default
@@ -2743,6 +2937,12 @@ literal "false"
 \begin_layout Description
 InputBohr Specifies that the geometry in the xyz file is in Bohr instead
  of Ångström.
+\end_layout
+
+\begin_layout Description
+Kgwh Scaling constant used in the generalized Wolfsberg–Helmholz (GWH)
+ initial guess.
+ The default is 1.75.
 \end_layout
 
 \begin_layout Description
@@ -2996,7 +3196,7 @@ occupied and occupied–virtual blocks.
 \end_layout
 
 \begin_layout Description
-PZIThr The threshhold for the initial localization procedure specified by
+PZIthr The threshhold for the initial localization procedure specified by
  
 \emph on
 PZlocmet
@@ -3090,14 +3290,14 @@ PZw
 \emph default
  to 0 (with 
 \emph on
-PZScale Constant
+PZscale Constant
 \emph default
 ), in which case the model is invariant to rotations in the occupied–occupied
  block.
 \end_layout
 
 \begin_layout Description
-PZOOThr The convergence threshold for the occupied–occupied gradient.
+PZOOthr The convergence threshold for the occupied–occupied gradient.
  The default is 
 \begin_inset Formula $10^{-4}$
 \end_inset
@@ -3117,7 +3317,7 @@ denberg localization.
 \end_layout
 
 \begin_layout Description
-PZOVThr The convergence threshold for the occupied–virtual gradient.
+PZOVthr The convergence threshold for the occupied–virtual gradient.
  The default is 
 \begin_inset Formula $10^{-5}$
 \end_inset
@@ -3141,7 +3341,7 @@ literal "true"
 \end_layout
 
 \begin_layout Description
-PZScale Scaling of the Perdew–Zunger self-interaction correction.
+PZscale Scaling of the Perdew–Zunger self-interaction correction.
  Can be 
 \emph on
 Constant
@@ -3158,7 +3358,7 @@ Density
 \end_layout
 
 \begin_layout Description
-PZScaleExp The exponent in the kinetic or density scaling equation.
+PZscaleExp The exponent in the kinetic or density scaling equation.
  The default is 
 \emph on
 1.0
@@ -3168,11 +3368,16 @@ PZScaleExp The exponent in the kinetic or density scaling equation.
 
 \begin_layout Description
 PZseed The random seed to use for the initial localization.
- The default is 
+ The default is
 \emph on
 0
 \emph default
 .
+\end_layout
+
+\begin_layout Description
+PZrand Apply a random rotation of the orbitals when initializing the PZ-SIC
+ localization? True by default (recommended).
 \end_layout
 
 \begin_layout Description
@@ -3254,12 +3459,26 @@ literal "false"
 \end_inset
 
 .
- 
+
+\end_layout
+
+\begin_layout Description
+SAPGrid Integration grid for the SAP (superposition of atomic potentials)
+ guess, given as
+\emph on
+nrad lmax
+\emph default
+ (as for
+\emph on
+DFTGrid
+\emph default
+).
+ Left empty by default, in which case a default grid is used.
 \end_layout
 
 \begin_layout Description
 SaveChk Save results to checkpoint file.
- Default is 
+ Default is
 \emph on
 erkale.chk
 \emph default
@@ -3298,14 +3517,15 @@ The molecular geometry can also be specified as a Z matrix; in this case
 \end_layout
 
 \begin_layout Description
-StrictIntegrals Do tight screening of two-electron integrals in on-the-fly
- calculations of the Hartree-Fock Coulomb and/or exchange matrices.
- 
-\emph on
-False
-\emph default
- by default, meaning that adaptive screening based on the change of the
- density matrix is used to skip small products.
+ScreeningThresh Threshold for density-weighted screening of two-electron
+ integrals in on-the-fly (Direct) Coulomb/exchange builds: a shell quartet
+ is skipped when its integral bound times the largest coupled density-matrix
+ element falls below this value.
+ Setting it to zero disables the screening.
+\end_layout
+
+\begin_layout Description
+IntegralThresh Threshold below which two-electron integrals are neglected.
 \end_layout
 
 \begin_layout Description
@@ -3326,6 +3546,17 @@ UseBroyden Use the Broyden convergence accelerator algorithm? False by default.
 \end_layout
 
 \begin_layout Description
+UseTRRH Use the Trust-Region Roothaan–Hall algorithm for convergence?
+ False by default.
+\end_layout
+
+\begin_layout Description
+TRRHminS Minimal allowed overlap of the occupied orbitals between successive
+ iterations in the Trust-Region Roothaan–Hall algorithm.
+ The default is 0.975.
+\end_layout
+
+\begin_layout Description
 UseLM Use pure spherical harmonics in the basis set, 
 \emph on
 i.e.
@@ -3342,11 +3573,28 @@ i.e.
 
 
 \series default
- functions instead of the 10 cartesians, 
+ functions instead of the 10 cartesians,
 \emph on
 etc
 \emph default
 .
+ True by default.
+\end_layout
+
+\begin_layout Description
+OptLM When spherical harmonics are used, keep the
+\emph on
+s
+\emph default
+ and
+\emph on
+p
+\emph default
+ shells in cartesian form (they coincide with the solid harmonics for
+\begin_inset Formula $l<2$
+\end_inset
+
+), which is slightly cheaper.
  True by default.
 \end_layout
 
@@ -3795,6 +4043,75 @@ casida-x.yy.dat
 
 \begin_layout Standard
 If default settings are enough for you, you don't need to specify a runfile.
+\end_layout
+
+\begin_layout Subsection
+erkale_complex_orbs
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_complex_orbs"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The
+\emph on
+erkale_complex_orbs
+\emph default
+ program runs a self-consistent field calculation with
+\emph on
+complex
+\emph default
+ orbitals, which is useful for linear molecules in a magnetic field along
+ the bond axis and for locating symmetry-broken solutions.
+ It is run as
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_complex_orbs runfile
+\end_layout
+
+\begin_layout Standard
+It shares the ground-state SCF keywords of
+\emph on
+erkale
+\emph default
+ (including
+\emph on
+JKMethod
+\emph default
+ and
+\emph on
+OccRIK
+\emph default
+ for the Coulomb/exchange build), and adds
+\end_layout
+
+\begin_layout Description
+LinearSymmetry Enforce the
+\begin_inset Formula $e^{im\phi}$
+\end_inset
+
+ orbital symmetry of a linear molecule placed along the
+\begin_inset Formula $z$
+\end_inset
+
+ axis.
+\end_layout
+
+\begin_layout Description
+LinearB Strength of a magnetic field along the bond axis.
+\end_layout
+
+\begin_layout Description
+LinearOccupations / LinearOccupationFile Read fixed per-
+\begin_inset Formula $m$
+\end_inset
+
+ orbital occupations from a file instead of using the Aufbau principle.
 \end_layout
 
 \begin_layout Subsection
@@ -7944,6 +8261,26 @@ https://github.com/evaleev/libint/
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
+key "Manzer2015"
+literal "true"
+
+\end_inset
+
+S.
+ Manzer, P.
+ R.
+ Horn, N.
+ Mardirossian, and M.
+ Head-Gordon, Fast, accurate evaluation of exact exchange: The occ-RI-K
+ algorithm, J.
+ Chem.
+ Phys.
+ 143, 024113 (2015).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
 key "LIBXC"
 literal "true"
 
@@ -8842,6 +9179,30 @@ A.
 
 \begin_layout Section*
 Changes
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2026-06 Merged the Cholesky and density-fitting machinery into a single
+ engine and replaced the
+\emph on
+DensityFitting
+\emph default
+ and
+\emph on
+Cholesky
+\emph default
+ switches with the unified
+\emph on
+JKMethod
+\emph default
+ keyword (4index / RI / Cholesky / CDFit).
+ Added the occ-RI-K exchange algorithm (
+\emph on
+OccRIK
+\emph default
+), complex-orbital SCF with linear symmetry and a magnetic field, and a
+ TREXIO interface.
 \end_layout
 
 \begin_layout Labeling

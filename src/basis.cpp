@@ -3496,7 +3496,7 @@ BasisSet BasisSet::exchange_fitting() const {
   return fit;
 }
 
-BasisSet BasisSet::cholesky_aux_basis(double thr) const {
+BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
   // Per-nucleus atomic Cholesky decomposition. A given element can
   // carry different orbital bases on different centers (mixed-basis
   // calculations), so we run cholesky_set per nucleus and tag each
@@ -3516,6 +3516,14 @@ BasisSet BasisSet::cholesky_aux_basis(double thr) const {
     // full=false -> use one-step ERIchol pivoting per atom to skip
     //              insignificant aux candidates before secondary CD
     ElementBasisSet aux_el(el.cholesky_set(thr, false, 0));
+    // Optionally prune high-angular-momentum aux shells (Lehtola JCTC 19,
+    // 6242 (2023)); l_obs is this center's orbital l_max. The aux basis is
+    // left uncontracted.
+    if(linc>=0) {
+      int Z=::get_Z(el.get_symbol());
+      int l_keep=aux_lmax_keep(Z, el.get_max_am(), linc);
+      aux_el.truncate_shells(std::map<int,int>{{Z, l_keep}});
+    }
     // Tag with atom number so construct_basis routes the right aux
     // basis to the right center even when atoms of the same element
     // carry different orbital primitives.

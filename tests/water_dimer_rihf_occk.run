@@ -1,0 +1,17 @@
+# Water dimer, occ-RI-K exchange (Manzer et al, JCP 143, 024113 (2015)).
+# Same RI-HF as water_dimer_rihf but with the occ-RI-K algorithm; the
+# total energy matches RI-K to ~1e-9 while the virtual orbitals differ.
+System water_dimer.xyz
+Method HF
+Basis aug-cc-pVDZ
+JKMethod RI
+FittingBasis aug-cc-pVDZ-JK
+OccRIK true
+Direct false
+IntegralThresh 1e-14
+
+
+
+Logfile water_dimer_rihf_occk.log
+SaveChk water_dimer_rihf_occk.chk
+BasisRotate false

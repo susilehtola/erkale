@@ -89,6 +89,10 @@ class Settings {
 
   /// Add SCF related settings
   void add_scf_settings();
+  /// Add the settings consumed by JKBuilder::configure (J/K build method,
+  /// integral thresholds, fitting basis). Called by add_scf_settings; called
+  /// directly by tools that drive a JKBuilder without the full SCF settings.
+  void add_jk_settings();
 
   /// Add a double valued setting
   void add_double(std::string name, std::string comment, double val, bool negative=false);
