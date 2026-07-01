@@ -94,6 +94,74 @@ void analyze_density(const BasisSet & basis, const arma::mat & P, const std::str
   printf("Root-mean-square size of %s wave packet % .6f\n",label.c_str(),sqrt(rsq-dipsq));
 }
 
+// External one-body confining trap on the quantum proton: a cylindrical
+// harmonic + C-inf-v-invariant quartic potential,
+//   V(r) = 1/2 m [ w_perp^2 (x^2+y^2) + w_par^2 z^2 ]
+//        + lam_par z^4 + lam_perp (x^2+y^2)^2 + lam_cross z^2 (x^2+y^2),
+// with lam_par = g m^2 w_par^3, lam_perp = g m^2 w_perp^3 from the dimensionless
+// anharmonicity g. Assembled from Cartesian moment integrals in the protonic AO
+// basis about the trap center. Returns a zero matrix when NEOTrap is off (so
+// TrapG=0 / trap-off reproduce the baseline bit-for-bit). See README_TRAP.md.
+static arma::mat build_proton_trap(const BasisSet & pbasis, double proton_mass) {
+  const size_t Nbf = pbasis.get_Nbf();
+  arma::mat V(Nbf, Nbf, arma::fill::zeros);
+  if(!settings.get_bool("NEOTrap"))
+    return V;
+
+  // Trap frequencies (convert cm^-1 -> Hartree if requested).
+  double wpar  = settings.get_double("TrapOmegaPar");
+  double wperp = settings.get_double("TrapOmegaPerp");
+  const std::string unit = settings.get_string("TrapOmegaUnit");
+  if(stricmp(unit, "cm-1") == 0) {
+    const double cm2Eh = 4.5563352529e-6;
+    wpar  *= cm2Eh;
+    wperp *= cm2Eh;
+  } else if(stricmp(unit, "Eh") != 0) {
+    throw std::runtime_error("TrapOmegaUnit must be 'cm-1' or 'Eh'.\n");
+  }
+
+  // Quartic couplings from the dimensionless anharmonicity g.
+  const double g  = settings.get_double("TrapG");
+  const double m2 = proton_mass*proton_mass;
+  const double lam_par   = g * m2 * wpar*wpar*wpar;
+  const double lam_perp  = g * m2 * wperp*wperp*wperp;
+  const double lam_cross = settings.get_double("TrapLambdaCross");
+
+  // Trap center: explicit TrapCenter, else the protonic nucleus center.
+  double x0=0.0, y0=0.0, z0=0.0;
+  const std::string tc = settings.get_string("TrapCenter");
+  if(tc.size()) {
+    std::vector<std::string> tok = splitline(tc);
+    if(tok.size() != 3)
+      throw std::runtime_error("TrapCenter needs three numbers: x y z (bohr).\n");
+    x0=readdouble(tok[0]); y0=readdouble(tok[1]); z0=readdouble(tok[2]);
+  } else {
+    std::vector<nucleus_t> nuc = pbasis.get_nuclei();
+    if(nuc.size() != 1)
+      throw std::runtime_error("NEOTrap v1 supports a single quantum proton; set TrapCenter for a multi-proton trap.\n");
+    x0=nuc[0].r.x; y0=nuc[0].r.y; z0=nuc[0].r.z;
+  }
+
+  // Cartesian moment integrals about the trap center. moment(n)[getind(a,b,c)]
+  // is < mu | (x-x0)^a (y-y0)^b (z-z0)^c | nu >.
+  std::vector<arma::mat> M2 = pbasis.moment(2, x0, y0, z0);
+  std::vector<arma::mat> M4 = pbasis.moment(4, x0, y0, z0);
+
+  V += 0.5*proton_mass*wperp*wperp * (M2[getind(2,0,0)] + M2[getind(0,2,0)]);
+  V += 0.5*proton_mass*wpar *wpar  *  M2[getind(0,0,2)];
+  V += lam_par   *  M4[getind(0,0,4)];
+  V += lam_perp  * (M4[getind(4,0,0)] + 2.0*M4[getind(2,2,0)] + M4[getind(0,4,0)]);
+  V += lam_cross * (M4[getind(2,0,2)] + M4[getind(0,2,2)]);
+
+  // The moment integrals are symmetric; enforce it exactly against round-off.
+  V = 0.5*(V + V.t());
+
+  printf("NEO proton trap: w_par = %.6e Eh, w_perp = %.6e Eh, g = %.5f, lam_cross = %.4e a.u.; center (% .4f % .4f % .4f).\n",
+         wpar, wperp, g, lam_cross, x0, y0, z0);
+  fflush(stdout);
+  return V;
+}
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -115,6 +183,14 @@ int main_guarded(int argc, char **argv) {
   settings.add_bool("H2", "Run H2+ instead of H atom?", false);
   settings.add_double("H2BondLength", "Bond length for H2+ in a.u.", 2.0);
   settings.add_bool("RemoveCOM", "Remove COM terms", false);
+  // External one-body confining trap on the quantum proton (see README_TRAP.md)
+  settings.add_bool("NEOTrap", "Apply an external harmonic + quartic trap to the quantum proton", false);
+  settings.add_string("TrapOmegaUnit", "Unit of the trap frequencies: cm-1 or Eh", "cm-1");
+  settings.add_double("TrapOmegaPar", "Trap frequency along the z axis (w_par)", 0.0);
+  settings.add_double("TrapOmegaPerp", "Trap frequency perpendicular to z (w_perp)", 0.0);
+  settings.add_double("TrapG", "Dimensionless quartic anharmonicity g (sets lam_par, lam_perp)", 0.0);
+  settings.add_double("TrapLambdaCross", "Coefficient of the z^2 (x^2+y^2) quartic, a.u.", 0.0);
+  settings.add_string("TrapCenter", "Trap center 'x y z' in bohr (empty = quantum proton center)", "");
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -216,9 +292,14 @@ int main_guarded(int argc, char **argv) {
     Vp = -pbasis.nuclear(classical_nuclei);
   }
 
+  // External confining trap on the quantum proton (one-body). Added to the
+  // proton core Hamiltonian, so both the BO proton spectrum and the CI (which
+  // read H0p below) see it. Zero unless NEOTrap is enabled.
+  arma::mat Vtrap = build_proton_trap(pbasis, proton_mass);
+
   // Core Hamiltonian
   arma::mat H0 = T + V;
-  arma::mat H0p = Tp + Vp;
+  arma::mat H0p = Tp + Vp + Vtrap;
 
   // Orthogonalizing matrices
   arma::mat Xe(BasOrth(Se,verbose));
@@ -240,6 +321,11 @@ int main_guarded(int argc, char **argv) {
   arma::eig_sym(Ep_bo, Cp_bo, Hp_bo);
   arma::mat Xp_bo = Xp * Cp_bo;
   Ep_bo.print("Quantum proton spectrum");
+  // Low protonic roots at full precision (parseable by the trap sweep / tests).
+  for(size_t i=0;i<std::min((size_t) 8, (size_t) Ep_bo.n_elem);i++) {
+    printf("Proton root %2i % .10e\n", (int) i, Ep_bo(i));
+    fflush(stdout);
+  }
 
   // Compute the two-electron integrals
   size_t e_nbf = basis.get_Nbf();
