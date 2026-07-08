@@ -67,8 +67,11 @@ the CI structure changes.
 | `TrapOmegaPar`    | `w_par` (trap frequency along z)                               | `0.0`   |
 | `TrapOmegaPerp`   | `w_perp` (perpendicular frequency; set `== TrapOmegaPar` for isotropic) | `0.0` |
 | `TrapG`           | dimensionless anharmonicity `g` (sets `lam_par`, `lam_perp`)   | `0.0`   |
-| `TrapLambdaCross` | `z^2 (x^2+y^2)` coefficient (a.u.)                             | `0.0`   |
+| `TrapLambdaCross` | `z^2 (x^2+y^2)` coefficient (a.u.); either sign is allowed      | `0.0`   |
 | `TrapCenter`      | `x y z` in bohr; empty = quantum proton center                | (proton center) |
+
+Per-state protonic moments about the trap center, multi-root energies and state
+averaging are documented in [`README_MOMENTS.md`](README_MOMENTS.md).
 
 `NEOTrap false` (or `NEOTrap true` with `TrapG 0` and `w = 0`) reproduces the
 trap-off `hneoci` result bit-for-bit (`build_proton_trap` returns a zero
@@ -90,12 +93,17 @@ reference code is needed for T0-T3:
 - **T2 — cylindrical harmonic.** `w_par != w_perp` with a converged basis:
   ground state `-> w_perp + 1/2 w_par`; ladder = doubly degenerate `pi` at
   `w_perp`, `sigma` at `w_par`, integer overtones.
-- **T3 — quartic (1D).** Freeze the transverse motion; small `g` gives a
-  ground-state shift `Delta E = (3/4) g w_par`
-  (`<z^4>_0 = 3 / (4 m^2 w_par^2)`, `lam_par = g m^2 w_par^3`).
+- **T3 — quartic.** In a single matched Gaussian the proton energy *is* the
+  expectation value, so the quartic shift is exact for any `g`, not just
+  perturbatively. Isotropic `g` gives `Delta E = (11/4) g w` (pinning `M^{004}`,
+  `M^{400}`, `M^{040}` and the factor 2 on `M^{220}`), and a pure cross term
+  gives `Delta E = lam_cross / (2 m^2 w^2)` (pinning `M^{202} + M^{022}`).
+  A single axis-resolved `g` also drives `lam_perp`, so the transverse motion
+  cannot be frozen through the keyword set; these exact expectation values are a
+  stronger check than the perturbative 1D shift `(3/4) g w_par` would be.
 
 ## Files touched
 
 `src/contrib/hneoci.cpp` only: the keywords, the `build_proton_trap()` matrix
-assembly, and `H0p = Tp + Vp + Vtrap`. No changes to `neo.cpp`, the two-particle
+assembly, and `H0p = Tp + Vp + trap.V`. No changes to `neo.cpp`, the two-particle
 integrals, the optimizer, or the electronic basis handling.
