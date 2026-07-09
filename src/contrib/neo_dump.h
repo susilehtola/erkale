@@ -50,7 +50,9 @@ class DensityFit;
  * \param Cp,occp,hcore_p proton SCF MOs, occupations, AO core Hamiltonian
  * \param n_electrons,n_protons,proton_mass  counts / mass
  * \param e_scf,e_classical  SCF total energy and classical nuclear repulsion
- * \param density_fitting omega/alpha/beta select the e-p (and p-p) operator
+ * \param shared_aux      true when both species expand in one auxiliary/pivot
+ *                   space, so (mu nu|a b) = B_e B_p^T; false means e-p is
+ *                   recomputed exactly. omega/alpha/beta select the operator
  * \param version         ERKALE version string for provenance
  */
 void neo_dump(const std::string & filename,
@@ -69,7 +71,7 @@ void neo_dump(const std::string & filename,
               // scalars
               int n_electrons, int n_protons, double proton_mass,
               double e_scf, double e_classical,
-              bool density_fitting, double omega, double alpha, double beta,
+              bool shared_aux, double omega, double alpha, double beta,
               const std::string & version);
 
 #endif

@@ -126,7 +126,20 @@ def main():
         close("C3 electron total Tr[D S]", float(np.trace(De @ eblk[0]["S"])), nel, 1e-10)
         Dp = check_species(p, 1.0, npr)
 
-        eri_ep = f["/eri_ep"][:]
+        # With a shared auxiliary index eri_ep is not stored: it is exactly
+        # B_e B_p^T. Reconstruct it, which also exercises the shared index.
+        if "/eri_ep" in f:
+            eri_ep = f["/eri_ep"][:]
+        else:
+            if not int(f.attrs.get("shared_aux", 0)):
+                raise RuntimeError("no eri_ep and shared_aux is not set")
+            Be, Bp_ = eblk[0]["B"], p["B"]
+            if Be.shape[0] != Bp_.shape[0]:
+                raise RuntimeError("shared_aux set but naux_e != naux_p")
+            eri_ep = np.einsum("Pmn,Pab->mnab", Be, Bp_, optimize=True)
+            chk("C0 %s eri_ep from shared index" % "e-p", True,
+                "naux=%d, reconstructed (%d,%d,%d,%d)" % ((Be.shape[0],) + eri_ep.shape))
+
         Jp, Kp = coulomb_exchange(f, p, Dp)
         Je, _ = coulomb_exchange(f, eblk[0], De)          # Coulomb from the total density
         Ks = [coulomb_exchange(f, r, d)[1] for r, d in zip(eblk, Ds)]

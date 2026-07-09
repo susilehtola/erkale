@@ -33,6 +33,7 @@
 #include "density_fitting.h"
 #include "jkbuilder.h"
 #include "neo_dump.h"
+#include "neo_cholesky.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -111,6 +112,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
   settings.add_bool("vpp", "Include JK terms for protons?", true);
+  settings.add_bool("NEOSharedCholesky", "Decompose the electronic and protonic integrals against one shared set of Cholesky vectors; ignored unless JKMethod is Cholesky with point protons", true);
   settings.add_string("NEODump", "Dump converged NEO-SCF to this HDF5 file for post-SCF correlation codes (empty = off)", "");
   settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
   settings.add_bool("NEODumpVerify", "Reconstruct the energy from the NEODump tensors and check it against the SCF energy", true);
@@ -136,6 +138,7 @@ int main_guarded(int argc, char **argv) {
   bool finiteproton = settings.get_bool("FiniteProton");
   bool density_fitting = (JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting);
   bool vpp = settings.get_bool("vpp");
+  bool shared_cholesky = settings.get_bool("NEOSharedCholesky");
 
   Checkpoint chkpt(savechk,true);
 
@@ -244,6 +247,36 @@ int main_guarded(int argc, char **argv) {
   double fitthr=settings.get_double("FittingThreshold");
   double cholfitthr=settings.get_double("FittingCholeskyThreshold");
 
+  // One decomposition decomposes one operator, so a shared pivot set can serve
+  // the e-e, p-p and e-p blocks only when all three carry the bare 1/r12. The
+  // keyword defaults on, so quietly stand down where that does not hold rather
+  // than reject decks that never asked for it.
+  //
+  // vpp is deliberately not a precondition: it governs whether J_pp/K_pp enter
+  // the Fock build, not whether the protonic block gets decomposed. The shared
+  // vectors are worth having either way -- a downstream correlation treatment
+  // needs them even when the reference SCF omitted the proton-proton mean field.
+  if(shared_cholesky) {
+    const char * why = nullptr;
+    if(density_fitting)
+      why = "JKMethod is not Cholesky";
+    else if(finiteproton)
+      why = "FiniteProton screens the e-p operator, which bare-Coulomb vectors cannot represent";
+    else if(!Sp.n_elem)
+      why = "there are no quantum protons";
+    if(why) {
+      printf("NEOSharedCholesky disabled: %s.\n", why);
+      fflush(stdout);
+      shared_cholesky = false;
+    }
+  }
+
+  // The e-p Coulomb is factorized -- B_e B_p^T over a common vector index --
+  // when the two species share an auxiliary expansion. Density fitting shares a
+  // Gaussian aux basis; the shared-pivot Cholesky shares a pivot basis. Without
+  // one, e-p is evaluated exactly from four-center integrals.
+  const bool factorized_ep = density_fitting || shared_cholesky;
+
   if(density_fitting) {
     fitlib.load_basis(settings.get_string("FittingBasis"));
     {
@@ -271,11 +304,19 @@ int main_guarded(int argc, char **argv) {
     double cholshthr=settings.get_double("CholeskyShThr");
     double shtol=settings.get_double("IntegralThresh");
     double fitcholthr=settings.get_double("FittingCholeskyThreshold");
-    Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
-    if(finiteproton)
-      pfit.set_range_separation(omega, alpha, beta);
-    if(vpp)
-      Npairs_p=pfit.fill_cholesky(pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
+    if(shared_cholesky) {
+      Npairs_e=0;
+      Npairs_p=0;
+      neo_shared_cholesky(basis,pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose,dfit,pfit);
+      Npairs_e=basis.compute_screening(shtol).shpairs.size();
+      Npairs_p=pbasis.compute_screening(shtol).shpairs.size();
+    } else {
+      Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
+      if(finiteproton)
+        pfit.set_range_separation(omega, alpha, beta);
+      if(vpp)
+        Npairs_p=pfit.fill_cholesky(pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
+    }
   }
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
@@ -472,7 +513,11 @@ int main_guarded(int argc, char **argv) {
     return Jt;
   };
 
-  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_ri = [&](const arma::mat & Pe) {
+  // c = B_e^T P_e in the shared auxiliary/pivot space, then J = -B_p c: the
+  // cross-species Coulomb over a common vector index. Exact to the Cholesky
+  // threshold when the pivot set is shared, the DF analogue when the shared
+  // space is a Gaussian aux basis.
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_factorized = [&](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
     arma::mat J=-pfit.calcJ_vector(c);
     return J;
@@ -482,10 +527,10 @@ int main_guarded(int argc, char **argv) {
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [&](const arma::mat & Pe) {
-    return density_fitting ? electron_proton_coulomb_ri(Pe) : electron_proton_coulomb_exact(Pe);
+    return factorized_ep ? electron_proton_coulomb_factorized(Pe) : electron_proton_coulomb_exact(Pe);
   };
 
-  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_ri = [&dfit, &pfit](const arma::mat & Pp) {
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_factorized = [&dfit, &pfit](const arma::mat & Pp) {
     arma::vec c(pfit.compute_expansion(Pp));
     arma::mat J=-dfit.calcJ_vector(c);
     return J;
@@ -495,7 +540,7 @@ int main_guarded(int argc, char **argv) {
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb = [&](const arma::mat & Pp) {
-    return density_fitting ? proton_electron_coulomb_ri(Pp) : proton_electron_coulomb_exact(Pp);
+    return factorized_ep ? proton_electron_coulomb_factorized(Pp) : proton_electron_coulomb_exact(Pp);
   };
 
   OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> restricted_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
@@ -1183,7 +1228,7 @@ int main_guarded(int argc, char **argv) {
                pbasis, pfit, Cp_ao, occp, hcore_p,
                Nel, (int) proton_indices.size(), proton_mass,
                scfsolver.get_energy(), Ecnucr,
-               density_fitting, omega, alpha, beta, version);
+               factorized_ep, omega, alpha, beta, version);
     }
   }
 
