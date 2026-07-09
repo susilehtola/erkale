@@ -111,7 +111,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("SaveChk", "Checkpoint file to save to", "neo.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
-  settings.add_string("vpp", "Include the proton-proton mean field J_pp/K_pp? true/false, or Auto: on only for two or more quantum protons", "Auto");
+  settings.add_string("vpp", "Include the proton-proton mean field J_pp/K_pp? Auto (on from two quantum protons), true, or false (single proton only)", "Auto");
   settings.add_bool("NEOSharedCholesky", "Decompose the electronic and protonic integrals against one shared set of Cholesky vectors; ignored unless JKMethod is Cholesky with point protons", true);
   settings.add_string("NEODump", "Dump converged NEO-SCF to this HDF5 file for post-SCF correlation codes (empty = off)", "");
   settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
@@ -195,6 +195,18 @@ int main_guarded(int argc, char **argv) {
   } else {
     std::ostringstream oss;
     oss << "Could not parse the truth value " << vppstr << " for setting vpp; use true, false or Auto.\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Switching the mean field off is only defensible for a single proton, where it
+  // is exactly zero on the occupied space. With two or more the protons genuinely
+  // repel -- 1.05 Eh for H2 with both nuclei quantum -- and omitting that is not
+  // an approximation but a different, unphysical Hamiltonian. Refuse rather than
+  // silently converge to it.
+  if(!vpp && proton_indices.size() > 1) {
+    std::ostringstream oss;
+    oss << "vpp false is not allowed with " << proton_indices.size() << " quantum protons:\n"
+        << "the proton-proton Coulomb and exchange cancel only for a single proton.\n";
     throw std::runtime_error(oss.str());
   }
 
@@ -1217,12 +1229,9 @@ int main_guarded(int argc, char **argv) {
     // Optional export of the converged NEO-SCF for an external correlation code
     std::string neodump = settings.get_string("NEODump");
     if(neodump.size()) {
-      // The dump's energy reconstruction includes the p-p Coulomb and exchange.
-      // With one quantum proton those cancel exactly, so vpp is immaterial; with
-      // more they do not, and an SCF that skipped them would not reconstruct.
-      if(!vpp && proton_indices.size() > 1)
-        throw std::runtime_error("NEODump with more than one quantum proton requires vpp: the SCF energy would omit the proton-proton mean field that the dumped integrals contain.\n");
-
+      // No vpp check here: it can only be off for a single quantum proton, whose
+      // p-p Coulomb and exchange cancel exactly, so the dump's energy
+      // reconstruction is unaffected either way.
       bool restricted_e = (M==1);
       size_t Nmat = fock.size();
 
