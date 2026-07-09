@@ -1153,52 +1153,25 @@ int main_guarded(int argc, char **argv) {
       bool restricted_e = (M==1);
       size_t Nmat = fock.size();
 
-      // Proton block (last) in the AO basis
+      // The converged SCF orbitals, in the AO basis. These -- not the canonical
+      // orbitals of some rebuilt Fock -- are what define the SCF density, so
+      // they are what gets dumped. No reference Fock is exported: the proton's
+      // depends on whether the correlation model carries a proton-proton
+      // fluctuation potential, so the consumer builds it from the dumped core
+      // Hamiltonian and two-particle factors.
       arma::mat Cp_ao = Xp * dm.first[Nmat-1];
       arma::vec occp = dm.second[Nmat-1];
-      arma::vec Ep = arma::diagvec(dm.first[Nmat-1].t() * fock[Nmat-1] * dm.first[Nmat-1]);
-      arma::mat Dp = Cp_ao * arma::diagmat(occp) * Cp_ao.t();
 
-      // Electron block(s) in the AO basis + total electron density
-      std::vector<arma::mat> Ce, Focke;
-      std::vector<arma::vec> occe_v, Ee_v;
-      arma::mat De(X.n_rows, X.n_rows, arma::fill::zeros);
+      std::vector<arma::mat> Ce;
+      std::vector<arma::vec> occe_v;
       size_t nblk = restricted_e ? 1 : 2;
       for(size_t s=0;s<nblk;s++) {
-        arma::mat Cs = X * dm.first[s];
-        arma::vec os = dm.second[s];
-        Ce.push_back(Cs);
-        occe_v.push_back(os);
-        Ee_v.push_back(arma::diagvec(dm.first[s].t() * fock[s] * dm.first[s]));
-        De += Cs * arma::diagmat(os) * Cs.t();
+        Ce.push_back(X * dm.first[s]);
+        occe_v.push_back(dm.second[s]);
       }
 
-      // AO Fock matrices, rebuilt from the converged densities with the same
-      // engine the SCF used (the lambdas carry the correct K and e-p signs).
       arma::mat hcore_e = T + Vc;
-      arma::mat Jpe = proton_electron_coulomb(Dp);
-      if(restricted_e) {
-        arma::mat J, K;
-        std::tie(J, K) = electronic_terms(Ce[0], occe_v[0]);
-        Focke.push_back(hcore_e + J + 0.5*K + Jpe);
-      } else {
-        arma::mat Ja, Ka, Jb, Kb;
-        std::tie(Ja, Ka) = electronic_terms(Ce[0], occe_v[0]);
-        std::tie(Jb, Kb) = electronic_terms(Ce[1], occe_v[1]);
-        Focke.push_back(hcore_e + Ja + Jb + Ka + Jpe);
-        Focke.push_back(hcore_e + Ja + Jb + Kb + Jpe);
-      }
       arma::mat hcore_p = Tp + Vpc;
-      arma::mat Jep = electron_proton_coulomb(De);
-      // Self-interaction-free proton Fock for the correlation consumer:
-      // kinetic + classical-nucleus attraction + the electron mean-field
-      // attraction only. The proton-proton J_p/K_p are deliberately excluded
-      // (a single quantum proton has no proton-proton interaction; including
-      // it leaves the occupied orbital unchanged but spuriously unbinds the
-      // proton virtuals). The total SCF energy and the dumped p-p B-tensor are
-      // unaffected -- this only sets the reference operator whose canonical
-      // orbitals/energies are written.
-      arma::mat Fock_p = hcore_p + Jep;
 
 #ifdef SVNRELEASE
       std::string version(SVNREVISION);
@@ -1206,8 +1179,8 @@ int main_guarded(int argc, char **argv) {
       std::string version("unknown");
 #endif
       neo_dump(neodump, settings.get_string("NEODumpIntegrals"), settings.get_bool("NEODumpVerify"),
-               basis, dfit, restricted_e, Ce, occe_v, Ee_v, hcore_e, Focke,
-               pbasis, pfit, Cp_ao, occp, Ep, hcore_p, Fock_p,
+               basis, dfit, restricted_e, Ce, occe_v, hcore_e,
+               pbasis, pfit, Cp_ao, occp, hcore_p,
                Nel, (int) proton_indices.size(), proton_mass,
                scfsolver.get_energy(), Ecnucr,
                density_fitting, omega, alpha, beta, version);
