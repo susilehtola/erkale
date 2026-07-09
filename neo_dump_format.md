@@ -72,15 +72,29 @@ between species.
 These are reconstructed from the same engine factors (`= Σ_P B·B`), i.e. they carry
 the SCF's fitting/Cholesky approximation, not a separate exact recomputation.
 
-**Electron-proton — always dense, in both representations:**
+**Electron-proton.** Governed by `/meta:shared_aux`.
+
+When the two species expand in **one shared auxiliary space** (`shared_aux = 1`),
+their `B` factors carry a **common vector index** and the e-p tensor is exactly
+
+```
+(μν|ab) = Σ_P B_e[P,μ,ν] · B_p[P,a,b]
+```
+
+so it is **not stored** — it would cost `nbf_e²·nbf_p²` for something already on
+disk. That is the case for density fitting (both species fitted in the same
+Gaussian aux basis) and for the shared-pivot Cholesky decomposition
+(`NEOSharedCholesky`, §6). Reconstruct it, or better, contract with it directly.
+
+Otherwise (`shared_aux = 0`, or `integral_representation = "dense"` where no `B`
+exists to rebuild from) it is written out:
 
 | Dataset  | Shape (C-order)              | Element |
 |----------|------------------------------|---------|
 | `eri_ep` | `(nbf_e,nbf_e,nbf_p,nbf_p)`  | `(μν\|ab)`, electrons on `r1`, protons on `r2`, **bare positive** |
 
-(In DF mode the SCF shares one aux basis, so `(μν|ab)=Σ_P B_e[P,μν]B_p[P,ab]`; in CD
-mode the species have independent Cholesky spaces and the SCF computes e-p
-*exactly* — so `eri_ep` is dumped dense to stay engine-consistent either way.)
+Check `H5Lexists(file, "/eri_ep")` rather than assuming; when absent, `shared_aux`
+is set and `naux_e == naux_p`.
 
 ### 1.4 MO ordering and occupations
 
@@ -137,6 +151,7 @@ operator: every two-particle quantity in it is sign-free (§2.3).
 | `proton_mass`              | double | proton mass (atomic units) scaling the nuclear kinetic operator |
 | `naux_e`                   | int    | electron fit dimension (only in `btensor` mode) |
 | `naux_p`                   | int    | proton fit dimension (only in `btensor` mode) |
+| `shared_aux`               | bool   | `true` = `B_e`/`B_p` share a vector index, `eri_ep` omitted (§1.3) |
 | `e_scf`                    | double | converged NEO-SCF total energy printed by ERKALE |
 | `e_classical`              | double | Coulomb repulsion among the *classical* (non-quantum) nuclei only |
 | `erkale_version`           | string | ERKALE version / git description |
@@ -245,10 +260,9 @@ and exchange cancel exactly, so the error is invisible; with two it is not.
 Note also that the RI p-p energy itself is inaccurate, not merely ill-conditioned:
 for CH₄ with two quantum protons, `J_pp` is `5.460` under RI against `5.750` under
 Cholesky, a `0.29 Eh` fitting error that shifts the total energy by `1.1 mEh`. **Use
-`JKMethod Cholesky` for NEO dumps with more than one quantum proton.** A future
-superbasis Cholesky (one decomposition over the union of the electronic and protonic
-bases, segmented into `B_e`/`B_p` sharing a common vector index) would remove both
-problems and make `eri_ep` exact by construction rather than by aux-basis coincidence.
+`JKMethod Cholesky` for NEO dumps** — which then also gets you the shared-pivot
+decomposition of §6, and with it an `eri_ep` that is exact by construction rather
+than by aux-basis coincidence.
 
 ---
 
@@ -307,3 +321,63 @@ diagonalizing `f` within the occupied and virtual blocks separately, rotating `C
 accordingly; and take `eps = diag(Cᵀ f C)`. Asserting `‖f C − S C diag(eps)‖ ≈ 0` on
 the *dumped* `C` will now fail by design — assert orthonormality instead, and assert
 canonicality only after the semicanonical rotation.
+
+---
+
+## 6. Shared-pivot Cholesky (`NEOSharedCholesky`, default on)
+
+With `JKMethod Cholesky` and point protons, ERKALE decomposes the electronic and
+protonic two-particle integrals against **one shared set of Cholesky vectors**.
+`naux_e == naux_p`, `shared_aux = 1`, and `eri_ep` is omitted (§1.3).
+
+The object decomposed is the Gram matrix of the **union of the two same-species
+pair spaces** under the Coulomb metric,
+
+```
+M = [ (ee|ee)  (ee|pp) ]
+    [ (pp|ee)  (pp|pp) ]
+```
+
+*not* the pair space of the union of the two basis sets. The latter would also
+generate cross products `μa` of one electronic and one protonic function. Those
+have large diagonals — protonic functions are tight and sit on the electronic
+ones — so they would attract pivots, and they reconstruct `(μa|νb)` integrals no
+NEO model uses: electrons and protons are distinguishable, so there is no e-p
+exchange.
+
+ERKALE's CD is two-step, i.e. density fitting in an auxiliary basis of pivot
+orbital products, so this is implemented as a **shared pivot basis** rather than
+as an explicit decomposition of `M` followed by slicing. Pivots are selected per
+species and unioned; one metric `(piv|piv)` and one orthogonaliser `X = M^{-1/2}`
+are built over the union; each species then holds `L = Xᵀ (piv | μν)` over its own
+orbital basis. The union is bounded at the same threshold as a joint pivoting by
+the standard Cholesky bound `|Δ(μν|ab)| ≤ √(Δ_μν · Δ_ab)`, and the joint canonical
+orthogonalization prunes the redundancy it introduces. That orthogonalization
+normalizes the metric to unit diagonal first, which is what keeps the ~10⁶
+disparity between tight protonic and diffuse electronic pivot self-energies from
+discarding independent electronic functions by sheer magnitude.
+
+**Accuracy**, HeHHe⁺ / cc-pVDZ / PB4-F1, against the exact four-center e-p tensor
+and against independent per-species CDs:
+
+| quantity | deviation |
+|---|---|
+| `(μν\|ab)` = `B_e·B_pᵀ` vs exact four-center | max abs `4.2e-09`, max rel `8.8e-10` |
+| `(μν\|λσ)` vs independent CD | `1.5e-08` |
+| `(ab\|cd)` vs independent CD | `1.7e-08` |
+| `e_scf` vs independent CD | `6.4e-11` |
+
+**Cost.** Each species' `B` widens to the union: for CH₄ with two quantum protons,
+377 electronic + 362 protonic pivots orthogonalize to 717 shared vectors, so `B_e`
+grows 377→717 and `B_p` 362→717. But `eri_ep` disappears, and it was the dominant
+term: the dump falls from 56.4 MB to 28.9 MB, and the `O(nbf_e²·nbf_p²)` scaling is
+eliminated rather than merely reduced.
+
+**Restrictions.** One decomposition decomposes one operator, so the shared vectors
+serve the e-e, p-p and e-p blocks only when all three carry the bare `1/r12`. The
+keyword therefore stands down (with a printed reason) under `JKMethod RI`, under
+`FiniteProton` (a screened e-p kernel cannot reuse bare-Coulomb vectors), and when
+there are no quantum protons. It is **independent of `vpp`**: whether `J_pp/K_pp`
+enter the SCF Fock is separate from whether the protonic block is decomposed, and a
+downstream correlation treatment needs `B_p` either way. CD gradients are
+unavailable on a shared-pivot fit and throw if called.

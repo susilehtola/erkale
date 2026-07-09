@@ -748,6 +748,77 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   return orbpairs.size();
 }
 
+size_t DensityFit::fill_cholesky_shared(const BasisSet & orbbas,
+                                        const std::vector<GaussianShell> & piv_shells,
+                                        const std::vector<std::pair<size_t, size_t>> & piv_shellpairs,
+                                        const arma::umat & piv_index,
+                                        arma::uword piv_sentinel,
+                                        const arma::mat & X,
+                                        bool dir,
+                                        double shell_screen_tol,
+                                        int piv_max_am, int piv_max_contr,
+                                        bool verbose) {
+  // Same object as fill_cholesky produces -- L = X^T (piv|mu nu) with the
+  // metric baked in -- but the pivot basis and its orthogonaliser are given,
+  // not derived from this orbital basis. See the header for why.
+  Timer ttot;
+
+  cholesky_mode = true;
+  cd_foreign_pivots = true;
+  init_orbital_state(orbbas, dir);
+  auxshells.clear();
+  maxauxam    = 0;
+  maxauxcontr = 0;
+  maxam       = std::max(maxorbam, piv_max_am);
+  maxcontr    = std::max(maxorbcontr, (size_t) piv_max_contr);
+
+  Naux = X.n_cols;
+  cd_X = X;
+  cd_pivot_index = piv_index;
+  cd_pivot_sentinel = piv_sentinel;
+  cd_pivot_shellpairs_vec = piv_shellpairs;
+  pivot_shellpairs.clear();
+  pivot_shellpairs.insert(piv_shellpairs.begin(), piv_shellpairs.end());
+
+  // The metric is baked into the L blocks, exactly as in fill_cholesky, so
+  // the J/K kernels see an identity metric in CD mode.
+  ab.reset();
+  ab_inv.reset();
+  ab_invh.reset();
+
+  orbpairs = orbbas.compute_screening(shell_screen_tol).shpairs;
+
+  std::vector<std::pair<size_t, size_t>> sp_pairs, sp_firsts, sp_sizes;
+  build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
+
+  auto builder = std::make_shared<DirectCDBlocks>(
+      Nbf, Naux, sp_pairs, sp_firsts, sp_sizes,
+      orbshells, piv_shells, cd_pivot_shellpairs_vec, cd_pivot_index, cd_pivot_sentinel,
+      cd_X, omega, alpha, beta, maxam, maxcontr);
+  if(dir) {
+    blocks = builder;
+  } else {
+    auto cached = std::make_shared<CachedBlocks>(
+        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes));
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+      arma::mat slot = cached->block_mut(ip);
+      slot = builder->get_block(ip);
+    }
+    blocks = cached;
+  }
+
+  if(verbose) {
+    printf("Shared-pivot CD: %i orbital shell pairs against %i shared vectors (%s).\n",
+           (int) orbpairs.size(), (int) Naux, ttot.elapsed().c_str());
+    fflush(stdout);
+  }
+
+  return orbpairs.size();
+}
+
 // Helper for the two CD force loops. Both compute a 4-shell dERIWorker
 // derivative and accumulate into a per-thread fwrk; the only thing
 // that varies is the outer shellpair list and the per-quartet
@@ -993,6 +1064,8 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
 arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const {
   if(!cholesky_mode)
     throw std::runtime_error("DensityFit::forceJ_cholesky requires fill_cholesky to have been called.\n");
+  if(cd_foreign_pivots)
+    throw std::runtime_error("DensityFit::forceJ_cholesky: the pivot basis is not the orbital basis (shared-pivot CD); CD gradients are not implemented for it.\n");
   if(P.n_rows != Nbf || P.n_cols != Nbf)
     throw std::runtime_error("DensityFit::forceJ_cholesky: density matrix dimension mismatch.\n");
 
@@ -1037,6 +1110,8 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
 arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, const std::vector<double> & occo, double kfrac) const {
   if(Corig.n_rows != Nbf)
     throw std::runtime_error("DensityFit::forceK: orbital matrix doesn't match basis set.\n");
+  if(cd_foreign_pivots)
+    throw std::runtime_error("DensityFit::forceK: the pivot basis is not the orbital basis (shared-pivot CD); gradients are not implemented for it.\n");
 
   // Filter to occupied orbitals (drop columns with zero occupation).
   arma::mat C;

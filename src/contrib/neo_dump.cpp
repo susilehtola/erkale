@@ -249,7 +249,7 @@ void neo_dump(const std::string & filename,
               const arma::mat & hcore_p,
               int n_electrons, int n_protons, double proton_mass,
               double e_scf, double e_classical,
-              bool density_fitting, double omega, double alpha, double beta,
+              bool shared_aux, double omega, double alpha, double beta,
               const std::string & version) {
 
   if(representation != "btensor" && representation != "dense") {
@@ -276,9 +276,9 @@ void neo_dump(const std::string & filename,
   arma::mat Gee = Be * Be.t();
   arma::mat Gpp = Bp * Bp.t();
   arma::mat Gep;
-  if(density_fitting) {
+  if(shared_aux) {
     if(Be.n_cols != Bp.n_cols)
-      throw std::runtime_error("neo_dump: electron and proton density-fitting bases differ -- cannot share the e-p auxiliary expansion.\n");
+      throw std::runtime_error("neo_dump: the electron and proton factors do not share a vector index -- cannot form the e-p expansion.\n");
     Gep = Be * Bp.t();
   } else {
     Gep = exact_ep(ebasis, pbasis, omega, alpha, beta);
@@ -388,6 +388,9 @@ void neo_dump(const std::string & filename,
     write_int_attr(root, "naux_e", (int) Be.n_cols);
     write_int_attr(root, "naux_p", (int) Bp.n_cols);
   }
+  // With a shared auxiliary/pivot space the two B factors carry a common vector
+  // index, so eri_ep is a product of tensors already on disk and is not stored.
+  write_int_attr(root, "shared_aux", shared_aux ? 1 : 0);
   write_dbl_attr(root, "e_scf", e_scf);
   write_dbl_attr(root, "e_classical", e_classical);
   write_str_attr(root, "erkale_version", version);
@@ -426,12 +429,18 @@ void neo_dump(const std::string & filename,
   if(!dense)
     write_B(pg, Bp, Np);
 
-  // electron-proton tensor: always dense (mu nu | a b), bare positive.
-  // Write C-order (Ne,Ne,Np,Np): need row-major of Gep, i.e. column-major of Gep.t().
-  {
+  // Electron-proton tensor, bare positive (mu nu | a b). Omitted when the two B
+  // factors share a vector index, since it is then exactly B_e B_p^T and storing
+  // it would cost Ne^2 Np^2 for nothing. Written dense otherwise -- including in
+  // "dense" representation, where no B factor is on disk to reconstruct it from.
+  if(dense || !shared_aux) {
+    // C-order (Ne,Ne,Np,Np): row-major of Gep is the column-major buffer of Gep.t().
     arma::mat Gept = Gep.t();
     std::vector<hsize_t> dims = { (hsize_t) Ne, (hsize_t) Ne, (hsize_t) Np, (hsize_t) Np };
     write_buffer(file, "eri_ep", Gept.memptr(), dims);
+  } else {
+    printf("eri_ep omitted: shared auxiliary index, (mu nu|a b) = sum_P B_e[P,mu,nu] B_p[P,a,b].\n");
+    fflush(stdout);
   }
 
   // dense per-species tensors. Gee/Gpp are symmetric in (pair<->pair), so their
@@ -500,7 +509,7 @@ void neo_dump(const std::string & filename,
 
     if(std::abs(diff) > 1e-7) {
       bool screened = !(omega == 0.0 && alpha == 1.0 && beta == 0.0);
-      if(density_fitting && screened)
+      if(shared_aux && screened)
         // Finite-proton RI uses dfit's metric for the electron-side expansion and
         // pfit's (screened) 3-center for the proton-side projection; that mixed
         // metric is not exactly B_e B_p^T, so a small residual is expected here.

@@ -187,7 +187,7 @@ if(OPENORBITAL_HEADER)
   endif()
   message(STATUS "Eigen3 headers for OpenOrbitalOptimizer targets: ${EIGEN3_INCLUDE_DIR}")
 
-  add_executable (erkale_neo neo.cpp neo_dump.cpp)
+  add_executable (erkale_neo neo.cpp neo_dump.cpp neo_cholesky.cpp)
   target_include_directories(erkale_neo PUBLIC "${EIGEN3_INCLUDE_DIR}")
   set_target_properties(erkale_neo PROPERTIES OUTPUT_NAME "erkale_neo${SUFFIX}")
   target_include_directories(erkale_neo PUBLIC "${OPENORBITAL_HEADER}")

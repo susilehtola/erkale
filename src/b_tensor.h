@@ -175,11 +175,16 @@ public:
  * outlives the DensityFit that built it.
  */
 class DirectCDBlocks : public BTensorBlocksBase {
-  /// Orbital shells, owned copy.
+  /// Orbital shells, owned copy. These carry the (mu nu) bra.
   std::vector<GaussianShell> orb_shells_;
-  /// Pivot shellpairs to iterate over inside get_block.
+  /// Shells the pivot products are built from, owned copy. Normally the
+  /// same as orb_shells_; for a multicomponent (NEO) shared pivot basis
+  /// they belong to whichever species contributed the pivot, which need
+  /// not be the species carrying the bra.
+  std::vector<GaussianShell> piv_shells_;
+  /// Pivot shellpairs to iterate over inside get_block, indexing piv_shells_.
   std::vector<std::pair<size_t, size_t>> pivot_shellpairs_;
-  /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank or pivot_sentinel_.
+  /// Lookup over the *pivot* basis: (mu, nu) -> pivot rank or pivot_sentinel_.
   arma::umat pivot_index_;
   /// Sentinel value used in pivot_index_ (Nselected = pivot_index_xt.n_rows).
   arma::uword pivot_sentinel_;
@@ -204,11 +209,30 @@ class DirectCDBlocks : public BTensorBlocksBase {
   size_t Nselected_;
 
  public:
+  /// Single-species: the pivot products are built from the orbital shells.
   DirectCDBlocks(size_t Nbf, size_t Naux,
                  std::vector<std::pair<size_t, size_t>> shellpairs,
                  std::vector<std::pair<size_t, size_t>> firsts,
                  std::vector<std::pair<size_t, size_t>> sizes,
                  std::vector<GaussianShell> orb_shells,
+                 std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
+                 arma::umat pivot_index,
+                 arma::uword pivot_sentinel,
+                 arma::mat pivot_X,
+                 double omega, double alpha, double beta,
+                 int max_am, int max_contr);
+
+  /// Foreign pivot basis: the (mu nu) bra comes from orb_shells, the pivot
+  /// products from piv_shells, and pivot_index is indexed over the pivot
+  /// basis. max_am / max_contr must cover both. Used by the NEO shared-pivot
+  /// decomposition, where one pivot set spans the electronic and protonic
+  /// pair spaces at once.
+  DirectCDBlocks(size_t Nbf, size_t Naux,
+                 std::vector<std::pair<size_t, size_t>> shellpairs,
+                 std::vector<std::pair<size_t, size_t>> firsts,
+                 std::vector<std::pair<size_t, size_t>> sizes,
+                 std::vector<GaussianShell> orb_shells,
+                 std::vector<GaussianShell> piv_shells,
                  std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
                  arma::umat pivot_index,
                  arma::uword pivot_sentinel,

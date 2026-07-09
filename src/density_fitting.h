@@ -145,6 +145,12 @@ class DensityFit {
   /// drive the metric build and the force sweeps.
   std::set<std::pair<size_t, size_t>> pivot_shellpairs;
 
+  /// True when the pivot products were built from a basis other than the
+  /// orbital basis (fill_cholesky_shared). cd_pivot_index is then indexed
+  /// over the pivot basis, not the orbital basis, so the CD gradient
+  /// kernels -- which assume the two coincide -- must refuse to run.
+  bool cd_foreign_pivots = false;
+
   /// Form screening matrix
   void form_screening();
   /// Throw std::logic_error unless P has the Nbf x Nbf density-matrix
@@ -203,20 +209,6 @@ class DensityFit {
   template<typename BuildQ>
   void accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, double sign, BuildQ && build_q) const;
 
-  /// Two-step CD pivot selection (phases A-C: diagonal, pair
-  /// enumeration, pivoted selection). Pivots-only: populates the
-  /// by-ref outputs (pivot list, product map, pivot shellpairs); the
-  /// (mu nu | piv) integrals are rebuilt per block by the cached/direct
-  /// block builders, not returned here. Honors the instance's range
-  /// separation (set_range_separation).
-  size_t select_two_step_pivots(const BasisSet & basis,
-                                double cholesky_tol,
-                                double shell_reuse_thr,
-                                double shell_screen_tol,
-                                bool verbose,
-                                arma::uvec & pi,
-                                arma::umat & invmap,
-                                std::set<std::pair<size_t, size_t>> & piv_shellpairs) const;
   /// Compute shell in (a|uv) matrix
   arma::mat compute_a_munu(ERIWorker * eri, size_t ip, double * memptr = nullptr) const;
   /// Project P_munu onto the aux basis through one shellpair block:
@@ -325,6 +317,56 @@ class DensityFit {
                        double shell_screen_tol,
                        double fit_cholesky_thr,
                        bool verbose);
+
+  /**
+   * Fill the B tensor from an *externally supplied* pivot basis and metric
+   * orthogonaliser, rather than selecting pivots from this object's own
+   * orbital basis.
+   *
+   * This is what makes a multicomponent (NEO) decomposition possible: one
+   * pivot set spanning the union of the electronic and protonic pair spaces,
+   * with one metric M = (piv|piv) and one orthogonaliser X = M^{-1/2}, is
+   * handed to a DensityFit per species. Each then holds
+   * L = X^T (piv | mu nu) over its own orbital basis, so the two share a
+   * common vector index P and the cross-species integrals come out as
+   * (mu nu | a b) = sum_P B_e[P,mu,nu] B_p[P,a,b] -- exact to the Cholesky
+   * threshold, rather than exact only when both species happen to be fitted
+   * in the same auxiliary basis.
+   *
+   * piv_shells is the concatenated pivot basis with globally unique
+   * first_ind; piv_index is indexed over it. piv_max_am / piv_max_contr must
+   * cover it. The CD force kernels are unavailable on the result (the pivot
+   * and orbital bases no longer coincide) and throw if called.
+   *
+   * Returns the number of significant orbital shell pairs.
+   */
+  size_t fill_cholesky_shared(const BasisSet & orbbas,
+                              const std::vector<GaussianShell> & piv_shells,
+                              const std::vector<std::pair<size_t, size_t>> & piv_shellpairs,
+                              const arma::umat & piv_index,
+                              arma::uword piv_sentinel,
+                              const arma::mat & X,
+                              bool direct,
+                              double shell_screen_tol,
+                              int piv_max_am, int piv_max_contr,
+                              bool verbose);
+
+  /// Two-step CD pivot selection (phases A-C: diagonal, pair
+  /// enumeration, pivoted selection). Pivots-only: populates the
+  /// by-ref outputs (pivot list, product map, pivot shellpairs); the
+  /// (mu nu | piv) integrals are rebuilt per block by the cached/direct
+  /// block builders, not returned here. Honors the instance's range
+  /// separation (set_range_separation). Public so a multicomponent
+  /// decomposition can select pivots per species and union them before
+  /// building one shared metric (see contrib/neo_cholesky.h).
+  size_t select_two_step_pivots(const BasisSet & basis,
+                                double cholesky_tol,
+                                double shell_reuse_thr,
+                                double shell_screen_tol,
+                                bool verbose,
+                                arma::uvec & pi,
+                                arma::umat & invmap,
+                                std::set<std::pair<size_t, size_t>> & piv_shellpairs) const;
 
   /// True iff this object was filled via fill_cholesky (i.e. the
   /// blocks hold CD-derived L vectors, not a genuine aux basis).

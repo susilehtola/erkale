@@ -245,8 +245,26 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
                                arma::mat pivot_X,
                                double omega, double alpha, double beta,
                                int max_am, int max_contr)
+    : DirectCDBlocks(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes),
+                     orb_shells, orb_shells, std::move(pivot_shellpairs),
+                     std::move(pivot_index), pivot_sentinel, std::move(pivot_X),
+                     omega, alpha, beta, max_am, max_contr) {}
+
+DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
+                               std::vector<std::pair<size_t, size_t>> shellpairs,
+                               std::vector<std::pair<size_t, size_t>> firsts,
+                               std::vector<std::pair<size_t, size_t>> sizes,
+                               std::vector<GaussianShell> orb_shells,
+                               std::vector<GaussianShell> piv_shells,
+                               std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
+                               arma::umat pivot_index,
+                               arma::uword pivot_sentinel,
+                               arma::mat pivot_X,
+                               double omega, double alpha, double beta,
+                               int max_am, int max_contr)
     : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
+      piv_shells_(std::move(piv_shells)),
       pivot_shellpairs_(std::move(pivot_shellpairs)),
       pivot_index_(std::move(pivot_index)),
       pivot_sentinel_(pivot_sentinel),
@@ -309,12 +327,12 @@ arma::mat DirectCDBlocks::get_block(size_t ip) const {
   for(size_t pp=0; pp<pivot_shellpairs_.size(); pp++) {
     const size_t ks = pivot_shellpairs_[pp].first;
     const size_t ls = pivot_shellpairs_[pp].second;
-    const size_t Nk = orb_shells_[ks].get_Nbf();
-    const size_t Nl = orb_shells_[ls].get_Nbf();
-    const size_t k0 = orb_shells_[ks].get_first_ind();
-    const size_t l0 = orb_shells_[ls].get_first_ind();
+    const size_t Nk = piv_shells_[ks].get_Nbf();
+    const size_t Nl = piv_shells_[ls].get_Nbf();
+    const size_t k0 = piv_shells_[ks].get_first_ind();
+    const size_t l0 = piv_shells_[ls].get_first_ind();
 
-    eri->compute(&orb_shells_[imus], &orb_shells_[inus], &orb_shells_[ks], &orb_shells_[ls]);
+    eri->compute(&orb_shells_[imus], &orb_shells_[inus], &piv_shells_[ks], &piv_shells_[ls]);
     const std::vector<double> * erip = eri->getp();
 
     for(size_t ii=0; ii<Nmu; ii++)
