@@ -54,3 +54,22 @@ else()
   target_link_libraries(integraltest ${LIBINT_LIBRARIES})
   target_link_libraries(integraltest ${HDF5_LIBRARIES})
 endif()
+
+add_executable(cdforcetest cdforcetest.cpp)
+# The name of the executable is
+set_target_properties(cdforcetest PROPERTIES OUTPUT_NAME "cdforcetest${SUFFIX}")
+target_link_libraries(cdforcetest liberkale_emd)
+target_link_libraries(cdforcetest liberkale)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(cdforcetest -lrt)
+  endif()
+  target_link_libraries(cdforcetest ${GSL_LIBRARIES})
+  target_link_libraries(cdforcetest ${LAPACK_LIBRARIES})
+  target_link_libraries(cdforcetest ${LIBXC_LIBRARIES})
+  target_link_libraries(cdforcetest ${LIBINT_LIBRARIES})
+  target_link_libraries(cdforcetest ${HDF5_LIBRARIES})
+endif()
