@@ -118,6 +118,16 @@ is set and `naux_e == naux_p`.
 spatial orbital, full p-p exchange) — a fully spin-polarized determinant of identical
 fermions. For one proton the p-p Coulomb+exchange self-interaction cancels exactly.
 
+That cancellation is why `vpp` (the proton-proton mean field in the SCF Fock)
+defaults to **`Auto`**: off for a single quantum proton, on from two. With one
+proton `J_pp + K_pp` annihilates the occupied orbital and contributes nothing to
+the energy, so switching it on changes no number in this file — it only pushes the
+protonic virtuals above the dissociation threshold, since they would then see the
+proton's own charge. From two protons the interaction is physical and `vpp` is on.
+`proton/B` is exported either way. Note that `NEODump` with **more than one**
+quantum proton requires `vpp`: the energy reconstruction of §3 includes the p-p
+Coulomb and exchange, which an SCF that skipped them would not reproduce.
+
 ### 1.5 Sign of the electron-proton interaction
 
 `eri_ep` is the **bare, positive** `(μν|ab)`. The physical interaction is attractive

@@ -111,7 +111,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("SaveChk", "Checkpoint file to save to", "neo.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
-  settings.add_bool("vpp", "Include JK terms for protons?", true);
+  settings.add_string("vpp", "Include the proton-proton mean field J_pp/K_pp? true/false, or Auto: on only for two or more quantum protons", "Auto");
   settings.add_bool("NEOSharedCholesky", "Decompose the electronic and protonic integrals against one shared set of Cholesky vectors; ignored unless JKMethod is Cholesky with point protons", true);
   settings.add_string("NEODump", "Dump converged NEO-SCF to this HDF5 file for post-SCF correlation codes (empty = off)", "");
   settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
@@ -137,7 +137,7 @@ int main_guarded(int argc, char **argv) {
   std::string savechk = settings.get_string("SaveChk");
   bool finiteproton = settings.get_bool("FiniteProton");
   bool density_fitting = (JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting);
-  bool vpp = settings.get_bool("vpp");
+  std::string vppstr = settings.get_string("vpp");
   bool shared_cholesky = settings.get_bool("NEOSharedCholesky");
 
   Checkpoint chkpt(savechk,true);
@@ -175,6 +175,28 @@ int main_guarded(int argc, char **argv) {
   }
   for(size_t i=0; i<quantum_protons.size(); i++)
     quantum_protons[i].num=i;
+
+  // Resolve vpp, which needs the proton count. A single quantum proton has no
+  // proton-proton interaction: J_pp + K_pp annihilates its occupied orbital and
+  // its Coulomb and exchange energies cancel exactly, so the mean field changes
+  // no SCF number. It does change the protonic virtuals, which then see the
+  // proton's own charge and come out unbound. Auto therefore leaves it off for a
+  // single proton and switches it on from two, where the interaction is physical.
+  bool vpp;
+  if(stricmp(vppstr,"Auto")==0) {
+    vpp = (proton_indices.size() > 1);
+    printf("vpp Auto: %s for %i quantum proton%s.\n", vpp ? "on" : "off",
+           (int) proton_indices.size(), proton_indices.size()==1 ? "" : "s");
+    fflush(stdout);
+  } else if(stricmp(vppstr,"true")==0 || stricmp(vppstr,"on")==0 || stricmp(vppstr,"yes")==0) {
+    vpp = true;
+  } else if(stricmp(vppstr,"false")==0 || stricmp(vppstr,"off")==0 || stricmp(vppstr,"no")==0) {
+    vpp = false;
+  } else {
+    std::ostringstream oss;
+    oss << "Could not parse the truth value " << vppstr << " for setting vpp; use true, false or Auto.\n";
+    throw std::runtime_error(oss.str());
+  }
 
   // Collect classical nuclei
   std::vector<std::tuple<int,double,double,double>> classical_nuclei;
@@ -314,7 +336,10 @@ int main_guarded(int argc, char **argv) {
       Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
       if(finiteproton)
         pfit.set_range_separation(omega, alpha, beta);
-      if(vpp)
+      // The protonic factor is needed by the Fock build only when vpp is on, but
+      // the dump exports it regardless -- a correlation treatment needs B_p even
+      // when the reference SCF omitted the proton-proton mean field.
+      if(vpp || settings.get_string("NEODump").size())
         Npairs_p=pfit.fill_cholesky(pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
     }
   }
@@ -1192,8 +1217,11 @@ int main_guarded(int argc, char **argv) {
     // Optional export of the converged NEO-SCF for an external correlation code
     std::string neodump = settings.get_string("NEODump");
     if(neodump.size()) {
-      if(!vpp)
-        throw std::runtime_error("NEODump requires vpp=true: the proton-proton integrals are part of the dump.\n");
+      // The dump's energy reconstruction includes the p-p Coulomb and exchange.
+      // With one quantum proton those cancel exactly, so vpp is immaterial; with
+      // more they do not, and an SCF that skipped them would not reconstruct.
+      if(!vpp && proton_indices.size() > 1)
+        throw std::runtime_error("NEODump with more than one quantum proton requires vpp: the SCF energy would omit the proton-proton mean field that the dumped integrals contain.\n");
 
       bool restricted_e = (M==1);
       size_t Nmat = fock.size();
