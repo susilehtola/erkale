@@ -942,10 +942,16 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
           double accum = 0.0;
           for(size_t ii=0; ii<Ni; ii++)
             for(size_t jj=0; jj<Nj; jj++) {
+              // cd_pivot_index is symmetric, so within a diagonal
+              // shellpair both (ii, jj) and (jj, ii) map to the same
+              // pivot; keep one orientation, or the pivot gets counted
+              // twice against the once-per-pivot metric convention.
+              if(is == js && jj < ii) continue;
               const arma::uword pidx = cd_pivot_index(i0+ii, j0+jj);
               if(pidx == cd_pivot_sentinel) continue;
               for(size_t kk=0; kk<Nk; kk++)
                 for(size_t ll=0; ll<Nl; ll++) {
+                  if(ks == ls && ll < kk) continue;
                   const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
                   if(qidx == cd_pivot_sentinel) continue;
                   accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * M(pidx, qidx);
@@ -1050,6 +1056,13 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
             const size_t col = ii*Nj + jj;
             for(size_t kk=0; kk<Nk; kk++)
               for(size_t ll=0; ll<Nl; ll++) {
+                // cd_pivot_index is symmetric, so within a diagonal
+                // pivot shellpair both (kk, ll) and (ll, kk) map to
+                // the same pivot; keep one orientation, or the pivot
+                // gets counted twice against the once-per-pivot
+                // 3-index convention. (The orbital (ii, jj) side is a
+                // genuine ordered-pair sum -- no restriction there.)
+                if(ks == ls && ll < kk) continue;
                 const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
                 if(qidx == cd_pivot_sentinel) continue;
                 accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * Q_ip(qidx, col);
