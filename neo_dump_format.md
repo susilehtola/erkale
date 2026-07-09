@@ -123,10 +123,14 @@ defaults to **`Auto`**: off for a single quantum proton, on from two. With one
 proton `J_pp + K_pp` annihilates the occupied orbital and contributes nothing to
 the energy, so switching it on changes no number in this file — it only pushes the
 protonic virtuals above the dissociation threshold, since they would then see the
-proton's own charge. From two protons the interaction is physical and `vpp` is on.
-`proton/B` is exported either way. Note that `NEODump` with **more than one**
-quantum proton requires `vpp`: the energy reconstruction of §3 includes the p-p
-Coulomb and exchange, which an SCF that skipped them would not reproduce.
+proton's own charge.
+
+From two protons the protons genuinely repel, and `vpp false` is **rejected**:
+omitting a 1.05 Eh interaction (H₂ with both nuclei quantum) is not an
+approximation but a different Hamiltonian. So `vpp` can only ever be off for a
+single proton, and the dump's energy reconstruction (§3) — which includes the p-p
+Coulomb and exchange — is unaffected by it either way. `proton/B` is exported
+regardless.
 
 ### 1.5 Sign of the electron-proton interaction
 
