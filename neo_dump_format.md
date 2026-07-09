@@ -84,10 +84,15 @@ mode the species have independent Cholesky spaces and the SCF computes e-p
 
 ### 1.4 MO ordering and occupations
 
-- MOs in `C`/`eps` are **energy-ordered** (aufbau): occupied first, then virtual.
+- `C` holds the **SCF orbitals verbatim**, reordered so that the **occupied ones
+  come first**. They are orthonormal (`Cᵀ S C = I`) but are **not** canonical
+  with respect to any particular Fock matrix — see §2.3.
 - `nmo ≤ nbf`: linearly dependent AO directions are removed by canonical
   orthogonalization, so `C` is `(nbf, nmo)` with no padding.
-- Occupation vectors are **not stored** — they follow from `nocc` and the species rule:
+- Occupation is defined by **column order**: the first `nocc` columns are
+  occupied, the rest are virtual. The `occ` vector stores the same information
+  explicitly (and lets a reader assert it); the writer rejects fractional or
+  non-aufbau occupations, which the column convention cannot express.
 
 | Species block        | occ per occupied MO | `nocc` | density `D` |
 |----------------------|---------------------|--------|-------------|
@@ -109,9 +114,8 @@ multiplies by `q_e·q_p = -1`:
 E_ep  =  - Σ_{μν∈e}  Σ_{ab∈p}   eri_ep[μ,ν,a,b] · D^e[μ,ν] · D^p[a,b]
 ```
 
-The `fock` matrices in this file *do* already include the mean-field e-p attraction
-with its `-` sign (they are the converged SCF Fock matrices — §2.3); only the raw
-`eri_ep` tensor is sign-free.
+No Fock matrix is stored, so this file contains **no** sign-carrying mean-field
+operator: every two-particle quantity in it is sign-free (§2.3).
 
 ---
 
@@ -156,44 +160,53 @@ Electron group, **RHF** (`restricted_electrons = true`):
 | Dataset | Shape        | Notes |
 |---------|--------------|-------|
 | `nmo`,`nocc` | scalar int | `nocc = n_electrons/2` |
-| `C`     | `(nbf,nmo)`  | canonical AO→MO, energy-ordered (§2.3) |
-| `eps`   | `(nmo,)`     | canonical MO energies |
+| `C`     | `(nbf,nmo)`  | SCF AO→MO, occupied columns first (§1.4, §2.3) |
+| `occ`   | `(nmo,)`     | SCF occupations (`2.0` × `nocc`, then zeros) |
 | `hcore` | `(nbf,nbf)`  | one-particle core (§2.3) |
-| `fock`  | `(nbf,nbf)`  | converged Fock (§2.3) |
-
-`C`/`eps` are the **canonical** orbitals: the writer diagonalizes the stored
-`fock` in the `overlap` metric, so they satisfy `F C = S C diag(eps)`,
-`Cᵀ S C = I`, `Cᵀ F C = diag(eps)` (validated at write time, residuals printed).
-`nocc` is the integer particle count of the block (occupied = lowest `nocc`
-canonical orbitals).
 
 Electron group, **UHF** (`restricted_electrons = false`): the same, suffixed `_a`/`_b`
-— `nmo_a/nmo_b`, `nocc_a/nocc_b`, `C_a/C_b`, `eps_a/eps_b`, `hcore` (spin-independent,
-single copy), `fock_a/fock_b`.
+— `nmo_a/nmo_b`, `nocc_a/nocc_b`, `C_a/C_b`, `occ_a/occ_b`, `hcore` (spin-independent,
+single copy).
 
-Proton group: `nmo`, `nocc` (`= n_quantum_protons`), `C`, `eps`, `hcore`, `fock`.
+Proton group: `nmo`, `nocc` (`= n_quantum_protons`), `C`, `occ`, `hcore`.
 
-### 2.3 What `hcore` and `fock` contain
+### 2.3 What `hcore` contains, and why there is no `fock`
 
 - **Electron `hcore`** `= T_e + V_e(classical)` — kinetic + attraction to the
   *classical* nuclei only. The e-p attraction is **not** here (two-particle, via
   `eri_ep`).
 - **Proton `hcore`** `= T_p/m_p + V_p(classical)` — mass-scaled kinetic + repulsion
   from classical nuclei (`+` sign for the positive test charge), `m_p = proton_mass`.
-- **Electron `fock`** is the converged self-consistent AO Fock with all mean-field
-  two-particle terms at their physical signs (including the `−` e-p attraction):
-  `fock_e = hcore_e + J_ee[D^e] − ½K_ee[D^e] − J_ep[D^p]` (RHF; UHF uses
-  `J_ee[D^e] − K_ee[D^{σ}]` per spin). Its generalized eigenvalues in `overlap`
-  equal `eps`, and `C` are the eigenvectors (§2.2).
-- **Proton `fock`** is the **self-interaction-free** one-particle-per-orbital
-  operator `fock_p = hcore_p − J_pe[D^e]` (kinetic + classical-nucleus repulsion +
-  the electron mean-field attraction `−J_pe`), with **no** proton–proton `J_p/K_p`.
-  A single quantum proton has no proton–proton interaction; including its own
-  Coulomb/exchange leaves the occupied orbital and the total SCF energy unchanged
-  but spuriously unbinds the proton virtuals. Excluding it gives a physically bound
-  proton spectrum (occupied + virtual `eps` below the free-proton dissociation
-  threshold), which is what the CC consumer needs. The proton–proton interaction,
-  if needed, is available exactly from `proton/B` (`eri_pp`).
+
+**No Fock matrix and no orbital energies are dumped.** The right proton reference
+operator is use-case dependent, and baking one in silently corrupts the density:
+
+- A correlation model *without* a proton–proton fluctuation potential wants the
+  **self-interaction-free** `f_p = hcore_p − J_pe[D^e]`.
+- A model *with* one wants the **J/K-dressed** SCF Fock
+  `f_p = hcore_p − J_pe[D^e] + J_pp[D^p] − K_pp[D^p]`.
+
+These two operators share an occupied subspace **only for a single quantum proton**
+(where `J_pp + K_pp` annihilates the occupied orbital by exact self-interaction
+cancellation). For two or more protons they do not, so canonicalizing the SI-free
+operator — as this writer used to do — yields an occupied subspace that is *not*
+the SCF one, and hence a reconstructed density and reference energy that are wrong
+(observed: 5.5 mHa for CH₄ with two quantum protons).
+
+The dump therefore exports the **SCF orbitals themselves**, which define the SCF
+density by construction, and leaves the choice of reference operator to the
+consumer. The consumer:
+
+1. builds `D^e`, `D^p` from the first `nocc` columns of `C` (§1.4);
+2. builds whichever `f` it wants from `hcore`, `B` and `eri_ep`;
+3. **semicanonicalizes** — diagonalizes `f` separately within the occupied and the
+   virtual block — and takes `eps = diag(Cᵀ f C)`. This leaves both subspaces, and
+   hence the density, untouched.
+
+Step 3 is mandatory: the dumped orbitals are *not* eigenvectors of the SI-free
+proton operator. `erkale_neo` prints `max|f_ia|`, the surviving occupied–virtual
+coupling, at write time — it is at the SCF convergence level for one proton and
+`O(10⁻²)` for two.
 
 ---
 
@@ -211,9 +224,31 @@ spin and for the high-spin protons. The `(pq|rs)` come from `eri_xx` (`dense`) o
 reconstructed from `B` (`btensor`).
 
 `erkale_neo` with `NEODumpVerify true` reconstructs `E` from the on-disk tensors and
-asserts agreement with `e_scf`. Because the dumped integrals match the SCF's own
+asserts agreement with `e_scf`. `tests/neo_dump_check.py <dump.h5>` does the same from
+outside ERKALE and is the reference implementation of the consumer contract: it builds
+the densities from the dumped orbitals, rebuilds both reference Fock matrices,
+semicanonicalizes them, and checks all of it. Run it against any new dump.
+
+Because the dumped integrals match the SCF's own
 engine (B-tensors / engine-reconstructed dense, and an engine-consistent `eri_ep`),
-the residual is at the SCF convergence level (≈ `1e-9`) for both RI and Cholesky.
+the residual is at machine precision for Cholesky (`≈1e-14`, any proton count) and
+for RI with a single quantum proton.
+
+**RI with ≥2 quantum protons** shows a residual of `≈1e-8`. This is a conditioning
+artifact, not an inconsistency: `def2-universal-jkfit` is an *electronic* auxiliary
+basis and fits the tight protonic pair densities very poorly. For CH₄/PB4-F1 the
+proton fit factor `proton/B` has condition number `2.6e12` (vs `3.1e4` for Cholesky),
+so the two algebraically-equivalent ways of contracting `J_pp` — via `B·Bᵀ` here, via
+the metric solve in the SCF — differ at that level. With one proton the p-p Coulomb
+and exchange cancel exactly, so the error is invisible; with two it is not.
+
+Note also that the RI p-p energy itself is inaccurate, not merely ill-conditioned:
+for CH₄ with two quantum protons, `J_pp` is `5.460` under RI against `5.750` under
+Cholesky, a `0.29 Eh` fitting error that shifts the total energy by `1.1 mEh`. **Use
+`JKMethod Cholesky` for NEO dumps with more than one quantum proton.** A future
+superbasis Cholesky (one decomposition over the union of the electronic and protonic
+bases, segmented into `B_e`/`B_p` sharing a common vector index) would remove both
+problems and make `eri_ep` exact by construction rather than by aux-basis coincidence.
 
 ---
 
@@ -223,3 +258,52 @@ the residual is at the SCF convergence level (≈ `1e-9`) for both RI and Choles
   exported — the e-p operator would be screened, not bare `1/r12`. The writer throws.
 - **Dense `eri_ep` / dense mode.** No permutational-symmetry packing — intended for
   small systems (one/two quantum protons, modest electronic basis).
+- **RI with ≥2 quantum protons is inaccurate** (§3). Prefer `JKMethod Cholesky`.
+
+---
+
+## 5. Schema changelog
+
+### v2 — core Hamiltonian + SCF orbitals (breaking)
+
+Motivation: the writer used to store `C` as the canonical orbitals of the
+self-interaction-free proton Fock. That operator does not share the SCF occupied
+subspace once there is more than one quantum proton, so the reconstructed proton
+density — and any correlation treatment built on it — was wrong. Measured on CH₄
+with two quantum protons: `NEODumpVerify` off by `5.5e-3 Eh`. Single-proton dumps
+were unaffected (exact self-interaction cancellation makes the two operators share
+the occupied orbital), which is why it went unnoticed.
+
+**Removed** (consumers must stop reading these):
+
+| Dataset | Old shape | Replacement |
+|---------|-----------|-------------|
+| `electron/fock`, `electron/fock_a`, `electron/fock_b` | `(nbf,nbf)` | rebuild from `hcore` + `B` + `eri_ep` |
+| `proton/fock`   | `(nbf,nbf)` | rebuild from `proton/hcore` + `eri_ep` (+ `proton/B` for a dressed Fock) |
+| `electron/eps`, `electron/eps_a`, `electron/eps_b`   | `(nmo,)` | `diag(Cᵀ f C)` after semicanonicalization |
+| `proton/eps`    | `(nmo,)` | `diag(Cᵀ f C)` after semicanonicalization |
+
+**Added:**
+
+| Dataset | Shape | Meaning |
+|---------|-------|---------|
+| `electron/occ` (or `occ_a`/`occ_b`) | `(nmo,)` | SCF occupations, `2.0`/`1.0` × `nocc` then zeros |
+| `proton/occ` | `(nmo,)` | SCF occupations, `1.0` × `nocc` then zeros |
+
+**Changed semantics** (same name, same shape):
+
+| Dataset | Was | Is |
+|---------|-----|-----|
+| `electron/C`, `proton/C` | canonical eigenvectors of the dumped `fock` | the SCF orbitals, occupied columns first; orthonormal but **not** canonical |
+
+Unchanged: `nbf`, `nmo`, `nocc`, `hcore`, `overlap`, `B`, `eri_ep`, `eri_ee`,
+`eri_pp`, and every `/meta` attribute.
+
+**Consumer migration.** A reader that previously did *load `F`, `eps` → assert
+canonical → MO-transform* must now: build `D` from the first `nocc` columns of `C`;
+build `f` itself (`f_e = h + J − ½K − V_pe`, `f_p = h − V_ep`, plus `J_pp − K_pp` if
+the model carries a proton–proton fluctuation potential); **semicanonicalize** by
+diagonalizing `f` within the occupied and virtual blocks separately, rotating `C`
+accordingly; and take `eps = diag(Cᵀ f C)`. Asserting `‖f C − S C diag(eps)‖ ≈ 0` on
+the *dumped* `C` will now fail by design — assert orthonormality instead, and assert
+canonicality only after the semicanonical rotation.

@@ -13,7 +13,6 @@
 #include "basis.h"
 #include "density_fitting.h"
 #include "eriworker.h"
-#include "linalg.h"
 
 #include <hdf5.h>
 #include <cstdio>
@@ -178,30 +177,61 @@ namespace {
     return C * arma::diagmat(occ) * C.t();
   }
 
-  // Canonical MOs of a Fock matrix F in the AO overlap metric S: solve the
-  // generalized eigenproblem F C = S C diag(eps) with C^T S C = I and
-  // C^T F C = diag(eps), eps ascending. Canonical (symmetric) orthonormalization
-  // via BasOrth projects out near-linear-dependent directions, so C is
-  // (Nbf x Nmo) with Nmo <= Nbf. The SCF solver returns occupation-ordered
-  // orbitals that do not in general diagonalize the converged Fock (DIIS
-  // extrapolation), so the dump recanonicalizes here.
-  arma::mat canonical_orbitals(const arma::mat & F, const arma::mat & S, arma::vec & eps) {
-    arma::mat X = BasOrth(S);                 // Nbf x Nmo
-    arma::mat Fmo = X.t() * F * X;            // Nmo x Nmo
-    Fmo = 0.5*(Fmo + Fmo.t());                // symmetrize against round-off
-    arma::mat U;
-    arma::eig_sym(eps, U, Fmo);
-    return X * U;                             // Nbf x Nmo, ascending in eps
+  // Reorder the columns so the occupied orbitals come first, preserving the
+  // relative order within each group (arma::find returns ascending indices).
+  // The dump's occupation contract is purely positional.
+  void occupied_first(arma::mat & C, arma::vec & occ) {
+    arma::uvec perm = arma::join_cols(arma::find(occ > 0.0), arma::find(occ <= 0.0));
+    C = C.cols(perm);
+    occ = occ(perm);
   }
 
-  // Max-norm residuals of the canonical conditions, for validation/printing.
-  void canonical_residuals(const arma::mat & C, const arma::mat & S,
-                           const arma::mat & F, const arma::vec & eps,
-                           double & orthonormality, double & eigres, double & offdiag) {
+  // The consumer reads occupations off the column order: the first nocc columns
+  // carry occ_full, the rest are empty. Fractional or non-aufbau occupations
+  // cannot be expressed that way, so reject them rather than dump a file whose
+  // stated nocc does not reproduce the SCF density.
+  size_t checked_nocc(const arma::vec & occ, double occ_full, const std::string & label) {
+    size_t nocc = (size_t) arma::accu(occ > 0.0);
+    for(size_t i=0;i<occ.n_elem;i++) {
+      double want = (i<nocc) ? occ_full : 0.0;
+      if(std::abs(occ(i)-want) > 1e-10) {
+        std::ostringstream oss;
+        oss << "neo_dump: " << label << " orbital " << i << " has occupation " << occ(i)
+            << ", expected " << want << ".\nFractional or non-aufbau occupations cannot be"
+            << " expressed by the occupied-first column convention.\n";
+        throw std::runtime_error(oss.str());
+      }
+    }
+    return nocc;
+  }
+
+  // Max-norm deviation from orthonormality in the AO overlap metric.
+  double orthonormality(const arma::mat & C, const arma::mat & S) {
     arma::mat I(C.n_cols, C.n_cols, arma::fill::eye);
-    orthonormality = arma::abs(C.t()*S*C - I).max();
-    eigres = arma::abs(F*C - S*C*arma::diagmat(eps)).max();
-    offdiag = arma::abs(C.t()*F*C - arma::diagmat(eps)).max();
+    return arma::abs(C.t()*S*C - I).max();
+  }
+
+  // Semicanonical orbital energies: diagonalize F separately within the
+  // occupied and the virtual block. This is the operation the consumer performs
+  // after rebuilding its own reference Fock. It leaves both subspaces -- and
+  // hence the density -- untouched, so it is valid for any F, including one the
+  // SCF orbitals do not diagonalize. The surviving occupied-virtual coupling
+  // max|F_ia| is returned; it measures how far the SCF orbitals are from being
+  // canonical with respect to F.
+  arma::vec semicanonical_eps(const arma::mat & C, const arma::mat & F, size_t nocc,
+                              double & occvir) {
+    arma::mat Fmo = C.t()*F*C;
+    Fmo = 0.5*(Fmo + Fmo.t());
+    size_t nmo = C.n_cols;
+
+    occvir = (nocc>0 && nocc<nmo) ? arma::abs(Fmo.submat(0,nocc,nocc-1,nmo-1)).max() : 0.0;
+
+    arma::vec eps(nmo);
+    if(nocc)
+      eps.subvec(0,nocc-1) = arma::eig_sym(Fmo.submat(0,0,nocc-1,nocc-1));
+    if(nocc<nmo)
+      eps.subvec(nocc,nmo-1) = arma::eig_sym(Fmo.submat(nocc,nocc,nmo-1,nmo-1));
+    return eps;
   }
 
 } // anonymous namespace
@@ -213,13 +243,10 @@ void neo_dump(const std::string & filename,
               bool restricted_e,
               const std::vector<arma::mat> & Ce,
               const std::vector<arma::vec> & occe,
-              const std::vector<arma::vec> & epse,
               const arma::mat & hcore_e,
-              const std::vector<arma::mat> & focke,
               const BasisSet & pbasis, const DensityFit & pfit,
               const arma::mat & Cp, const arma::vec & occp,
-              const arma::vec & epsp, const arma::mat & hcore_p,
-              const arma::mat & fock_p,
+              const arma::mat & hcore_p,
               int n_electrons, int n_protons, double proton_mass,
               double e_scf, double e_classical,
               bool density_fitting, double omega, double alpha, double beta,
@@ -257,66 +284,88 @@ void neo_dump(const std::string & filename,
     Gep = exact_ep(ebasis, pbasis, omega, alpha, beta);
   }
 
-  // ---- canonical MOs consistent with the dumped Fock + AO overlaps ----
   // AO overlap is the metric each species' basis lives in (also dumped).
   arma::mat S_e = ebasis.overlap();
   arma::mat S_p = pbasis.overlap();
 
-  // Diagonalize the final converged Fock for each species so the stored MOs
-  // satisfy F C = S C diag(eps), C^T S C = I, C^T F C = diag(eps). The SCF
-  // solver returns occupation-ordered orbitals that do not diagonalize the
-  // rebuilt Fock; recanonicalize. The proton Fock passed in is already
-  // self-interaction-free (h_p + V_ep[D_e]), so its canonical virtuals are
-  // physically bound.
-  // Aufbau occupations on the canonical (energy-ordered) orbitals. The number
-  // of occupied orbitals is the integer particle count of the block (the sum of
-  // the SCF occupations, which may be spread fractionally over near-degenerate
-  // solver orbitals), NOT the count of nonzero entries -- otherwise a
-  // fractionally split orbital would be double-counted.
-  std::vector<arma::mat> Cc(Ce.size());
-  std::vector<arma::vec> epsc(Ce.size()), occc(Ce.size());
+  // ---- SCF orbitals, reordered occupied-first ----
+  // The coefficients are written verbatim: they are the ones that produced the
+  // SCF density. They are deliberately NOT recanonicalized against some Fock,
+  // because which Fock is "the" reference is use-case dependent. In particular
+  // the self-interaction-free proton Fock h_p + V_ep[D_e] does not share the
+  // SCF occupied subspace once there is more than one quantum proton, so
+  // diagonalizing it would silently hand the consumer a density that is not the
+  // SCF density. The consumer rebuilds its own reference operator instead.
   double occ_e = restricted_e ? 2.0 : 1.0;
-  for(size_t s=0;s<Ce.size();s++) {
-    Cc[s] = canonical_orbitals(focke[s], S_e, epsc[s]);
-    size_t nocc = (size_t) std::lround(arma::accu(occe[s]) / occ_e);
-    occc[s].zeros(Cc[s].n_cols);
-    if(nocc) occc[s].subvec(0,nocc-1).fill(occ_e);
-  }
-  arma::vec epsp_c;
-  arma::mat Cp_c = canonical_orbitals(fock_p, S_p, epsp_c);
-  size_t nocc_p = (size_t) std::lround(arma::accu(occp));
-  arma::vec occp_c(Cp_c.n_cols, arma::fill::zeros);
-  if(nocc_p) occp_c.subvec(0,nocc_p-1).ones();
+  std::vector<arma::mat> Cc(Ce);
+  std::vector<arma::vec> occc(occe);
+  std::vector<size_t> nocc_e(Ce.size());
+  arma::mat Cp_o(Cp);
+  arma::vec occp_o(occp);
 
-  // Validation: canonical conditions (a,b,c) and a bound proton spectrum.
-  printf("\nNEO dump canonicalization check (max-norm residuals):\n");
+  printf("\nNEO dump orbital check:\n");
   for(size_t s=0;s<Cc.size();s++) {
-    double rI,rFC,rOD;
-    canonical_residuals(Cc[s], S_e, focke[s], epsc[s], rI,rFC,rOD);
     const char * lbl = (Ce.size()==1) ? "electron" : (s==0 ? "electron alpha" : "electron beta");
-    printf("  %-14s ||C'SC-I||=%.2e  ||FC-SCe||=%.2e  ||C'FC-diag||=%.2e\n", lbl, rI,rFC,rOD);
-    if(rI>1e-8 || rFC>1e-6 || rOD>1e-6)
-      throw std::runtime_error("neo_dump: electron canonicalization residual too large!\n");
+    occupied_first(Cc[s], occc[s]);
+    nocc_e[s] = checked_nocc(occc[s], occ_e, lbl);
+    double rI = orthonormality(Cc[s], S_e);
+    printf("  %-14s nocc %3i / nmo %3i   ||C'SC-I||=%.2e\n",
+           lbl, (int) nocc_e[s], (int) Cc[s].n_cols, rI);
+    if(rI>1e-8)
+      throw std::runtime_error("neo_dump: electron orbitals are not orthonormal!\n");
   }
+  occupied_first(Cp_o, occp_o);
+  size_t nocc_p = checked_nocc(occp_o, 1.0, "proton");
   {
-    double rI,rFC,rOD;
-    canonical_residuals(Cp_c, S_p, fock_p, epsp_c, rI,rFC,rOD);
-    printf("  %-14s ||C'SC-I||=%.2e  ||FC-SCe||=%.2e  ||C'FC-diag||=%.2e\n", "proton", rI,rFC,rOD);
-    if(rI>1e-8 || rFC>1e-6 || rOD>1e-6)
-      throw std::runtime_error("neo_dump: proton canonicalization residual too large!\n");
+    double rI = orthonormality(Cp_o, S_p);
+    printf("  %-14s nocc %3i / nmo %3i   ||C'SC-I||=%.2e\n",
+           "proton", (int) nocc_p, (int) Cp_o.n_cols, rI);
+    if(rI>1e-8)
+      throw std::runtime_error("neo_dump: proton orbitals are not orthonormal!\n");
+  }
+  fflush(stdout);
+
+  // ---- SCF densities (the quantities the dumped orbitals must reproduce) ----
+  arma::mat De(Ne, Ne, arma::fill::zeros);
+  std::vector<arma::mat> Dspin;
+  for(size_t s=0;s<Cc.size();s++) {
+    Dspin.push_back(density(Cc[s], occc[s]));
+    De += Dspin.back();
+  }
+  arma::mat Dp = density(Cp_o, occp_o);
+  arma::vec de_vec = arma::vectorise(De); // symmetric => pair index mu*Ne+nu
+  arma::vec dp_vec = arma::vectorise(Dp);
+
+  // ---- diagnostic: the self-interaction-free proton spectrum ----
+  // Built here from exactly the quantities that go on disk (h_p and the e-p
+  // tensor contracted with the electron density), i.e. along the same path the
+  // consumer takes. Nothing below is written to the file.
+  {
+    arma::mat Vep(-arma::reshape(Gep.t()*de_vec, Np, Np));
+    arma::mat Fp_si = hcore_p + 0.5*(Vep + Vep.t());
+    double occvir;
+    arma::vec eps = semicanonical_eps(Cp_o, Fp_si, nocc_p, occvir);
+
+    printf("\nSelf-interaction-free proton spectrum (h_p + V_ep[D_e], semicanonical):\n");
+    printf("  highest occupied  % .6f\n", nocc_p ? eps(nocc_p-1) : 0.0);
     // Dissociation threshold for a quantum proton is 0 (free proton at rest,
     // vanishing potential at infinity); bound orbitals have eps < 0.
     const double thr = 0.0;
-    if(nocc_p < (size_t) Cp_c.n_cols) {
-      double lowest_virtual = epsp_c(nocc_p);
-      size_t nbound = (size_t) arma::accu(epsp_c.subvec(nocc_p, Cp_c.n_cols-1) < thr);
-      printf("  proton spectrum: highest occ %.4f, lowest virtual %.4f, %i bound virtual(s) below threshold %.1f\n",
-             epsp_c(nocc_p-1), lowest_virtual, (int) nbound, thr);
+    if(nocc_p < (size_t) Cp_o.n_cols) {
+      double lowest_virtual = eps(nocc_p);
+      size_t nbound = (size_t) arma::accu(eps.subvec(nocc_p, Cp_o.n_cols-1) < thr);
+      printf("  lowest virtual    % .6f  (%i bound virtual(s) below %.1f)\n",
+             lowest_virtual, (int) nbound, thr);
       if(lowest_virtual >= thr)
         throw std::runtime_error("neo_dump: lowest proton virtual is unbound -- proton self-interaction not removed?\n");
     }
+    // Nonzero for more than one quantum proton: the SCF orbitals diagonalize the
+    // J/K-dressed proton Fock, not this one. The consumer must semicanonicalize
+    // whichever reference operator it builds -- it must not assume the dumped
+    // orbitals are canonical.
+    printf("  max|F_ia| (occ-vir coupling) %.2e\n", occvir);
+    fflush(stdout);
   }
-  fflush(stdout);
 
   // ---- write the file ----
   hid_t file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -350,18 +399,16 @@ void neo_dump(const std::string & filename,
   write_mat(eg, "overlap", S_e);
   if(restricted_e) {
     write_int(eg, "nmo", (int) Cc[0].n_cols);
-    write_int(eg, "nocc", (int) arma::accu(occc[0] > 0.0));
+    write_int(eg, "nocc", (int) nocc_e[0]);
     write_mat(eg, "C", Cc[0]);
-    write_vec(eg, "eps", epsc[0]);
-    write_mat(eg, "fock", focke[0]);
+    write_vec(eg, "occ", occc[0]);
   } else {
     const char * suf[2] = {"_a", "_b"};
     for(int s=0;s<2;s++) {
       write_int(eg, std::string("nmo")+suf[s], (int) Cc[s].n_cols);
-      write_int(eg, std::string("nocc")+suf[s], (int) arma::accu(occc[s] > 0.0));
+      write_int(eg, std::string("nocc")+suf[s], (int) nocc_e[s]);
       write_mat(eg, std::string("C")+suf[s], Cc[s]);
-      write_vec(eg, std::string("eps")+suf[s], epsc[s]);
-      write_mat(eg, std::string("fock")+suf[s], focke[s]);
+      write_vec(eg, std::string("occ")+suf[s], occc[s]);
     }
   }
   if(!dense)
@@ -370,12 +417,11 @@ void neo_dump(const std::string & filename,
   // /proton
   hid_t pg = H5Gcreate2(file, "/proton", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   write_int(pg, "nbf", (int) Np);
-  write_int(pg, "nmo", (int) Cp_c.n_cols);
-  write_int(pg, "nocc", (int) arma::accu(occp_c > 0.0));
-  write_mat(pg, "C", Cp_c);
-  write_vec(pg, "eps", epsp_c);
+  write_int(pg, "nmo", (int) Cp_o.n_cols);
+  write_int(pg, "nocc", (int) nocc_p);
+  write_mat(pg, "C", Cp_o);
+  write_vec(pg, "occ", occp_o);
   write_mat(pg, "hcore", hcore_p);
-  write_mat(pg, "fock", fock_p);
   write_mat(pg, "overlap", S_p);
   if(!dense)
     write_B(pg, Bp, Np);
@@ -407,20 +453,9 @@ void neo_dump(const std::string & filename,
 
   // ---- verify: reconstruct the SCF energy from the dumped quantities ----
   if(do_verify) {
-    // electron density (total) and per-spin densities, from the canonical
-    // occupied orbitals (same occupied subspace as the SCF solution).
-    arma::mat De(Ne, Ne, arma::fill::zeros);
-    std::vector<arma::mat> Dspin;
-    for(size_t s=0;s<Cc.size();s++) {
-      arma::mat Ds = density(Cc[s], occc[s]);
-      Dspin.push_back(Ds);
-      De += Ds;
-    }
-    arma::mat Dp = density(Cp_c, occp_c);
-
-    arma::vec de_vec = arma::vectorise(De); // symmetric => pair index mu*Ne+nu
-    arma::vec dp_vec = arma::vectorise(Dp);
-
+    // The densities come from the dumped occupied orbitals, so this checks the
+    // whole contract: the file reproduces the SCF energy using only the core
+    // Hamiltonians, the two-particle factors and the occupied orbital columns.
     // one-particle
     double E1e = arma::trace(De * hcore_e);
     double E1p = arma::trace(Dp * hcore_p);
