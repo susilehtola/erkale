@@ -25,28 +25,18 @@
 // Needed to define contr_t
 #include "basis.h"
 
+// The workers no longer use libint or libderiv, but the executables
+// still call init_libint_base() / init_libderiv_base(); the includes
+// go away together with those calls when libint is dropped for good.
 #include <libint/libint.h>
 #include <libderiv/libderiv.h>
 
-/// Precursor data for ERIs
-typedef struct {
-  /// Distance between centers A and B
-  arma::vec AB;
-  /// Sum of exponents (Na,Nb)
-  arma::mat zeta;
-  /// Coordinates of center of product gaussian P, dimension (Na,Nb,3)
-  arma::cube P;
-  /// Distance between P and shell i center (Na,Nb,3)
-  arma::cube PA;
-  /// Distance between P and shell j center (Na,Nb,3)
-  arma::cube PB;
-  /// Contraction for first center (Na)
-  std::vector<contr_t> ic;
-  /// Array of exponents for second center (Nb)
-  std::vector<contr_t> jc;
-  /// Overlap of primitives on i and j (Na,Nb)
-  arma::mat S;
-} eri_precursor_t;
+/// Selector for the libcint two-electron integral kernels
+typedef enum {
+  CINT_ERI,      ///< int2e: plain electron repulsion integrals
+  CINT_ERI_IP1,  ///< int2e_ip1: derivative wrt the first shell
+  CINT_ERI_IP2   ///< int2e_ip2: derivative wrt the third shell
+} cint_eri_t;
 
 /// Worker for dealing with electron repulsion integrals and their derivatives
 class IntegralWorker {
@@ -61,28 +51,32 @@ class IntegralWorker {
   /// Output array
   std::vector<double> * output;
 
-  /// Integral kernel (i.e. Boys' function for Coulomb integrals)
-  arma::vec Gn;
+  /// Range separation constant: the computed integrals are
+  /// rs_alpha * full Coulomb + rs_beta * erfc(rs_omega r12)/r12
+  double rs_omega;
+  /// Weight of the full-Coulomb component
+  double rs_alpha;
+  /// Weight of the short-range (complementary error function) component
+  double rs_beta;
 
-  /// Per-position shellpair-precursor cache, keyed by shell pointer
-  /// pair. Each compute_precursor call site identifies itself with a
-  /// slot index (0 for the bra "ij" pair, 1 for the ket "kl" pair);
-  /// the slots are independent so a hit in one never invalidates the
-  /// other. Within a 4-index J/K build the outer (is,js) pair
-  /// repeats for many (ks,ls) inner iterations -- slot 0 stays
-  /// perfectly warm and slot 1 churns harmlessly. One worker per
-  /// thread under OpenMP, so no locking. Geometry steps rebuild the
-  /// basis and the workers, so stale shell pointers don't survive
-  /// across iterations.
-  const GaussianShell* cached_is_[2];
-  const GaussianShell* cached_js_[2];
-  eri_precursor_t cached_precursor_[2];
+  /// libcint atom table for the current shell quartet
+  std::vector<int> cint_atm;
+  /// libcint shell table for the current shell quartet
+  std::vector<int> cint_bas;
+  /// libcint data array: coordinates, exponents, contraction coefficients
+  std::vector<double> cint_env;
+  /// libcint integral output for the short-range component
+  std::vector<double> cint_sr;
+  /// libcint scratch memory
+  std::vector<double> cint_cache;
 
-  /// Compute the integral kernel
-  virtual void compute_G(double rho, double T, int nmax);
-
-  /// Reorder integrals
-  void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
+  /// Set up the libcint environment for the given shell quartet
+  void setup_cint_env(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Evaluate a two-electron kernel over the quartet set up in the
+  /// environment, combining the range separation components:
+  /// out = rs_alpha * full + rs_beta * erfc(rs_omega r12)/r12.
+  /// N is the number of integrals per operator component.
+  void cint_int2e(cint_eri_t kernel, int ncomp, const int *shls, size_t N, std::vector<double> & out);
 
   /// Do spherical transforms if necessary
   void spherical_transform(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
@@ -95,16 +89,6 @@ class IntegralWorker {
   /// Do spherical transform with respect to fourth index
   void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
 
-  /// Get precursor for a shell pair, consulting the per-worker cache.
-  /// `slot` (0 or 1) identifies the cache bucket: callers must use a
-  /// distinct slot for each precursor that needs to coexist in one
-  /// computation (slot 0 for the bra ij pair, slot 1 for the ket kl
-  /// pair). The returned reference is valid until the next
-  /// compute_precursor() call on the *same* slot.
-  const eri_precursor_t & compute_precursor(const GaussianShell *is, const GaussianShell *js, int slot);
-  /// Fill an eri_precursor_t for a shell pair (uncached helper).
-  void fill_precursor(const GaussianShell *is, const GaussianShell *js, eri_precursor_t & r);
-
  public:
   IntegralWorker();
   virtual ~IntegralWorker();
@@ -112,31 +96,9 @@ class IntegralWorker {
 
 /// Worker for computing electron repulsion integrals
 class ERIWorker: public IntegralWorker {
- protected:
-  /// Range separation constant: the computed integrals are
-  /// rs_alpha * full Coulomb + rs_beta * erfc(rs_omega r12)/r12
-  double rs_omega;
-  /// Weight of the full-Coulomb component
-  double rs_alpha;
-  /// Weight of the short-range (complementary error function) component
-  double rs_beta;
-
- private:
-  /// libcint atom table for the current shell quartet
-  std::vector<int> cint_atm;
-  /// libcint shell table for the current shell quartet
-  std::vector<int> cint_bas;
-  /// libcint data array: coordinates, exponents, contraction coefficients
-  std::vector<double> cint_env;
-  /// libcint integral output for the full-Coulomb component
+  /// libcint integral output
   std::vector<double> cint_out;
-  /// libcint integral output for the short-range component
-  std::vector<double> cint_out_sr;
-  /// libcint scratch memory
-  std::vector<double> cint_cache;
 
-  /// Set up the libcint environment for the given shell quartet
-  void setup_cint_env(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Compute the cartesian ERIs
   void compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Compute the cartesian ERIs using Huzinaga routines
@@ -160,28 +122,28 @@ class ERIWorker: public IntegralWorker {
   const std::vector<double> * getp() const;
 };
 
-/// Worker for computing electron repulsion integrals
+/// Worker for computing electron repulsion integral derivatives
 class dERIWorker: public IntegralWorker {
-  /// Libint worker
-  Libderiv_t libderiv;
+  // Pointers to the current shells
+  /// 1st shell
+  const GaussianShell *is;
+  /// 2nd shell
+  const GaussianShell *js;
+  /// 3rd shell
+  const GaussianShell *ks;
+  /// 4th shell
+  const GaussianShell *ls;
+
+  /// Cartesian derivative components (x,y,z) with respect to the
+  /// centers of the 2nd, 3rd and 4th shell, in ERKALE layout with the
+  /// normalization factors included; the 1st shell derivative follows
+  /// from translational invariance
+  std::vector<double> cint_dJ, cint_dK, cint_dL;
+  /// Scratch buffer for the K derivative layout remap
+  std::vector<double> cint_scr;
 
   /// Compute the cartesian ERI derivatives
   void compute_cartesian();
-  /// Compute data for libderiv
-  void compute_libderiv_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
-
-  // Pointers to the current shells
-  /// 1st shell
-  const GaussianShell *is, *is_orig;
-  /// 2nd shell
-  const GaussianShell *js, *js_orig;
-  /// 3rd shell
-  const GaussianShell *ks, *ks_orig;
-  /// 4th shell
-  const GaussianShell *ls, *ls_orig;
-  /// Swap?
-  bool swap_ij, swap_kl, swap_ijkl;
-
   /// Get the idx'th derivative in the input array
   void get_idx(int idx);
 
@@ -209,23 +171,12 @@ class ERIWorker_srlr: public ERIWorker {
   ~ERIWorker_srlr();
 };
 
-/// Worker for computing short- and long-range electron repulsion integrals
+/// Worker for computing short- and long-range electron repulsion integral derivatives
 class dERIWorker_srlr: public dERIWorker {
-  /// Compute the kernel
-  void compute_G(double rho, double T, int nmax);
-
-  /// Range separation constant
-  double omega;
-  /// Factor of long-range exchange
-  double alpha;
-  /// Factor of short-range exchange
-  double beta;
-
-  /// Short and long range Boys functions
-  arma::vec bf_short, bf_long;
-
  public:
+  /// Constructor
   dERIWorker_srlr(int maxam, int maxcontr, double omega, double alpha, double beta);
+  /// Destructor
   ~dERIWorker_srlr();
 };
 
