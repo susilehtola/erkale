@@ -21,6 +21,15 @@
 #include "integrals.h"
 #include <cfloat>
 
+extern "C" {
+#include <cint.h>
+#include <cint_funcs.h>
+}
+// cint.h defines function-like atm() and bas() accessor macros, which
+// mangle any same-named variable that is followed by a parenthesis
+#undef atm
+#undef bas
+
 // No Boys function interpolation?
 #define BOYSNOINTERP
 
@@ -75,17 +84,25 @@ void IntegralWorker::spherical_transform(const GaussianShell *is, const Gaussian
 }
 
 ERIWorker::ERIWorker(int maxam, int maxcontr) {
+  // The generated spherical transform routines only cover angular
+  // momenta below the libint limit
   if(maxam>=LIBINT_MAX_AM) {
     ERROR_INFO();
-    throw std::domain_error("You need a version of LIBINT that supports larger angular momentum.\n");
+    throw std::domain_error("The spherical transform tables don't support this angular momentum.\n");
   }
 
-  // Initialize evaluator
-  init_libint(&libint,maxam,pow(maxcontr,4));
+  // Plain Coulomb integrals by default
+  rs_omega=0.0;
+  rs_alpha=1.0;
+  rs_beta=0.0;
+
+  // libcint tables for a single shell quartet
+  cint_atm.resize(4*ATM_SLOTS);
+  cint_bas.resize(4*BAS_SLOTS);
+  cint_env.resize(PTR_ENV_START + 4*(3+2*maxcontr));
 }
 
 ERIWorker::~ERIWorker() {
-  free_libint(&libint);
 }
 
 dERIWorker::dERIWorker(int maxam, int maxcontr) {
@@ -105,96 +122,133 @@ dERIWorker::~dERIWorker() {
   free_libderiv(&libderiv);
 }
 
+void ERIWorker::setup_cint_env(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
+  const GaussianShell *shs[4]={is, js, ks, ls};
+
+  // Make sure the environment is large enough: the worker is sized for
+  // the orbital basis, but e.g. basis set normalization uses helper
+  // shells that may hold more primitives
+  {
+    size_t need=PTR_ENV_START;
+    for(int q=0;q<4;q++)
+      need+=3+2*shs[q]->get_Ncontr();
+    if(need>cint_env.size())
+      cint_env.resize(need);
+  }
+
+  // Zero the global parameter block (range separation is set in compute_cartesian)
+  std::fill(cint_env.begin(),cint_env.begin()+PTR_ENV_START,0.0);
+
+  int off=PTR_ENV_START;
+  for(int q=0;q<4;q++) {
+    const GaussianShell *sh=shs[q];
+
+    // Each shell sits on its own dummy atom; nuclear charges don't
+    // enter the two-electron integrals
+    cint_atm[q*ATM_SLOTS+CHARGE_OF]=0;
+    cint_atm[q*ATM_SLOTS+PTR_COORD]=off;
+    cint_atm[q*ATM_SLOTS+NUC_MOD_OF]=POINT_NUC;
+    cint_atm[q*ATM_SLOTS+PTR_ZETA]=0;
+    coords_t cen=sh->get_center();
+    cint_env[off++]=cen.x;
+    cint_env[off++]=cen.y;
+    cint_env[off++]=cen.z;
+
+    // libcint scales cartesian s and p shells by Y_00 = 1/sqrt(4pi)
+    // resp. |Y_1m| = sqrt(3/(4pi)) (its common_fac_sp convention) and
+    // leaves l>=2 alone. Compensating in the contraction coefficients
+    // makes the output plain integrals over the bare primitives,
+    // exactly like libint's build_eri; the relnorm factors applied in
+    // compute_cartesian then take care of all normalization.
+    const int l=sh->get_am();
+    double fl=1.0;
+    if(l==0)
+      fl=2.0*sqrt(M_PI);
+    else if(l==1)
+      fl=sqrt(4.0*M_PI/3.0);
+
+    const std::vector<contr_t> & c=sh->get_contr_ref();
+    cint_bas[q*BAS_SLOTS+ATOM_OF]=q;
+    cint_bas[q*BAS_SLOTS+ANG_OF]=l;
+    cint_bas[q*BAS_SLOTS+NPRIM_OF]=(int) c.size();
+    cint_bas[q*BAS_SLOTS+NCTR_OF]=1;
+    cint_bas[q*BAS_SLOTS+KAPPA_OF]=0;
+    cint_bas[q*BAS_SLOTS+PTR_EXP]=off;
+    for(size_t ip=0;ip<c.size();ip++)
+      cint_env[off++]=c[ip].z;
+    cint_bas[q*BAS_SLOTS+PTR_COEFF]=off;
+    for(size_t ip=0;ip<c.size();ip++)
+      cint_env[off++]=c[ip].c*fl;
+  }
+}
+
 void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
-  // Per-worker precursor cache: slot 0 for the bra pair, slot 1 for
-  // the ket pair, so the two refs don't alias.
-  const eri_precursor_t & ip=compute_precursor(is,js,0);
-  const eri_precursor_t & jp=compute_precursor(ks,ls,1);
+  // Fill the libcint tables for this quartet
+  setup_cint_env(is,js,ks,ls);
 
-  // Compute shell of cartesian ERIs using libint
+  // libcint runs the first shell fastest in its output buffer, whereas
+  // ERKALE stores the last index fastest: computing the reversed
+  // quartet (lk|ji), which by the permutational symmetry of the
+  // integrals equals (ij|kl), yields the result directly in ERKALE's
+  // layout. libcint places no restrictions on the angular momentum
+  // order within the quartet, so no swaps are needed either.
+  int shls[4]={3, 2, 1, 0};
 
-  // Libint computes (ab|cd) for
-  // l(a)>=l(b), l(c)>=l(d) and l(a)+l(b)>=l(c)+l(d)
-  // where l(a) is the angular momentum type of the a shell.
-  // THIS ROUTINE ASSUMES THAT THE SHELLS ARE ALREADY IN CORRECT ORDER!
+  size_t N=is->get_Ncart()*js->get_Ncart()*ks->get_Ncart()*ls->get_Ncart();
+  cint_out.resize(N);
 
-  // The sum of angular momenta is
-  int mmax=is->get_am()+js->get_am()+ks->get_am()+ls->get_am();
+  // Make sure the scratch area is large enough (out=NULL is a size query)
+  size_t csize=int2e_cart(NULL,NULL,shls,cint_atm.data(),4,cint_bas.data(),4,cint_env.data(),NULL,NULL);
+  if(csize>cint_cache.size())
+    cint_cache.resize(csize);
 
-  // Figure out the number of contractions
-  size_t Ncomb=is->get_Ncontr()*js->get_Ncontr()*ks->get_Ncontr()*ls->get_Ncontr();
+  // Full-range Coulomb component
+  if(rs_alpha!=0.0) {
+    cint_env[PTR_RANGE_OMEGA]=0.0;
+    if(!int2e_cart(cint_out.data(),NULL,shls,cint_atm.data(),4,cint_bas.data(),4,cint_env.data(),NULL,cint_cache.data()))
+      std::fill(cint_out.begin(),cint_out.end(),0.0);
+  } else
+    std::fill(cint_out.begin(),cint_out.end(),0.0);
 
-  // Check that all is in order
-  if(is->get_am()<js->get_am()) {
-    ERROR_INFO();
-    throw std::runtime_error("lambda_i < lambda_j\n");
-  }
+  // Short-range erfc(omega r12)/r12 component: negative omega selects
+  // the complementary error function attenuation in libcint
+  if(rs_beta!=0.0) {
+    cint_out_sr.resize(N);
+    cint_env[PTR_RANGE_OMEGA]=-rs_omega;
+    if(!int2e_cart(cint_out_sr.data(),NULL,shls,cint_atm.data(),4,cint_bas.data(),4,cint_env.data(),NULL,cint_cache.data()))
+      std::fill(cint_out_sr.begin(),cint_out_sr.end(),0.0);
+    for(size_t i=0;i<N;i++)
+      cint_out[i]=rs_alpha*cint_out[i]+rs_beta*cint_out_sr[i];
+  } else if(rs_alpha!=1.0)
+    for(size_t i=0;i<N;i++)
+      cint_out[i]*=rs_alpha;
 
-  if(ks->get_am()<ls->get_am()) {
-    ERROR_INFO();
-    throw std::runtime_error("lambda_k < lambda_l\n");
-  }
+  // Collect the results, plugging in the normalization factors
+  size_t ind_ij, ind_ijk, ind;
+  double norm_i, norm_ij, norm_ijk, norm;
 
-  if( (is->get_am()+js->get_am()) > (ks->get_am()+ls->get_am())) {
-    ERROR_INFO();
-    throw std::runtime_error("lambda_k + lambda_l < lambda_i + lambda_j\n");
-  }
+  // Numbers of functions on each shell
+  const std::vector<shellf_t> & ci=is->get_cart_ref();
+  const std::vector<shellf_t> & cj=js->get_cart_ref();
+  const std::vector<shellf_t> & ck=ks->get_cart_ref();
+  const std::vector<shellf_t> & cl=ls->get_cart_ref();
+  (*input).resize(N);
 
-  // Compute data for LIBINT
-  compute_libint_data(ip,jp,mmax);
-
-  // Pointer to integrals table
-  double *ints;
-
-  // Special handling of (ss|ss) integrals:
-  if(mmax==0) {
-    double tmp=0.0;
-    for(size_t i=0;i<Ncomb;i++)
-      tmp+=libint.PrimQuartet[i].F[0];
-
-    // Plug in normalizations
-    tmp*=is->get_cart()[0].relnorm;
-    tmp*=js->get_cart()[0].relnorm;
-    tmp*=ks->get_cart()[0].relnorm;
-    tmp*=ls->get_cart()[0].relnorm;
-
-    (*input).resize(1);
-    (*input)[0]=tmp;
-  } else {
-    //printf("Computing shell %i %i %i %i\n",is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
-    //    printf("which consists of basis functions (%i-%i)x(%i-%i)x(%i-%i)x(%i-%i).\n",(int) shells[is].get_first_ind(),(int) shells[is].get_last_ind(),(int) shells[js].get_first_ind(),(int) shells[js].get_last_ind(),(int) shells[ks].get_first_ind(),(int) shells[ks].get_last_ind(),(int) shells[ls].get_first_ind(),(int) shells[ls].get_last_ind());
-
-    // Now we can compute the integrals using libint:
-    ints=build_eri[is->get_am()][js->get_am()][ks->get_am()][ls->get_am()](&libint,Ncomb);
-
-    // and collect the results, plugging in the normalization factors
-    size_t ind_ij, ind_ijk, ind;
-    double norm_i, norm_ij, norm_ijk, norm;
-
-    // Numbers of functions on each shell
-    const std::vector<shellf_t> & ci=is->get_cart_ref();
-    const std::vector<shellf_t> & cj=js->get_cart_ref();
-    const std::vector<shellf_t> & ck=ks->get_cart_ref();
-    const std::vector<shellf_t> & cl=ls->get_cart_ref();
-    (*input).resize(ci.size()*cj.size()*ck.size()*cl.size());
-
-    for(size_t ii=0;ii<ci.size();ii++) {
-      norm_i=ci[ii].relnorm;
-      for(size_t ji=0;ji<cj.size();ji++) {
-	ind_ij=ii*cj.size()+ji;
-	norm_ij=cj[ji].relnorm*norm_i;
-	for(size_t ki=0;ki<ck.size();ki++) {
-	  ind_ijk=ind_ij*ck.size()+ki;
-	  norm_ijk=ck[ki].relnorm*norm_ij;
-	  for(size_t li=0;li<cl.size();li++) {
-	    // Index in computed integrals table
-	    ind=ind_ijk*cl.size()+li;
-	    // Total norm factor
-	    norm=cl[li].relnorm*norm_ijk;
-	    // Store scaled integral
-	    //printf("Scaling integral (%i %i %i %i) = %i by % e % e % e % e\n",(int) ii,(int) ji, (int) ki, (int) li, (int) ind, ci[ii].relnorm,cj[ji].relnorm,ck[ki].relnorm,cl[li].relnorm);
-	    (*input)[ind]=norm*ints[ind];
-	  }
+  for(size_t ii=0;ii<ci.size();ii++) {
+    norm_i=ci[ii].relnorm;
+    for(size_t ji=0;ji<cj.size();ji++) {
+      ind_ij=ii*cj.size()+ji;
+      norm_ij=cj[ji].relnorm*norm_i;
+      for(size_t ki=0;ki<ck.size();ki++) {
+	ind_ijk=ind_ij*ck.size()+ki;
+	norm_ijk=ck[ki].relnorm*norm_ij;
+	for(size_t li=0;li<cl.size();li++) {
+	  // Index in computed integrals table
+	  ind=ind_ijk*cl.size()+li;
+	  // Total norm factor
+	  norm=cl[li].relnorm*norm_ijk;
+	  // Store scaled integral
+	  (*input)[ind]=norm*cint_out[ind];
 	}
       }
     }
@@ -968,99 +1022,6 @@ void IntegralWorker::compute_G(double rho, double T, int nmax) {
 #endif
 }
 
-void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax) {
-  // Store AB and CD
-  for(int i=0;i<3;i++) {
-    libint.AB[i]=ip.AB(i);
-    libint.CD[i]=jp.AB(i);
-  }
-
-  size_t ind=0;
-
-  // Two-product centers
-  double P[3], Q[3];
-  // Four-product center
-  double W[3];
-  // Distances
-  double PQ[3], WP[3], WQ[3];
-
-  // Compute primitive data
-  for(size_t p=0;p<ip.ic.size();p++)
-    for(size_t q=0;q<ip.jc.size();q++) {
-      double zeta=ip.zeta(p,q);
-
-      // Compute overlaps for auxiliary integrals
-      double S12=ip.S(p,q);
-
-      for(size_t r=0;r<jp.ic.size();r++)
-	for(size_t s=0;s<jp.jc.size();s++) {
-	  double eta=jp.zeta(r,s);
-
-	  // Overlap for auxiliary integral
-	  double S34=jp.S(r,s);
-
-	  // Reduced exponent
-          double rho=zeta*eta/(zeta+eta);
-
-	  P[0]=ip.P(p,q,0);
-	  P[1]=ip.P(p,q,1);
-	  P[2]=ip.P(p,q,2);
-
-	  Q[0]=jp.P(r,s,0);
-	  Q[1]=jp.P(r,s,1);
-	  Q[2]=jp.P(r,s,2);
-
-	  W[0]=(zeta*P[0]+eta*Q[0])/(zeta+eta);
-	  W[1]=(zeta*P[1]+eta*Q[1])/(zeta+eta);
-	  W[2]=(zeta*P[2]+eta*Q[2])/(zeta+eta);
-
-	  PQ[0]=P[0]-Q[0];
-	  PQ[1]=P[1]-Q[1];
-	  PQ[2]=P[2]-Q[2];
-
-	  WP[0]=W[0]-P[0];
-	  WP[1]=W[1]-P[1];
-	  WP[2]=W[2]-P[2];
-
-	  WQ[0]=W[0]-Q[0];
-	  WQ[1]=W[1]-Q[1];
-	  WQ[2]=W[2]-Q[2];
-
-	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
-
-	  // Fill the quartet slot directly -- avoids copying a whole
-	  // prim_data struct out of a local per primitive quartet.
-	  prim_data & data=libint.PrimQuartet[ind++];
-
-          // Store PA, QC, WP and WQ
-          for(int i=0;i<3;i++) {
-            data.U[0][i]=ip.PA(p,q,i); // PA
-            data.U[2][i]=jp.PA(r,s,i); // QC
-            data.U[4][i]=WP[i]; // WP
-            data.U[5][i]=WQ[i]; // WQ
-          }
-
-	  // Store exponents
-	  data.oo2z=0.5/zeta;
-	  data.oo2n=0.5/eta;
-	  data.oo2zn=0.5/(eta+zeta);
-	  data.oo2p=0.5/rho;
-	  data.poz=rho/zeta;
-	  data.pon=rho/eta;
-
-	  // Kernel prefactor is
-	  double prefac=2.0*sqrt(rho/M_PI)*S12*S34;
-
-	  // Compute the kernel
-	  compute_G(rho,rho*rpqsq,mmax);
-
-	  // Store the integrals
-	  for(int i=0;i<=mmax;i++)
-	    data.F[i]=prefac*Gn(i);
-	}
-    }
-}
-
 void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax) {
   // Store AB and CD
   for(int i=0;i<3;i++) {
@@ -1162,36 +1123,14 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
     }
 }
 
-void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_orig, const GaussianShell *ks_orig, const GaussianShell *ls_orig) {
+void ERIWorker::compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
   // Calculate ERIs and transform them to spherical harmonics basis, if necessary.
 
-  // Helpers
-  const GaussianShell *is=is_orig;
-  const GaussianShell *js=js_orig;
-  const GaussianShell *ks=ks_orig;
-  const GaussianShell *ls=ls_orig;
-
-  // Did we need to swap the indices?
-  bool swap_ij=(is->get_am()<js->get_am());
-  bool swap_kl=(ks->get_am()<ls->get_am());
-  bool swap_ijkl=(is->get_am()+js->get_am() > ks->get_am() + ls->get_am());
-
-  // Swap shells if necessary
-  if(swap_ij)
-    std::swap(is,js);
-  if(swap_kl)
-    std::swap(ks,ls);
-  if(swap_ijkl) {
-    std::swap(is,ks);
-    std::swap(js,ls);
-  }
-
-  // Get the cartesian ERIs
+  // Get the cartesian ERIs (libcint places no restrictions on the
+  // angular momentum order, so no shell swaps are needed)
   compute_cartesian(is,js,ks,ls);
-  // Restore the original order
-  reorder(is_orig,js_orig,ks_orig,ls_orig,swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
-  spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
+  spherical_transform(is,js,ks,ls);
 }
 
 void ERIWorker::compute_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
@@ -1429,9 +1368,9 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
 }
 
 ERIWorker_srlr::ERIWorker_srlr(int maxam, int maxcontr, double w, double a, double b) : ERIWorker(maxam,maxcontr) {
-  omega=w;
-  alpha=a;
-  beta=b;
+  rs_omega=w;
+  rs_alpha=a;
+  rs_beta=b;
 }
 
 ERIWorker_srlr::~ERIWorker_srlr() {
@@ -1444,31 +1383,6 @@ dERIWorker_srlr::dERIWorker_srlr(int maxam, int maxcontr, double w, double a, do
 }
 
 dERIWorker_srlr::~dERIWorker_srlr() {
-}
-
-void ERIWorker_srlr::compute_G(double rho, double T, int nmax) {
-  // Compute helpers
-  double omegasq=omega*omega;
-  double rhomegasq=omegasq / (omegasq + rho);
-
-  // Evaluate Boys' functions
-#ifdef BOYSNOINTERP
-  boysF_arr(nmax,T,bf_long);
-  boysF_arr(nmax,T*rhomegasq,bf_short);
-#else
-  BoysTable::eval(nmax,T,bf_long);
-  BoysTable::eval(nmax,T*rhomegasq,bf_short);
-#endif
-
-  // Store values
-  Gn.zeros(nmax+1);
-
-  // [ w^2 / (w^2 + r) ]^(n+0.5)
-  double w2_wrN=sqrt(rhomegasq);
-  for(int i=0;i<=nmax;i++) {
-    Gn(i)=(alpha+beta)*bf_long(i) - beta*w2_wrN*bf_short(i);
-    w2_wrN*=rhomegasq;
-  }
 }
 
 void dERIWorker_srlr::compute_G(double rho, double T, int nmax) {
