@@ -31,6 +31,7 @@ else()
  target_link_libraries(erkale_xrs ${HDF5_LIBRARIES})
  target_link_libraries(erkale_xrs ${LIBXC_LIBRARIES})
  target_link_libraries(erkale_xrs ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_xrs ${LIBCINT_LIBRARIES})
 endif()
 
 

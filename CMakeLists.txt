@@ -119,6 +119,16 @@ message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
 message("libint linker flags are ${LIBINT_LIBRARIES}")
 message("")
 
+# Find libcint (also satisfied by the API-compatible qcint)
+find_path(LIBCINT_INCLUDE_DIRS cint.h)
+find_library(LIBCINT_LIBRARIES NAMES cint)
+if(NOT LIBCINT_INCLUDE_DIRS OR NOT LIBCINT_LIBRARIES)
+ message(FATAL_ERROR "libcint not found! Configure with -DLIBCINT_INCLUDE_DIRS=<dir of cint.h> -DLIBCINT_LIBRARIES=<libcint library>.")
+endif()
+message("libcint headers are in ${LIBCINT_INCLUDE_DIRS}")
+message("libcint linker flags are ${LIBCINT_LIBRARIES}")
+message("")
+
 # Find HDF5
 find_package(HDF5 REQUIRED)
 message("HDF5 headers are in ${HDF5_INCLUDE_DIRS}")

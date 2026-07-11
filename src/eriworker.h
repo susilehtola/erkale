@@ -112,15 +112,35 @@ class IntegralWorker {
 
 /// Worker for computing electron repulsion integrals
 class ERIWorker: public IntegralWorker {
-  /// Libint worker
-  Libint_t libint;
+ protected:
+  /// Range separation constant: the computed integrals are
+  /// rs_alpha * full Coulomb + rs_beta * erfc(rs_omega r12)/r12
+  double rs_omega;
+  /// Weight of the full-Coulomb component
+  double rs_alpha;
+  /// Weight of the short-range (complementary error function) component
+  double rs_beta;
 
+ private:
+  /// libcint atom table for the current shell quartet
+  std::vector<int> cint_atm;
+  /// libcint shell table for the current shell quartet
+  std::vector<int> cint_bas;
+  /// libcint data array: coordinates, exponents, contraction coefficients
+  std::vector<double> cint_env;
+  /// libcint integral output for the full-Coulomb component
+  std::vector<double> cint_out;
+  /// libcint integral output for the short-range component
+  std::vector<double> cint_out_sr;
+  /// libcint scratch memory
+  std::vector<double> cint_cache;
+
+  /// Set up the libcint environment for the given shell quartet
+  void setup_cint_env(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Compute the cartesian ERIs
   void compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Compute the cartesian ERIs using Huzinaga routines
   void compute_cartesian_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Compute data for libint
-  void compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
 
  public:
   /// Constructor
@@ -182,19 +202,6 @@ class dERIWorker: public IntegralWorker {
 
 /// Worker for computing short- and long-range electron repulsion integrals
 class ERIWorker_srlr: public ERIWorker {
-  /// Compute the kernel
-  void compute_G(double rho, double T, int nmax);
-
-  /// Range separation constant
-  double omega;
-  /// Weight for long-range (i.e. normal HF) exchange
-  double alpha;
-  /// Weight for short-range exchange
-  double beta;
-
-  /// Short and long range Boys functions
-  arma::vec bf_short, bf_long;
-
  public:
   /// Constructor
   ERIWorker_srlr(int maxam, int maxcontr, double omega, double alpha, double beta);
