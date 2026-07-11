@@ -26,7 +26,7 @@ LINK_DIRECTORIES(${HDF5_LIBRARY_DIRS})
 
 add_library (liberkale basis.cpp basislibrary.cpp boys.cpp
 stringutil.cpp mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp
-eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp solidharmonics.cpp
+eriscreen.cpp timer.cpp linalg.cpp solidharmonics.cpp
 diis.cpp scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
 scf-force.cpp elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp
 broyden.cpp tempered.cpp find_molecules.cpp properties.cpp

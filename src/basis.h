@@ -523,7 +523,7 @@ public:
   arma::mat coulomb_overlap(const BasisSet & rhs) const;
   /// Calculate kinetic energy matrix
   arma::mat kinetic() const;
-  /// Calculate gradient integral matrix
+  /// Calculate the <mu|nabla|nu> matrix (antisymmetric)
   std::vector<arma::mat> gradient_integral() const;
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
@@ -579,9 +579,6 @@ public:
   /// Find "identical" nuclei
   std::vector< std::vector<size_t> > find_identical_nuclei() const;
 };
-
-/// Compute three-center overlap integral
-arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks);
 
 /**
  * \class GaussianShell
@@ -745,7 +742,7 @@ public:
   arma::mat coulomb_overlap(const GaussianShell & rhs) const;
   /// Calculate kinetic energy matrix between shells
   arma::mat kinetic(const GaussianShell & rhs) const;
-  /// Calculate gradient integral between shells
+  /// Calculate <mu|nabla|nu> between shells, derivative on the ket
   std::vector<arma::mat> gradient_integral(const GaussianShell & rhs) const;
   /// Calculate nuclear repulsion matrix between shells
   arma::mat nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const;
