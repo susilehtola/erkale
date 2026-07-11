@@ -24,7 +24,7 @@ LINK_DIRECTORIES(${HDF5_LIBRARY_DIRS})
 # Create the ERKALE base library "erkale" which includes the following
 #sources
 
-add_library (liberkale basis.cpp basislibrary.cpp boys.cpp
+add_library (liberkale basis.cpp basislibrary.cpp
 stringutil.cpp mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp
 eriscreen.cpp timer.cpp linalg.cpp solidharmonics.cpp
 diis.cpp scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
