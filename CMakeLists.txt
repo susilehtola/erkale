@@ -119,11 +119,19 @@ message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
 message("libint linker flags are ${LIBINT_LIBRARIES}")
 message("")
 
-# Find libcint (also satisfied by the API-compatible qcint)
+# Find libcint (also satisfied by the API-compatible qcint); if it is
+# not available, fetch and build it from source
 find_path(LIBCINT_INCLUDE_DIRS cint.h)
 find_library(LIBCINT_LIBRARIES NAMES cint)
 if(NOT LIBCINT_INCLUDE_DIRS OR NOT LIBCINT_LIBRARIES)
- message(FATAL_ERROR "libcint not found! Configure with -DLIBCINT_INCLUDE_DIRS=<dir of cint.h> -DLIBCINT_LIBRARIES=<libcint library>.")
+ message(STATUS "libcint not found, building it from source")
+ include(FetchContent)
+ FetchContent_Declare(libcint
+  GIT_REPOSITORY https://github.com/sunqm/libcint.git
+  GIT_TAG v6.1.3)
+ FetchContent_MakeAvailable(libcint)
+ set(LIBCINT_LIBRARIES cint)
+ set(LIBCINT_INCLUDE_DIRS ${libcint_BINARY_DIR}/include ${libcint_SOURCE_DIR}/include)
 endif()
 message("libcint headers are in ${LIBCINT_INCLUDE_DIRS}")
 message("libcint linker flags are ${LIBCINT_LIBRARIES}")
