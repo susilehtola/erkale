@@ -157,6 +157,29 @@ class dERIWorker: public IntegralWorker {
   const std::vector<double> * getp(int idx);
 };
 
+/// Worker for computing one-electron integrals
+class Int1eWorker: public IntegralWorker {
+ public:
+  /// Constructor
+  explicit Int1eWorker(const CintEnv & env);
+  /// Destructor
+  virtual ~Int1eWorker();
+
+  /// Compute the block of one-electron integrals over the shell pair.
+  /// rinv_orig gives the origin of a 1/|r-C| operator and common_orig
+  /// that of a multipole operator; both are ignored by the kernels that
+  /// do not need them. The result has cint_1e_ncomp(kernel) components
+  /// of Ni x Nj integrals, the component running slowest and the second
+  /// shell fastest.
+  void compute(cint_1e_kernel_t kernel, size_t is, size_t js,
+               const double * rinv_orig=NULL, const double * common_orig=NULL);
+
+  /// Get a pointer to the integrals
+  const std::vector<double> * getp() const;
+  /// Get the ic'th component as a matrix
+  arma::mat get_mat(int ic, size_t is, size_t js) const;
+};
+
 /// Worker for computing short- and long-range electron repulsion integrals
 class ERIWorker_srlr: public ERIWorker {
  public:

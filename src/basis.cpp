@@ -46,79 +46,6 @@ extern "C" {
 #undef atm
 #undef bas
 
-/// Generic libcint one-electron integral block for a shell pair:
-/// returns the ncomp cartesian component matrices of plain integrals
-/// over the bare primitives, scaled by the relative normalization
-/// factors -- exactly the contracted quantity the old Obara-Saika
-/// kernels produced before the spherical transform. rinv_orig sets the
-/// origin of a 1/|r-R| operator, common_orig that of a multipole
-/// operator.
-static std::vector<arma::mat> cint1e_blocks(CINTIntegralFunction *intor, int ncomp,
-                                            const GaussianShell & A, const GaussianShell & B,
-                                            const double *rinv_orig=NULL, const double *common_orig=NULL) {
-  std::vector<int> cint_atm(2*ATM_SLOTS,0), cint_bas(2*BAS_SLOTS,0);
-  std::vector<double> cint_env(PTR_ENV_START,0.0);
-  if(rinv_orig)
-    for(int i=0;i<3;i++)
-      cint_env[PTR_RINV_ORIG+i]=rinv_orig[i];
-  if(common_orig)
-    for(int i=0;i<3;i++)
-      cint_env[PTR_COMMON_ORIG+i]=common_orig[i];
-
-  const GaussianShell *shs[2]={&A, &B};
-  for(int q=0;q<2;q++) {
-    const GaussianShell *sh=shs[q];
-    cint_atm[q*ATM_SLOTS+PTR_COORD]=(int) cint_env.size();
-    cint_atm[q*ATM_SLOTS+NUC_MOD_OF]=POINT_NUC;
-    coords_t cen=sh->get_center();
-    cint_env.push_back(cen.x);
-    cint_env.push_back(cen.y);
-    cint_env.push_back(cen.z);
-
-    // libcint scales cartesian s and p shells by Y_00 = 1/sqrt(4pi)
-    // resp. |Y_1m| = sqrt(3/(4pi)) (its common_fac_sp convention) and
-    // leaves l>=2 alone; compensate in the contraction coefficients so
-    // that the output is plain integrals over the bare primitives.
-    const int l=sh->get_am();
-    double fl=1.0;
-    if(l==0)
-      fl=2.0*sqrt(M_PI);
-    else if(l==1)
-      fl=sqrt(4.0*M_PI/3.0);
-
-    const std::vector<contr_t> & c=sh->get_contr_ref();
-    cint_bas[q*BAS_SLOTS+ATOM_OF]=q;
-    cint_bas[q*BAS_SLOTS+ANG_OF]=l;
-    cint_bas[q*BAS_SLOTS+NPRIM_OF]=(int) c.size();
-    cint_bas[q*BAS_SLOTS+NCTR_OF]=1;
-    cint_bas[q*BAS_SLOTS+PTR_EXP]=(int) cint_env.size();
-    for(size_t ip=0;ip<c.size();ip++)
-      cint_env.push_back(c[ip].z);
-    cint_bas[q*BAS_SLOTS+PTR_COEFF]=(int) cint_env.size();
-    for(size_t ip=0;ip<c.size();ip++)
-      cint_env.push_back(c[ip].c*fl);
-  }
-
-  const size_t ni=A.get_Ncart(), nj=B.get_Ncart();
-  std::vector<double> buf(ni*nj*ncomp);
-  int shls[2]={0, 1};
-  if(!intor(buf.data(),NULL,shls,cint_atm.data(),2,cint_bas.data(),2,cint_env.data(),NULL,NULL))
-    std::fill(buf.begin(),buf.end(),0.0);
-
-  // Unpack: the buffer runs the first shell fastest, then the second
-  // shell, with the operator component slowest
-  const std::vector<shellf_t> & ca=A.get_cart_ref();
-  const std::vector<shellf_t> & cb=B.get_cart_ref();
-  std::vector<arma::mat> out(ncomp);
-  for(int cmp=0;cmp<ncomp;cmp++) {
-    arma::mat M(ni,nj);
-    for(size_t j=0;j<nj;j++)
-      for(size_t i=0;i<ni;i++)
-        M(i,j)=buf[(cmp*nj+j)*ni+i]*ca[i].relnorm*cb[j].relnorm;
-    out[cmp]=std::move(M);
-  }
-  return out;
-}
 
 // Derivative operator
 inline double _der1(const double x[], int l, double zeta) {
@@ -354,11 +281,10 @@ void GaussianShell::normalize(bool coeffs) {
     for(size_t i=0;i<cart.size();i++)
       cart[i].relnorm=sqrt(doublefact(2*am-1)/(doublefact(2*cart[i].l-1)*doublefact(2*cart[i].m-1)*doublefact(2*cart[i].n-1)));
   } else {
-    // Compute self-overlap
-    arma::mat S=overlap(*this);
-    // and scale coefficients.
+    // Compute self-overlap and scale the coefficients
+    const arma::vec S=function_norms();
     for(size_t i=0;i<cart.size();i++)
-      cart[i].relnorm/=sqrt(S(0,0));
+      cart[i].relnorm/=sqrt(S(0));
   }
 }
 
@@ -860,21 +786,123 @@ arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
 }
 
 // Calculate overlaps between basis functions
-arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
+namespace {
+  /// Force-convention derivative of the nuclear attraction integrals
+  /// with respect to the centers of the two shells: components 0-2
+  /// differentiate the bra, 3-5 the ket. The operator is -1/|r-C|, and
+  /// the force convention is minus the geometric derivative, so the
+  /// derivative of the bra is +iprinv and that of the ket is its
+  /// transpose with the shells swapped.
+  arma::vec nuclear_pulay_pair(Int1eWorker & w, size_t i, size_t j, const arma::mat & P, const double * orig) {
+    std::vector<arma::mat> der(6);
+    w.compute(CINT1E_IPRINV,i,j,orig);
+    for(int ic=0;ic<3;ic++)
+      der[ic]=-w.get_mat(ic,i,j);
+    w.compute(CINT1E_IPRINV,j,i,orig);
+    for(int ic=0;ic<3;ic++)
+      der[ic+3]=-arma::trans(w.get_mat(ic,j,i));
 
-  // Overlap matrix
-  arma::mat S=cint1e_blocks(int1e_ovlp_cart,1,*this,rhs)[0];
-
-  // Transformation to spherical harmonics. Left side:
-  if(uselm) {
-    S=transmat*S;
+    arma::vec ret(6);
+    for(size_t ic=0;ic<6;ic++)
+      ret(ic)=arma::trace(arma::trans(P)*der[ic]);
+    return ret;
   }
-  // Right side
-  if(rhs.uselm) {
-    S=S*arma::trans(rhs.transmat);
+
+  /// Hellmann-Feynman derivative of the nuclear attraction integrals
+  /// with respect to the center of the operator, in the force
+  /// convention. By translational invariance it is the sum of the two
+  /// basis function center derivatives.
+  arma::vec nuclear_der_pair(Int1eWorker & w, size_t i, size_t j, const arma::mat & P, const double * orig) {
+    std::vector<arma::mat> der(3);
+    w.compute(CINT1E_IPRINV,i,j,orig);
+    for(int ic=0;ic<3;ic++)
+      der[ic]=w.get_mat(ic,i,j);
+    w.compute(CINT1E_IPRINV,j,i,orig);
+    for(int ic=0;ic<3;ic++)
+      der[ic]+=arma::trans(w.get_mat(ic,j,i));
+
+    arma::vec ret(3);
+    for(size_t ic=0;ic<3;ic++)
+      ret(ic)=arma::trace(arma::trans(P)*der[ic]);
+    return ret;
   }
 
-  return S;
+  /// Derivative of a two-index operator with respect to the centers of
+  /// the two shells, contracted with a matrix: components 0-2
+  /// differentiate the bra, 3-5 the ket
+  arma::vec pulay_pair(Int1eWorker & w, cint_1e_kernel_t bra, cint_1e_kernel_t ket,
+                       size_t i, size_t j, const arma::mat & P, double sign) {
+    arma::vec ret(6);
+    w.compute(bra,i,j);
+    for(int ic=0;ic<3;ic++)
+      ret(ic)=sign*arma::trace(arma::trans(P)*w.get_mat(ic,i,j));
+    w.compute(ket,i,j);
+    for(int ic=0;ic<3;ic++)
+      ret(ic+3)=sign*arma::trace(arma::trans(P)*w.get_mat(ic,i,j));
+    return ret;
+  }
+
+  /// Moment integrals of order mom around the given origin, in ERKALE's
+  /// order: the unique components with the powers of x decreasing. The
+  /// libcint operators are the full (symmetric) tensors, so any index
+  /// string with the right powers gives the component; the canonical
+  /// sorted one is used.
+  std::vector<arma::mat> moment_pair(Int1eWorker & w, int mom, size_t i, size_t j, const double * orig) {
+    static const cint_1e_kernel_t rint[5]={CINT1E_OVLP, CINT1E_R, CINT1E_RR, CINT1E_RRR, CINT1E_RRRR};
+    if(mom<0 || mom>4)
+      throw std::runtime_error("Moment integrals are only available up to fourth order.\n");
+
+    w.compute(rint[mom],i,j,NULL,orig);
+
+    std::vector<arma::mat> ret;
+    ret.reserve((mom+1)*(mom+2)/2);
+    for(int ii=0; ii<=mom; ii++) {
+      int nx=mom - ii;
+      for(int jj=0; jj<=ii; jj++) {
+        int ny=ii - jj;
+        int nz=jj;
+
+        int idx=0;
+        for(int k=0;k<nx;k++) idx=idx*3+0;
+        for(int k=0;k<ny;k++) idx=idx*3+1;
+        for(int k=0;k<nz;k++) idx=idx*3+2;
+
+        ret.push_back(w.get_mat(idx,i,j));
+      }
+    }
+    return ret;
+  }
+}
+
+arma::vec GaussianShell::function_norms() const {
+  // Overlap of the cartesian functions of the shell. Both functions sit
+  // on the same center, so the integral factorizes over the cartesian
+  // directions, and vanishes unless every direction has an even total
+  // power.
+  arma::mat S(cart.size(),cart.size(),arma::fill::zeros);
+  for(size_t ic=0;ic<cart.size();ic++)
+    for(size_t jc=0;jc<cart.size();jc++) {
+      const int L[3]={cart[ic].l+cart[jc].l, cart[ic].m+cart[jc].m, cart[ic].n+cart[jc].n};
+      if(L[0]%2 || L[1]%2 || L[2]%2)
+        continue;
+
+      double val=0.0;
+      for(size_t ip=0;ip<c.size();ip++)
+        for(size_t jp=0;jp<c.size();jp++) {
+          const double zeta=c[ip].z+c[jp].z;
+          double term=c[ip].c*c[jp].c*pow(M_PI/zeta,1.5);
+          for(int ix=0;ix<3;ix++)
+            term*=doublefact(L[ix]-1)/pow(2.0*zeta,L[ix]/2);
+          val+=term;
+        }
+      S(ic,jc)=cart[ic].relnorm*cart[jc].relnorm*val;
+    }
+
+  // Spherical functions are contractions of the cartesians
+  if(uselm)
+    S=transmat*S*arma::trans(transmat);
+
+  return arma::vec(S.diag());
 }
 
 // Calculate overlaps between basis functions
@@ -901,251 +929,14 @@ arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
   return S;
 }
 
-// Calculate kinetic energy matrix element between basis functions
-arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
-  // Kinetic energy matrix
-  arma::mat T=cint1e_blocks(int1e_kin_cart,1,*this,rhs)[0];
-
-  // Transformation to spherical harmonics. Left side:
-  if(uselm) {
-    T=transmat*T;
-  }
-  // Right side
-  if(rhs.uselm) {
-    T=T*arma::trans(rhs.transmat);
-  }
-
-  return T;
-}
-
-// Calculate gradient matrix element between basis functions
-std::vector<arma::mat> GaussianShell::gradient_integral(const GaussianShell & rhs) const {
-  // <mu|nabla|nu>, with the derivative acting on the ket. The operator
-  // is antisymmetric: <mu|nabla nu> = -<nabla mu|nu>. (The old
-  // Obara-Saika kernel put the derivative on whichever shell had the
-  // lower angular momentum without restoring the sign under the
-  // internal swap, so the sign used to depend on the shell pair.)
-  std::vector<arma::mat> T=cint1e_blocks(int1e_ovlpip_cart,3,*this,rhs);
-
-  // Transformation to spherical harmonics. Left side:
-  if(uselm) {
-    for(size_t ic=0;ic<3;ic++)
-      T[ic]=transmat*T[ic];
-  }
-  // Right side
-  if(rhs.uselm) {
-    for(size_t ic=0;ic<3;ic++)
-      T[ic]=T[ic]*arma::trans(rhs.transmat);
-  }
-
-  return T;
-}
 
 
-// Calculate nuclear attraction matrix element between basis functions
-arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const {
-  // Matrix element of the nuclear attraction operator -1/|r-C|
-  const double orig[3]={cx, cy, cz};
-  arma::mat Vnuc=-cint1e_blocks(int1e_rinv_cart,1,*this,rhs,orig)[0];
 
-  // Transformation to spherical harmonics. Left side:
-  if(uselm) {
-    Vnuc=transmat*Vnuc;
-  }
-  // Right side
-  if(rhs.uselm) {
-    Vnuc=Vnuc*arma::trans(rhs.transmat);
-  }
 
-  return Vnuc;
-}
 
-arma::vec GaussianShell::nuclear_pulay(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const {
-  const double orig[3]={cx, cy, cz};
 
-  // Basis function center derivatives of the attraction integral
-  // -1/|r-C|, in the force sign convention (minus the geometric
-  // derivative): components 0-2 differentiate the bra center, 3-5 the
-  // ket center. The ket derivative is the transpose of the bra
-  // derivative of the swapped pair.
-  std::vector<arma::mat> bra=cint1e_blocks(int1e_iprinv_cart,3,*this,rhs,orig);
-  std::vector<arma::mat> ket=cint1e_blocks(int1e_iprinv_cart,3,rhs,*this,orig);
 
-  std::vector<arma::mat> dermat(6);
-  for(size_t i=0;i<3;i++) {
-    dermat[i]=-bra[i];
-    dermat[i+3]=-arma::trans(ket[i]);
-  }
 
-  // Transformation to spherical harmonics. Left side:
-  if(uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=transmat*dermat[i];
-  // Right side
-  if(rhs.uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
-
-  // Compute the force
-  arma::vec ret(dermat.size());
-  ret.zeros();
-  for(size_t i=0;i<dermat.size();i++) {
-    ret(i)=arma::trace(arma::trans(P)*dermat[i]);
-  }
-
-  return ret;
-}
-
-arma::vec GaussianShell::nuclear_der(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const {
-  const double orig[3]={cx, cy, cz};
-
-  // Hellmann-Feynman term: derivative of the attraction integral
-  // -1/|r-C| with respect to the operator center C, in the force sign
-  // convention. By translational invariance it is minus the sum of the
-  // two basis function center derivatives.
-  std::vector<arma::mat> bra=cint1e_blocks(int1e_iprinv_cart,3,*this,rhs,orig);
-  std::vector<arma::mat> ket=cint1e_blocks(int1e_iprinv_cart,3,rhs,*this,orig);
-
-  std::vector<arma::mat> dermat(3);
-  for(size_t i=0;i<3;i++)
-    dermat[i]=bra[i]+arma::trans(ket[i]);
-
-  // Transformation to spherical harmonics. Left side:
-  if(uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=transmat*dermat[i];
-
-  // Right side
-  if(rhs.uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
-
-  // Compute the force
-  arma::vec ret(dermat.size());
-  ret.zeros();
-  for(size_t i=0;i<dermat.size();i++) {
-    ret(i)=arma::trace(arma::trans(P)*dermat[i]);
-  }
-
-  return ret;
-}
-
-arma::vec GaussianShell::kinetic_pulay(const arma::mat & P, const GaussianShell & rhs) const {
-  // Basis function center derivatives of the kinetic energy integral,
-  // in the force sign convention (minus the geometric derivative):
-  // components 0-2 differentiate the bra center, 3-5 the ket center.
-  std::vector<arma::mat> bra=cint1e_blocks(int1e_ipkin_cart,3,*this,rhs);
-  std::vector<arma::mat> ket=cint1e_blocks(int1e_kinip_cart,3,*this,rhs);
-
-  std::vector<arma::mat> dermat(6);
-  for(size_t i=0;i<3;i++) {
-    dermat[i]=bra[i];
-    dermat[i+3]=ket[i];
-  }
-
-  // Transformation to spherical harmonics. Left side:
-  if(uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=transmat*dermat[i];
-  // Right side
-  if(rhs.uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
-
-  // Compute the force
-  arma::vec ret(dermat.size());
-  ret.zeros();
-  for(size_t i=0;i<dermat.size();i++) {
-    ret(i)=arma::trace(arma::trans(P)*dermat[i]);
-  }
-
-  return ret;
-}
-
-arma::vec GaussianShell::overlap_der(const arma::mat & W, const GaussianShell & rhs) const {
-  // Basis function center derivatives of the overlap integral, in the
-  // force sign convention (minus the geometric derivative): components
-  // 0-2 differentiate the bra center, 3-5 the ket center.
-  std::vector<arma::mat> bra=cint1e_blocks(int1e_ipovlp_cart,3,*this,rhs);
-  std::vector<arma::mat> ket=cint1e_blocks(int1e_ovlpip_cart,3,*this,rhs);
-
-  std::vector<arma::mat> dermat(6);
-  for(size_t i=0;i<3;i++) {
-    dermat[i]=bra[i];
-    dermat[i+3]=ket[i];
-  }
-
-  // Transformation to spherical harmonics. Left side:
-  if(uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=transmat*dermat[i];
-  // Right side
-  if(rhs.uselm)
-    for(size_t i=0;i<dermat.size();i++)
-      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
-
-  // Compute the force
-  arma::vec ret(dermat.size());
-  ret.zeros();
-  for(size_t i=0;i<dermat.size();i++) {
-    ret(i)=-arma::trace(arma::trans(W)*dermat[i]);
-  }
-
-  return ret;
-}
-
-std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, double z, const GaussianShell & rhs) const {
-  // Calculate moment integrals around (x,y,z) between shells
-
-  // Amount of moments is
-  size_t Nmom=(momam+1)*(momam+2)/2;
-
-  const double orig[3]={x, y, z};
-
-  // Evaluate the full moment operator tensor. The stock libcint
-  // integrals go up to fourth order, which covers all of ERKALE
-  // (fourth moments are the highest used, in Boys localization).
-  static CINTIntegralFunction * const rint[5]={int1e_ovlp_cart, int1e_r_cart, int1e_rr_cart, int1e_rrr_cart, int1e_rrrr_cart};
-  if(momam<0 || momam>4)
-    throw std::runtime_error("Moment integrals are only available up to fourth order.\n");
-  int ncomp=1;
-  for(int k=0;k<momam;k++)
-    ncomp*=3;
-  std::vector<arma::mat> full=cint1e_blocks(rint[momam],ncomp,*this,rhs,NULL,orig);
-
-  // Collect the unique components in ERKALE's descending-x order. The
-  // operator tensor is symmetric, so any index string with the right
-  // exponents will do; use the canonical sorted one.
-  std::vector<arma::mat> ret;
-  ret.reserve(Nmom);
-  for(int ii=0; ii<=momam; ii++) {
-    int nx=momam - ii;
-    for(int jj=0; jj<=ii; jj++) {
-      int ny=ii - jj;
-      int nz=jj;
-
-      int idx=0;
-      for(int k=0;k<nx;k++) idx=idx*3+0;
-      for(int k=0;k<ny;k++) idx=idx*3+1;
-      for(int k=0;k<nz;k++) idx=idx*3+2;
-
-      arma::mat momval=full[idx];
-
-      // Convert to spherical basis if necessary
-      if(uselm) {
-        momval=transmat*momval;
-      }
-      // Right side
-      if(rhs.uselm) {
-        momval=momval*arma::trans(rhs.transmat);
-      }
-
-      ret.push_back(momval);
-    }
-  }
-
-  return ret;
-}
 
 arma::vec GaussianShell::integral() const {
   // Compute integrals over the cartesian functions
@@ -1556,16 +1347,20 @@ size_t BasisSet::get_last_ind(size_t num) const {
 
 arma::vec BasisSet::get_bf_Rsquared() const {
   arma::vec Rsq(get_Nbf());
+
+  CintEnv cenv(*this,false);
+  Int1eWorker w(cenv);
+
   for(size_t i=0;i<shells.size();i++) {
     // First function on shell
     size_t i0=shells[i].get_first_ind();
     // Number of functions
     size_t nbf=shells[i].get_Nbf();
 
-    // Get coordinates of shell center
+    // Calculate second moments around the center of the shell
     coords_t cen=shells[i].get_center();
-    // Calculate moment integrals
-    std::vector<arma::mat> mom2=shells[i].moment(2, cen.x, cen.y, cen.z, shells[i]);
+    const double orig[3]={cen.x, cen.y, cen.z};
+    std::vector<arma::mat> mom2=moment_pair(w,2,i,i,orig);
     // Compute spatial extents
     for(size_t fi=0;fi<nbf;fi++)
       Rsq(i0+fi)=mom2[getind(2,0,0)](fi,fi)+mom2[getind(0,2,0)](fi,fi)+mom2[getind(0,0,2)](fi,fi);
@@ -2099,29 +1894,31 @@ arma::mat BasisSet::sph_to_cart_trans() const {
 
 arma::mat BasisSet::overlap() const {
   // Form overlap matrix
-
-  // Size of basis set
   const size_t N=get_Nbf();
-
-  // Initialize matrix
   arma::mat S(N,N);
   S.zeros();
 
-  // Loop over shells
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++) {
-    // Shells in pair
-    size_t i=shellpairs[ip].is;
-    size_t j=shellpairs[ip].js;
+  {
+    Int1eWorker w(cenv);
 
-    // Get overlap between shells
-    arma::mat tmp=shells[i].overlap(shells[j]);
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++) {
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
 
-    // Store overlap
-    S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-    S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      w.compute(CINT1E_OVLP,i,j);
+      arma::mat tmp=w.get_mat(0,i,j);
+
+      S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+      S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+    }
   }
 
   return S;
@@ -2168,14 +1965,26 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
   arma::mat S12(Nl,Nr);
   S12.zeros();
 
+  // The shells of the other basis follow ours in the environment
+  CintEnv cenv(*this,rhs,false);
+  const size_t Nsh=shells.size();
+
   // Loop over shells
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t i=0;i<shells.size();i++) {
-    for(size_t j=0;j<rhs.shells.size();j++) {
-      S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
-		 shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=shells[i].overlap(rhs.shells[j]);;
+  {
+    Int1eWorker w(cenv);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t i=0;i<shells.size();i++) {
+      for(size_t j=0;j<rhs.shells.size();j++) {
+        w.compute(CINT1E_OVLP,i,Nsh+j);
+        S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
+                   shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=w.get_mat(0,i,Nsh+j);
+      }
     }
   }
   return S12;
@@ -2209,29 +2018,31 @@ arma::mat BasisSet::coulomb_overlap(const BasisSet & rhs) const {
 
 arma::mat BasisSet::kinetic() const {
   // Form kinetic energy matrix
-
-  // Size of basis set
   size_t N=get_Nbf();
-
-  // Initialize matrix
   arma::mat T(N,N);
   T.zeros();
 
-  // Loop over shells
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++) {
-    // Shells in pair
-    size_t i=shellpairs[ip].is;
-    size_t j=shellpairs[ip].js;
+  {
+    Int1eWorker w(cenv);
 
-    // Get partial kinetic energy matrix
-    arma::mat tmp=shells[i].kinetic(shells[j]);
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++) {
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
 
-    // Store result
-    T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-    T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      w.compute(CINT1E_KIN,i,j);
+      arma::mat tmp=w.get_mat(0,i,j);
+
+      T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+      T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+    }
   }
 
   return T;
@@ -2239,32 +2050,36 @@ arma::mat BasisSet::kinetic() const {
 
 std::vector<arma::mat> BasisSet::gradient_integral() const {
   // Form the <mu|nabla|nu> matrix
-
-  // Size of basis set
   size_t N=get_Nbf();
-
-  // Initialize matrix
   std::vector<arma::mat> T(3);
   for(size_t ic=0; ic<3;ic++)
     T[ic].zeros(N,N);
 
-  // Loop over shells
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++) {
-    // Shells in pair
-    size_t i=shellpairs[ip].is;
-    size_t j=shellpairs[ip].js;
+  {
+    Int1eWorker w(cenv);
 
-    // Get the shell pair block
-    std::vector<arma::mat> tmp=shells[i].gradient_integral(shells[j]);
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++) {
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
 
-    // Store result; the operator is antisymmetric
-    for(size_t ic=0;ic<3;ic++) {
-      T[ic].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp[ic];
-      if(i!=j)
-	T[ic].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=-arma::trans(tmp[ic]);
+      // The derivative acts on the ket
+      w.compute(CINT1E_OVLPIP,i,j);
+
+      // The operator is antisymmetric
+      for(size_t ic=0;ic<3;ic++) {
+        arma::mat tmp=w.get_mat(ic,i,j);
+        T[ic].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+        if(i!=j)
+          T[ic].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=-arma::trans(tmp);
+      }
     }
   }
 
@@ -2297,9 +2112,17 @@ arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,doubl
   arma::mat Vnuc(N,N);
   Vnuc.zeros();
 
+  CintEnv cenv(*this,false);
+
   // Loop over shells
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
+#endif
+  {
+    Int1eWorker w(cenv);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<shellpairs.size();ip++)
     for(size_t inuc=0;inuc<nuclear_data.size();inuc++) {
@@ -2310,8 +2133,10 @@ arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,doubl
       size_t i=shellpairs[ip].is;
       size_t j=shellpairs[ip].js;
 
-      // Get subblock
-      arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[j]);
+      // Get subblock. The attraction operator is -Z/|r-C|.
+      const double orig[3]={cx, cy, cz};
+      w.compute(CINT1E_RINV,i,j,orig);
+      arma::mat tmp=-Z*w.get_mat(0,i,j);
 
       // On the off diagonal we fill out both sides of the matrix
       if(i!=j) {
@@ -2321,6 +2146,7 @@ arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,doubl
 	// On the diagonal we just get it once
 	Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
     }
+  }
 
   return Vnuc;
 }
@@ -2335,17 +2161,27 @@ arma::mat BasisSet::potential(coords_t r) const {
   arma::mat V(N,N);
   V.zeros();
 
+  CintEnv cenv(*this,false);
+
   // Loop over shells
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
+#endif
+  {
+    Int1eWorker w(cenv);
+    const double orig[3]={r.x, r.y, r.z};
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<shellpairs.size();ip++) {
     // Shells in pair
     size_t i=shellpairs[ip].is;
     size_t j=shellpairs[ip].js;
 
-    // Get subblock
-    arma::mat tmp=shells[i].nuclear(r.x,r.y,r.z,shells[j]);
+    // Get subblock. The operator is -1/|r-C|.
+    w.compute(CINT1E_RINV,i,j,orig);
+    arma::mat tmp=-w.get_mat(0,i,j);
 
     // On the off diagonal we fill out both sides of the matrix
     if(i!=j) {
@@ -2354,6 +2190,7 @@ arma::mat BasisSet::potential(coords_t r) const {
     } else
       // On the diagonal we just get it once
       V.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+  }
   }
 
   return V;
@@ -2552,10 +2389,13 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
 
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
+    Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
@@ -2585,7 +2425,8 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
 	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
 
 	// Get the forces
-	arma::vec tmp=Z*shells[i].nuclear_pulay(cx,cy,cz,Pmat,shells[j]);
+	const double orig[3]={cx, cy, cz};
+	arma::vec tmp=Z*nuclear_pulay_pair(w,i,j,Pmat,orig);
 
 	// Off-diagonal?
 	if(i!=j)
@@ -2614,10 +2455,13 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
 
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
+    Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
@@ -2647,7 +2491,8 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
 	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
 
 	// Get the forces
-	arma::vec tmp=Z*shells[i].nuclear_der(cx,cy,cz,Pmat,shells[j]);
+	const double orig[3]={cx, cy, cz};
+	arma::vec tmp=Z*nuclear_der_pair(w,i,j,Pmat,orig);
 
 	// Off-diagonal?
 	if(i!=j)
@@ -2674,10 +2519,13 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
 
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
+    Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
@@ -2694,7 +2542,7 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
       arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
 
       // Get the forces
-      arma::vec tmp=shells[i].kinetic_pulay(Pmat,shells[j]);
+      arma::vec tmp=pulay_pair(w,CINT1E_IPKIN,CINT1E_KINIP,i,j,Pmat,1.0);
 
       // Off-diagonal?
       if(i!=j)
@@ -2723,10 +2571,13 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
 
+  CintEnv cenv(*this,false);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
+    Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
@@ -2744,7 +2595,7 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
       arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
 
       // Get the forces
-      arma::vec tmp=shells[i].overlap_der(Pmat,shells[j]);
+      arma::vec tmp=pulay_pair(w,CINT1E_IPOVLP,CINT1E_OVLPIP,i,j,Pmat,-1.0);
 
       // Off-diagonal?
       if(i!=j)
@@ -2818,18 +2669,26 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
     ret[i].zeros();
   }
 
+  CintEnv cenv(*this,false);
+
   // Loop over shells
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
+#endif
+  {
+    Int1eWorker w(cenv);
+    const double orig[3]={x, y, z};
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<shellpairs.size();ip++) {
     // Shells in pair
     size_t i=shellpairs[ip].is;
     size_t j=shellpairs[ip].js;
 
-
     // Compute moment integral over shells
-    std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[j]);
+    std::vector<arma::mat> ints=moment_pair(w,mom,i,j,orig);
 
     // Store moments
     if(i!=j) {
@@ -2841,6 +2700,7 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
       for(size_t m=0;m<Nmom;m++)
 	ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
     }
+  }
   }
 
   return ret;
