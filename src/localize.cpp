@@ -23,7 +23,6 @@
 #include "timer.h"
 #include "linalg.h"
 #include "localization.h"
-// Needed for libint init
 #include "eriworker.h"
 
 #include <algorithm>
@@ -395,8 +394,6 @@ int main_guarded(int argc, char **argv) {
     return 1;
   }
 
-  // Initialize libint
-  init_libint_base();
 
   settings.add_string("LoadChk","Checkpoint to load","erkale.chk");
   settings.add_string("SaveChk","Checkpoint to save results to","erkale.chk");

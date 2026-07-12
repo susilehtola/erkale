@@ -33,7 +33,6 @@
 #include "timer.h"
 #include "lbfgs.h"
 
-// Needed for libint init
 #include "eriworker.h"
 
 #include <armadillo>
@@ -418,10 +417,6 @@ int main_guarded(int argc, char **argv) {
     return 0;
   }
 
-  // Initialize libint
-  init_libint_base();
-  // Initialize libderiv
-  init_libderiv_base();
 
   Timer tprog;
   tprog.print_time();

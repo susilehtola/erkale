@@ -44,7 +44,7 @@
  * in development, although with the benefit of getting to grips with
  * low level stuff. The decision was made a lot simpler due to the
  * availability of fast, free libraries for computing electron
- * repulsion integrals (libint) and exchange-correlation functionals
+ * repulsion integrals (libcint) and exchange-correlation functionals
  * (libxc), which meant that most of the dull stuff was already done
  * by others.
  *

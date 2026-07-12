@@ -25,8 +25,7 @@ set(SOVERSION 0.1.0)
 
 # Cmake modules/macros are in a subdirectory to keep the root directory cleaner
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
-# Configuration where to find libint is in current directory
-set(libint_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
+# Configuration where to find Armadillo is in current directory
 set(Armadillo_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 # System default basis set repository (need not exist)
@@ -111,12 +110,6 @@ message("")
 find_package(libxc REQUIRED)
 message("libxc headers are in ${LIBXC_INCLUDE_DIRS}")
 message("libxc linker flags are ${LIBXC_LIBRARIES}")
-message("")
-
-# Find libint
-find_package(libint REQUIRED)
-message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
-message("libint linker flags are ${LIBINT_LIBRARIES}")
 message("")
 
 # Find libcint (also satisfied by the API-compatible qcint); if it is

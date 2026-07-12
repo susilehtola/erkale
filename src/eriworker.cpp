@@ -79,9 +79,9 @@ void IntegralWorker::spherical_transform(const GaussianShell *is, const Gaussian
 }
 
 ERIWorker::ERIWorker(int maxam, int maxcontr) {
-  // The generated spherical transform routines only cover angular
-  // momenta below the libint limit
-  if(maxam>=LIBINT_MAX_AM) {
+  // The generated spherical transform routines cover angular momenta
+  // up to ERKALE's own limit
+  if(maxam>max_am) {
     ERROR_INFO();
     throw std::domain_error("The spherical transform tables don't support this angular momentum.\n");
   }
@@ -92,9 +92,9 @@ ERIWorker::~ERIWorker() {
 }
 
 dERIWorker::dERIWorker(int maxam, int maxcontr) {
-  // The generated spherical transform routines only cover angular
-  // momenta below the libint limit
-  if(maxam>=LIBINT_MAX_AM) {
+  // The generated spherical transform routines cover angular momenta
+  // up to ERKALE's own limit
+  if(maxam>max_am) {
     ERROR_INFO();
     throw std::domain_error("The spherical transform tables don't support this angular momentum.\n");
   }
@@ -139,9 +139,9 @@ void IntegralWorker::setup_cint_env(const GaussianShell *is, const GaussianShell
     // libcint scales cartesian s and p shells by Y_00 = 1/sqrt(4pi)
     // resp. |Y_1m| = sqrt(3/(4pi)) (its common_fac_sp convention) and
     // leaves l>=2 alone. Compensating in the contraction coefficients
-    // makes the output plain integrals over the bare primitives,
-    // exactly like libint's build_eri; the relnorm factors applied in
-    // compute_cartesian then take care of all normalization.
+    // makes the output plain integrals over the bare primitives; the
+    // relnorm factors applied in compute_cartesian then take care of
+    // all normalization.
     const int l=sh->get_am();
     double fl=1.0;
     if(l==0)

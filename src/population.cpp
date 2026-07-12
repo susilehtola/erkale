@@ -24,7 +24,6 @@
 #include "bader.h"
 #include "timer.h"
 
-// Needed for libint init
 #include "eriworker.h"
 
 #ifdef _OPENMP
@@ -84,8 +83,6 @@ int main_guarded(int argc, char **argv) {
   // Need to add scf keywords for basis set defaults
   settings.add_scf_settings();
 
-  // Initialize libint
-  init_libint_base();
 
   // Load checkpoint
   Checkpoint chkpt(settings.get_string("LoadChk"),false);

@@ -100,7 +100,7 @@ class DensityFit {
   /// Three-index (alpha | mu nu) block source, indexed per orbital
   /// shellpair. In non-direct mode this is a CachedBlocks with the
   /// integrals precomputed and stored; in direct mode this is a
-  /// DirectDFBlocks that computes blocks on demand via libint.
+  /// DirectDFBlocks that computes blocks on demand.
   /// Either way, the J/K kernels consume blocks via the same
   /// blocks->get_block(ip) interface. shared_ptr so DensityFit
   /// copies (e.g. Edmiston) share the storage / state.

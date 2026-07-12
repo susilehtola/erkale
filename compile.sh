@@ -64,19 +64,9 @@ LAPACKSER="-lopenblas"
 system_cmake=0
 system_gsl=0
 system_libxc=0
-system_libint=0
 system_hdf5=0
 system_blas=0
 
-# Maximum supported angular momentum (affects libint if it's compiled)
-MAXAM="6"
-# Maximum optimized angular momentum (affects libint if it's
-# compiled). If this is very large, libint compilation will take ages
-# and the resulting libraries will be HUGE.
-OPTAM="4"
-# Maximum angular momentum for first ERI derivatives (affects libint
-# if it's compiled)
-MAXDERIV="5"
 
 # Running on cygwin?
 if [[ "$CYGWIN" != "" ]]; then
@@ -91,8 +81,6 @@ export GSLVER="2.6"
 #export XCVER="4.0.3"
 # Use newest git snapshot
 export XCVER="git"
-# libint 1.1.6
-export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
 #export ARMAVER="9.200.6"
 export ARMAVER="git"
 export CMAKEVER="3.16.5"
@@ -225,51 +213,6 @@ if(( ! ${system_libxc} )); then
 
     if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 	echo "Error compiling libxc."
-	[ "$PS1" ] && return || exit
-    fi
-fi
-
-# libint
-if(( ! ${system_libint} )); then
-    if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a ]]; then
-	echo -n "Compiling libint ..."
-
-	if [ ! -d ${builddir}/libint-${INTVER} ]; then
-	    if [ ! -f ${srcdir}/libint-${INTVER}.tar.gz ]; then
-		cd ${srcdir}
-		wget -O libint-${INTVER}.tar.gz "https://github.com/evaleev/libint/archive/${INTVER}/libint-${INTVER}.tar.gz"
-	    fi
-	    cd ${builddir}
-	    tar zxf ${srcdir}/libint-${INTVER}.tar.gz
-	fi
-
-	cd ${builddir}/libint-${INTVER}
-	# Use more conservative optimization flags, since libint is already highly optimized.
-	export ICFLAGS=`echo ${CFLAGS} |sed 's|-O2|-O1|g'`
-	export ICXXFLAGS=`echo ${CXXFLAGS} |sed 's|-O2|-O1|g'`
-	aclocal -I lib/autoconf
-	autoconf
-	./configure --enable-static --disable-shared \
-	    --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
-	    --with-libint-max-am=${MAXAM} --with-libint-opt-am=${OPTAM} \
-	    --with-libderiv-max-am1=${MAXDERIV}  --disable-r12 \
-	    --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
-	    --with-cc-optflags="${ICFLAGS}" \
-	    --with-cxx-optflags="${ICXXFLAGS}" &>configure.log
-
-	if [[ "$cygwin" != "" ]]; then
-	    # Grow stack size
-	    sed -i 's| -lm | -Wl,--stack,8388608 -lm|' src/bin/MakeVars
-	fi
-
-	make -j ${nprocs} &> make.log
-	make install &> install.log
-	make clean &> clean.log
-	echo " done"
-    fi
-
-    if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a ]]; then
-	echo "Error compiling libint."
 	[ "$PS1" ] && return || exit
     fi
 fi
@@ -459,16 +402,6 @@ else
 fi
 
 # Libint
-echo "set(LIBINT_FOUND 1)" > erkale/config/libintConfig.cmake
-if(( ${system_libint} )); then
-    echo "set(LIBINT_INCLUDE_DIRS \"/usr/include\")" >> erkale/config/libintConfig.cmake
-    echo "set(LIBINT_LIBRARIES -lderiv -lint)"  >> erkale/config/libintConfig.cmake
-else
-    echo "set(LIBINT_INCLUDE_DIRS \"${topdir}/libint/include\")" >> erkale/config/libintConfig.cmake
-    #echo "set(LIBINT_LIBRARY_DIRS \"${topdir}/libint/lib\")"  >> erkale/config/libintConfig.cmake
-    echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libderiv.a ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
-fi
-
 # BLAS
 if(( ! ${system_blas} )); then
     LAPACKSER="-L${topdir}/openblas/lib/ -lopenblas -lgfortran"

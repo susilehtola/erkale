@@ -35,7 +35,6 @@
 #include "../xyzutils.h"
 #include "xrsscf.h"
 
-// Needed for libint init
 #include "../eriworker.h"
 
 #include <algorithm>
@@ -816,8 +815,6 @@ int main_guarded(int argc, char **argv) {
     return 0;
   }
 
-  // Initialize libint
-  init_libint_base();
 
   Timer t;
   t.print_time();

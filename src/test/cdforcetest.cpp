@@ -67,8 +67,6 @@ int main(int argc, char ** argv) {
   const double cholthr=(argc>3)?atof(argv[3]):1e-12;
   const double delta  =(argc>4)?atof(argv[4]):1e-5;
 
-  init_libint_base();
-  init_libderiv_base();
   settings.add_scf_settings();
 
   Checkpoint chk(chkf,false);
