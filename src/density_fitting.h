@@ -52,6 +52,7 @@
 #include "global.h"
 #include "b_tensor.h"
 #include "basis.h"
+#include "cintenv.h"
 #include "eriworker.h"
 
 #include <memory>
@@ -92,8 +93,10 @@ class DensityFit {
   std::vector<GaussianShell> auxshells;
   int maxauxam;
   size_t maxauxcontr;
-  /// Dummy shell
-  GaussianShell dummy;
+  /// libcint description of the orbital basis, followed by the
+  /// auxiliary basis (in two-step CD there is no separate auxiliary
+  /// basis, and the environment holds the orbital shells alone)
+  CintEnv cenv;
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
@@ -156,7 +159,7 @@ class DensityFit {
   /// Throw std::logic_error unless P has the Nbf x Nbf density-matrix
   /// shape. Shared by the J / expansion entry points.
   void check_density_dims(const arma::mat & P) const;
-  /// Set Nbf, Nnuc, direct, orbshells, dummy, maxorbam, maxorbcontr
+  /// Set Nbf, Nnuc, direct, orbshells, maxorbam, maxorbcontr
   /// from the orbital basis. Shared by fill() and fill_cholesky();
   /// aux-side state (Naux, auxshells, maxauxam/contr, maxam/contr)
   /// and the cholesky_mode-specific bookkeeping are set by the

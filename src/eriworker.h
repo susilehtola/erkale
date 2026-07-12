@@ -18,149 +18,150 @@
 #ifndef ERIWORKER_H
 #define ERIWORKER_H
 
-// To debug derivatives
-//#define DEBUGDERIV
-
+#include <memory>
 #include <vector>
-// Needed to define contr_t
+
 #include "basis.h"
+#include "cintenv.h"
 
-/// Selector for the libcint two-electron integral kernels
-typedef enum {
-  CINT_ERI,      ///< int2e: plain electron repulsion integrals
-  CINT_ERI_IP1,  ///< int2e_ip1: derivative wrt the first shell
-  CINT_ERI_IP2   ///< int2e_ip2: derivative wrt the third shell
-} cint_eri_t;
-
-/// Worker for dealing with electron repulsion integrals and their derivatives
+/**
+ * Workers for electron repulsion integrals and their derivatives.
+ *
+ * The shells are addressed by their index in a CintEnv, which holds the
+ * libcint description of the basis (and, where the caller built it that
+ * way, of an auxiliary basis appended after it) together with the
+ * integral optimizers. The environment is shared by all threads; the
+ * workers are per thread.
+ *
+ * The integrals come out directly in ERKALE's basis and index order:
+ * libcint runs its first shell fastest, so the workers evaluate the
+ * reversed shell tuple -- which by the permutational symmetry of the
+ * integrals is the same integral -- to get ERKALE's last-index-fastest
+ * ordering, and they call the spherical kernels when the basis is
+ * spherical, so no transformation step is needed.
+ */
 class IntegralWorker {
  protected:
-  /// Storage arrays (operated through pointer)
-  std::vector<double> arrone;
-  /// Storage arrays (operated through pointer)
-  std::vector<double> arrtwo;
+  /// The libcint description of the shells (not owned)
+  const CintEnv * envp;
 
-  /// Input array
-  std::vector<double> * input;
-  /// Output array
-  std::vector<double> * output;
-
-  /// Range separation constant: the computed integrals are
-  /// rs_alpha * full Coulomb + rs_beta * erfc(rs_omega r12)/r12
-  double rs_omega;
-  /// Weight of the full-Coulomb component
-  double rs_alpha;
-  /// Weight of the short-range (complementary error function) component
-  double rs_beta;
-
-  /// libcint atom table for the current shell quartet
-  std::vector<int> cint_atm;
-  /// libcint shell table for the current shell quartet
-  std::vector<int> cint_bas;
-  /// libcint data array: coordinates, exponents, contraction coefficients
-  std::vector<double> cint_env;
-  /// libcint integral output for the short-range component
-  std::vector<double> cint_sr;
+  /// Private copy of the environment data array. The range separation
+  /// constant is written into it, so it cannot be shared between threads.
+  std::vector<double> env;
   /// libcint scratch memory
-  std::vector<double> cint_cache;
+  std::vector<double> cache;
+  /// Buffer for the second range separation component
+  std::vector<double> srbuf;
+  /// Buffer for the raw libcint output, before the layout remap
+  std::vector<double> tmp;
 
-  /// Set up the libcint environment for the given shell quartet
-  void setup_cint_env(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Evaluate a two-electron kernel over the quartet set up in the
-  /// environment, combining the range separation components:
-  /// out = rs_alpha * full + rs_beta * erfc(rs_omega r12)/r12.
-  /// N is the number of integrals per operator component.
-  void cint_int2e(cint_eri_t kernel, int ncomp, const int *shls, size_t N, std::vector<double> & out);
+  /// Integrals in ERKALE order
+  std::vector<double> ints;
 
-  /// Do spherical transforms if necessary
-  void spherical_transform(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Do spherical transform with respect to first index
-  void transform_i(int am, size_t Nj, size_t Nk, size_t Nl);
-  /// Do spherical transform with respect to second index
-  void transform_j(int am, size_t Ni, size_t Nk, size_t Nl);
-  /// Do spherical transform with respect to third index
-  void transform_k(int am, size_t Ni, size_t Nj, size_t Nl);
-  /// Do spherical transform with respect to fourth index
-  void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
+  /// Range separation: the integrals are
+  /// rs_alpha * full Coulomb + rs_beta * erfc(rs_omega r12) / r12
+  double rs_omega, rs_alpha, rs_beta;
+
+  /// Integral optimizers for the attenuated kernels, one per kernel,
+  /// built on demand and owned by the worker. The optimizers of the
+  /// environment are only valid for the full-range kernels: libcint
+  /// bakes the range separation constant into the primitive pair data,
+  /// so the attenuated kernels need their own, and since the workers
+  /// are per thread these can be built without a lock.
+  std::vector<void *> sr_opts;
+
+  /// The optimizer to use for the given kernel and range separation
+  void * get_opt(cint_kernel_t kernel, double omega);
+
+  /// Evaluate a kernel over the given shells, combining the range
+  /// separation components. nsh is the number of shells the kernel takes
+  /// (2, 3 or 4), ncomp the number of operator components and N the
+  /// number of integrals per component; the results are left in out.
+  void evaluate(cint_kernel_t kernel, int nsh, const int * shls, int ncomp, size_t N,
+                std::vector<double> & out);
+
+  /// Scale the integrals to ERKALE's normalization of the basis
+  /// functions (a no-op when the environment has unit factors). The
+  /// shells are listed in ERKALE index order, the slowest index first.
+  void normalize(const size_t * shls, int nsh, int ncomp, std::vector<double> & out) const;
+
+  /// Remap a three-center block from libcint's layout to ERKALE's
+  void remap_3c(const std::vector<double> & in, int ncomp,
+                size_t Ni, size_t Nj, size_t Nk, std::vector<double> & out) const;
 
  public:
-  IntegralWorker();
+  /// Constructor
+  IntegralWorker(const CintEnv & env, double omega=0.0, double alpha=1.0, double beta=0.0);
+  /// Destructor
   virtual ~IntegralWorker();
 };
 
 /// Worker for computing electron repulsion integrals
 class ERIWorker: public IntegralWorker {
-  /// libcint integral output
-  std::vector<double> cint_out;
-
-  /// Compute the cartesian ERIs
-  void compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Compute the cartesian ERIs using Huzinaga routines
-  void compute_cartesian_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-
  public:
   /// Constructor
-  ERIWorker(int maxam, int maxcontr);
+  ERIWorker(const CintEnv & env, double omega=0.0, double alpha=1.0, double beta=0.0);
   /// Destructor
   virtual ~ERIWorker();
 
-  /// Compute eris
-  void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Compute eris using Huzinaga routines
-  void compute_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Get the eris
+  /// Compute the four-center integrals (ij|kl)
+  void compute(size_t is, size_t js, size_t ks, size_t ls);
+  /// Compute the three-center integrals (ij|k)
+  void compute_3c(size_t is, size_t js, size_t ks);
+  /// Compute the two-center integrals (i|j)
+  void compute_2c(size_t is, size_t js);
+
+  /// Compute the four-center integrals with the in-house Huzinaga
+  /// routines: the independent reference used by integraltest
+  void compute_debug(size_t is, size_t js, size_t ks, size_t ls);
+
+  /// Get the integrals
   std::vector<double> get() const;
-  /// Get the eris
-  std::vector<double> & rget() const;
-  /// Get pointer to eris
+  /// Get a reference to the integrals
+  std::vector<double> & rget();
+  /// Get a pointer to the integrals
   const std::vector<double> * getp() const;
 };
 
 /// Worker for computing electron repulsion integral derivatives
 class dERIWorker: public IntegralWorker {
-  // Pointers to the current shells
-  /// 1st shell
-  const GaussianShell *is;
-  /// 2nd shell
-  const GaussianShell *js;
-  /// 3rd shell
-  const GaussianShell *ks;
-  /// 4th shell
-  const GaussianShell *ls;
+  /// Derivatives with respect to the shell centers, in ERKALE order:
+  /// 3*nsh components of N integrals each
+  std::vector<double> dR;
+  /// Scratch buffer for the layout remaps
+  std::vector<double> scr;
 
-  /// Cartesian derivative components (x,y,z) with respect to the
-  /// centers of the 2nd, 3rd and 4th shell, in ERKALE layout with the
-  /// normalization factors included; the 1st shell derivative follows
-  /// from translational invariance
-  std::vector<double> cint_dJ, cint_dK, cint_dL;
-  /// Scratch buffer for the K derivative layout remap
-  std::vector<double> cint_scr;
-
-  /// Compute the cartesian ERI derivatives
-  void compute_cartesian();
-  /// Get the idx'th derivative in the input array
-  void get_idx(int idx);
+  /// Number of integrals in the current shell tuple
+  size_t N;
+  /// Number of shells in the current tuple
+  int nsh;
 
  public:
-  dERIWorker(int maxam, int maxcontr);
+  /// Constructor
+  dERIWorker(const CintEnv & env, double omega=0.0, double alpha=1.0, double beta=0.0);
+  /// Destructor
   virtual ~dERIWorker();
 
-  /// Compute derivatives
-  void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Get the derivatives wrt index idx
-  std::vector<double> get(int idx);
-  /// Get the derivatives wrt index idx
-  const std::vector<double> * getp(int idx);
+  /// Compute the derivatives of the four-center integrals (ij|kl)
+  void compute(size_t is, size_t js, size_t ks, size_t ls);
+  /// Compute the derivatives of the three-center integrals (ij|k)
+  void compute_3c(size_t is, size_t js, size_t ks);
+  /// Compute the derivatives of the two-center integrals (i|j)
+  void compute_2c(size_t is, size_t js);
 
-  /// Compute the derivatives, debug version
-  std::vector<double> get_debug(int idx);
+  /// Get the derivatives with respect to index idx = 3*ish + ic, where
+  /// ish numbers the shells in the order they were given to compute and
+  /// ic is the cartesian component
+  std::vector<double> get(int idx);
+  /// Get a pointer to the derivatives with respect to index idx
+  const std::vector<double> * getp(int idx);
 };
 
 /// Worker for computing short- and long-range electron repulsion integrals
 class ERIWorker_srlr: public ERIWorker {
  public:
   /// Constructor
-  ERIWorker_srlr(int maxam, int maxcontr, double omega, double alpha, double beta);
+  ERIWorker_srlr(const CintEnv & env, double omega, double alpha, double beta);
   /// Destructor
   ~ERIWorker_srlr();
 };
@@ -169,28 +170,26 @@ class ERIWorker_srlr: public ERIWorker {
 class dERIWorker_srlr: public dERIWorker {
  public:
   /// Constructor
-  dERIWorker_srlr(int maxam, int maxcontr, double omega, double alpha, double beta);
+  dERIWorker_srlr(const CintEnv & env, double omega, double alpha, double beta);
   /// Destructor
   ~dERIWorker_srlr();
 };
-
-#include <memory>
 
 /// Allocate an ERIWorker matching the given range-separation parameters.
 /// (omega, alpha, beta) == (0, 1, 0) is the plain-Coulomb default and
 /// gets a vanilla ERIWorker; everything else gets ERIWorker_srlr.
 inline std::unique_ptr<ERIWorker>
-make_eri_worker(int maxam, int maxcontr, double omega, double alpha, double beta) {
+make_eri_worker(const CintEnv & env, double omega, double alpha, double beta) {
   if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
-    return std::unique_ptr<ERIWorker>(new ERIWorker(maxam, maxcontr));
-  return std::unique_ptr<ERIWorker>(new ERIWorker_srlr(maxam, maxcontr, omega, alpha, beta));
+    return std::unique_ptr<ERIWorker>(new ERIWorker(env));
+  return std::unique_ptr<ERIWorker>(new ERIWorker_srlr(env, omega, alpha, beta));
 }
 
 inline std::unique_ptr<dERIWorker>
-make_deri_worker(int maxam, int maxcontr, double omega, double alpha, double beta) {
+make_deri_worker(const CintEnv & env, double omega, double alpha, double beta) {
   if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
-    return std::unique_ptr<dERIWorker>(new dERIWorker(maxam, maxcontr));
-  return std::unique_ptr<dERIWorker>(new dERIWorker_srlr(maxam, maxcontr, omega, alpha, beta));
+    return std::unique_ptr<dERIWorker>(new dERIWorker(env));
+  return std::unique_ptr<dERIWorker>(new dERIWorker_srlr(env, omega, alpha, beta));
 }
 
 #endif

@@ -50,15 +50,17 @@ namespace {
                          const std::vector<pivpair_t> & piv_sp,
                          const arma::umat & piv_index,
                          arma::uword sentinel,
-                         size_t Nselected,
-                         int max_am, int max_contr) {
+                         size_t Nselected) {
     arma::mat M(Nselected, Nselected, arma::fill::zeros);
+
+    // libcint description of the combined pivot shells
+    CintEnv cenv(shells);
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
-      auto eri = make_eri_worker(max_am, max_contr, 0.0, 1.0, 0.0);
+      auto eri = make_eri_worker(cenv, 0.0, 1.0, 0.0);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
@@ -78,7 +80,7 @@ namespace {
           const size_t k0 = shells[ks].get_first_ind();
           const size_t l0 = shells[ls].get_first_ind();
 
-          eri->compute(&shells[is], &shells[js], &shells[ks], &shells[ls]);
+          eri->compute(is,js,ks,ls);
           const std::vector<double> * erip = eri->getp();
 
           for(size_t ii=0; ii<Ni; ii++)
@@ -160,8 +162,7 @@ void neo_shared_cholesky(const BasisSet & ebasis, const BasisSet & pbasis,
   const int piv_max_contr = std::max(ebasis.get_max_Ncontr(), pbasis.get_max_Ncontr());
 
   Timer t;
-  arma::mat M = pivot_metric(piv_shells, piv_sp, piv_index, sentinel, Nselected,
-                             piv_max_am, piv_max_contr);
+  arma::mat M = pivot_metric(piv_shells, piv_sp, piv_index, sentinel, Nselected);
   const double t_int = t.get();
 
   // Orthogonalise the joint metric. Normalise to unit diagonal first: the

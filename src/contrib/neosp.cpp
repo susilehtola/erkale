@@ -212,17 +212,19 @@ int main_guarded(int argc, char **argv) {
     // Target matrix
     arma::mat Jt(target_basis.get_Nbf(), target_basis.get_Nbf(), arma::fill::zeros);
 
+    // libcint environment: the target shells, followed by the source
+    // shells of the other species
+    CintEnv cenv(target_basis, source_basis);
+    const size_t Nsh_tgt = cenv.get_Nsh_orb();
+
     // Compute integrals
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
       // ERI worker. unique_ptr so a throw inside the loop doesn't
-      // leak the allocation; .get() is used at every call site
-      // inside the loop (legacy raw-pointer API).
-      auto maxam = std::max(source_basis.get_max_am(),target_basis.get_max_am());
-      auto maxncontr = std::max(source_basis.get_max_Ncontr(), target_basis.get_max_Ncontr());
-      auto eri_owner = make_eri_worker(maxam, maxncontr, omega, alpha, beta);
+      // leak the allocation
+      auto eri_owner = make_eri_worker(cenv, omega, alpha, beta);
       ERIWorker *eri = eri_owner.get();
 
 #ifndef _OPENMP
@@ -264,7 +266,7 @@ int main_guarded(int argc, char **argv) {
           }
 
           // Compute integrals
-          eri->compute(&tshells[it],&tshells[jt],&sshells[ks],&sshells[ls]);
+          eri->compute(it,jt,Nsh_tgt+ks,Nsh_tgt+ls);
 
           // Extract density
           arma::mat Pskl = source_density.submat(ks0,ls0,ks0+Nsk-1,ls0+Nsl-1);

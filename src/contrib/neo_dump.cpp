@@ -120,9 +120,11 @@ namespace {
 
     arma::mat G(Ne*Ne, Np*Np, arma::fill::zeros);
 
-    int maxam = std::max(ebasis.get_max_am(), pbasis.get_max_am());
-    int maxncontr = std::max(ebasis.get_max_Ncontr(), pbasis.get_max_Ncontr());
-    auto eri_owner = make_eri_worker(maxam, maxncontr, omega, alpha, beta);
+    // libcint environment: the electronic shells, followed by the
+    // protonic ones
+    CintEnv cenv(ebasis, pbasis);
+    const size_t Nsh_e = cenv.get_Nsh_orb();
+    auto eri_owner = make_eri_worker(cenv, omega, alpha, beta);
     ERIWorker * eri = eri_owner.get();
 
     for(size_t i=0;i<eshells.size();i++) {
@@ -138,7 +140,7 @@ namespace {
             size_t Nl = pshells[l].get_Nbf();
             size_t l0 = pshells[l].get_first_ind();
 
-            eri->compute(&eshells[i], &eshells[j], &pshells[k], &pshells[l]);
+            eri->compute(i,j,Nsh_e+k,Nsh_e+l);
             const std::vector<double> & ints = *eri->getp();
 
             for(size_t ii=0;ii<Ni;ii++)

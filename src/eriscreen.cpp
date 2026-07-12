@@ -103,6 +103,10 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   basp=basisv;
   Nbf=basisv->get_Nbf();
 
+  // libcint description of the basis: the tables and the integral
+  // optimizers are built once here and shared by the worker pools
+  cenv=CintEnv(*basp);
+
   // Form index helper
   iidx=i_idx(Nbf);
 
@@ -130,13 +134,13 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
 
 ERIWorker * ERIscreen::acquire_eri(int ith) const {
   if(!eri_pool_[ith])
-    eri_pool_[ith] = make_eri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
+    eri_pool_[ith] = make_eri_worker(cenv, omega, alpha, beta);
   return eri_pool_[ith].get();
 }
 
 dERIWorker * ERIscreen::acquire_deri(int ith) const {
   if(!deri_pool_[ith])
-    deri_pool_[ith] = make_deri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
+    deri_pool_[ith] = make_deri_worker(cenv, omega, alpha, beta);
   return deri_pool_[ith].get();
 }
 
@@ -246,7 +250,7 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
         }
 
 	// Compute integrals
-	eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	eri->compute(is,js,ks,ls);
 	erip=eri->getp();
 
 	// Digest the integrals
@@ -327,7 +331,7 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
           continue;
 
 	// Compute the derivatives.
-	deri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	deri->compute(is,js,ks,ls);
 
 	// Digest the forces on the nuclei
 	f.zeros();

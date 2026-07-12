@@ -1,3 +1,4 @@
+#include "../cintenv.h"
 #include "../eriworker.h"
 #include "../integrals.h"
 #include "../checkpoint.h"
@@ -22,12 +23,15 @@ int main(int argc, char **argv) {
   // Get shells in basis set
   std::vector<GaussianShell> shells(basis.get_shells());
 
+  // libcint description of the basis
+  CintEnv cenv(basis);
+
   // Loop over shells
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    ERIWorker eri(basis.get_max_am(),basis.get_max_Ncontr());
+    ERIWorker eri(cenv);
 
 #ifdef _OPENMP
 #pragma omp for
@@ -37,11 +41,11 @@ int main(int argc, char **argv) {
 	for(size_t ks=0;ks<shells.size();ks++) {
 	  for(size_t ls=0;ls<shells.size();ls++) {
 	    // Get the production integrals
-	    eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	    eri.compute(is,js,ks,ls);
 	    std::vector<double> prod(eri.get());
 
 	    // Get Huzinaga integrals
-	    eri.compute_debug(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	    eri.compute_debug(is,js,ks,ls);
 	    std::vector<double> huzinaga(eri.get());
 
 	    // Compare integrals
