@@ -440,7 +440,7 @@ int main_guarded(int argc, char **argv) {
   settings.set_string("JKMethod","RI");
   settings.add_bool("NumGrad","Use finite-difference gradient?",false);
   settings.add_int("Stencil","Order of finite-difference stencil for numgrad",2);
-  settings.add_double("Stepsize","Finite-difference stencil step size",1e-6);
+  settings.add_double("Stepsize","Finite-difference stencil step size",1e-4);
   settings.add_double("LineStepFac","Line search step length factor",sqrt(10.0));
   settings.add_double("InitialStep","Initial step size in bohr",0.2);
   settings.add_double("ParaThr","Threshold for parabolic fit interval in bohr (dimer only)",1e-2);
