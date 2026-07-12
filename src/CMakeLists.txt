@@ -30,7 +30,7 @@ broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
 checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
-density_fitting.cpp jkbuilder.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
+density_fitting.cpp jkbuilder.cpp lebedev.cpp eriworker.cpp cintenv.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
 stockholder.cpp b_tensor.cpp lbfgs.cpp gdm.cpp
 slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
@@ -118,12 +118,6 @@ else()
  target_link_libraries(erkale_loc ${LIBCINT_LIBRARIES})
  target_link_libraries(erkale_loc ${HDF5_LIBRARIES})
 endif()
-
-
-# Spherical transform generator
-add_executable (eriworker_gentransform eriworker_gentransform.cpp solidharmonics.cpp mathf.cpp)
-target_link_libraries(eriworker_gentransform ${GSL_LIBRARIES})
-target_link_libraries(eriworker_gentransform ${LAPACK_LIBRARIES})
 
 
 # Density cube tool
@@ -218,15 +212,6 @@ add_subdirectory(external)
 
 # Compile the extra programs
 add_subdirectory(contrib)
-
-# Recipe for compiling full ERIWorker file
-add_custom_command(
- OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
- DEPENDS eriworker_gentransform
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eriworker.cpp
- COMMAND eriworker_gentransform > ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
- COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriworker.cpp >> ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
-)
 
 # Recipe for building SCF
 add_custom_command(

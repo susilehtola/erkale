@@ -204,7 +204,10 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 
 size_t ERItable::fill(const BasisSet * basp, double tol) {
   Nbf=basp->get_Nbf();
-  
+
+  // libcint description of the basis, shared by the workers
+  CintEnv cenv(*basp);
+
   // Shells
   const std::vector<GaussianShell> & shells=basp->get_shells_ref();
 
@@ -236,7 +239,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 #endif // ifdef _OPENMP
   {
     // ERI worker
-    auto eri = make_eri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
+    auto eri = make_eri_worker(cenv, omega, alpha, beta);
 
     // Integral array
     const std::vector<double> * erip;
@@ -286,7 +289,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
         }
 
 	// Compute integrals
-	eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	eri->compute(is,js,ks,ls);
 	erip=eri->getp();
 
 	// Store integrals

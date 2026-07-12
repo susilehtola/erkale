@@ -26,6 +26,7 @@
 #include <stdexcept>
 
 #include "basis.h"
+#include "cintenv.h"
 #include "eriworker.h"
 #include "elements.h"
 #include "integrals.h"
@@ -366,13 +367,12 @@ void GaussianShell::coulomb_normalize() {
   size_t Ncart=cart.size();
   size_t Nbf=get_Nbf();
 
-  // Dummy shell
-  GaussianShell dummy;
-  dummy=dummyshell();
-
-  // Compute ERI
-  ERIWorker eri(get_am(),get_Ncontr());
-  eri.compute(this,&dummy,this,&dummy);
+  // The Coulomb self-repulsion (i|j) of the functions on this shell.
+  // The environment measures the current normalization of the shell, so
+  // repeated calls compound as they did with the four-center integrals.
+  CintEnv cenv(std::vector<GaussianShell>(1,*this),false);
+  ERIWorker eri(cenv);
+  eri.compute_2c(0,0);
   const std::vector<double> * erip=eri.getp();
 
   if(!uselm) {
@@ -380,18 +380,14 @@ void GaussianShell::coulomb_normalize() {
     for(size_t i=0;i<Ncart;i++)
       cart[i].relnorm*=1.0/sqrt((*erip)[i*Nbf+i]);
   } else {
-    // Spherical normalization, need to distribute
-    // normalization coefficient among cartesians
-
-    // Spherical ERI is
-    // ERI = transmat * ERI_cart * trans(transmat)
-
-    // FIXME - Do something more clever here
-    // Check that all factors are the same
+    // Spherical normalization, need to distribute the normalization
+    // coefficient among the cartesians, so all the functions of the
+    // shell must have the same norm
     int diff=0;
     for(size_t i=1;i<Nbf;i++)
       if(fabs((*erip)[i*Nbf+i]-(*erip)[0])>sqrt(DBL_EPSILON)*(*erip)[0]) {
 	printf("%e != %e, diff %e\n",(*erip)[i*Nbf+i],(*erip)[0],(*erip)[i*Nbf+i]-(*erip)[0]);
+	fflush(stdout);
 	diff++;
       }
 
@@ -883,19 +879,18 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
 
 // Calculate overlaps between basis functions
 arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
-
-  // Number of functions on shells
+  // Number of functions on the shells
   size_t Ni=get_Nbf();
   size_t Nj=rhs.get_Nbf();
 
-  // Compute ERI
-  GaussianShell dummy=dummyshell();
-  int maxam=std::max(get_am(),rhs.get_am());
-  int maxcontr=std::max(get_Ncontr(),rhs.get_Ncontr());
-  ERIWorker eri(maxam,maxcontr);
-  const std::vector<double> * erip;
-  eri.compute(this,&dummy,&rhs,&dummy);
-  erip=eri.getp();
+  // Two-center Coulomb integrals over the shell pair
+  std::vector<GaussianShell> shpair;
+  shpair.push_back(*this);
+  shpair.push_back(rhs);
+  CintEnv cenv(shpair,false);
+  ERIWorker eri(cenv);
+  eri.compute_2c(0,1);
+  const std::vector<double> * erip=eri.getp();
 
   // Fill overlap matrix
   arma::mat S(Ni,Nj);
@@ -2381,8 +2376,61 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
   const std::vector<eripair_t> & shpairs = scr.shpairs;
   // and nuclei
   std::vector<nucleus_t> nuclei=get_nuclei();
-  if(verbose)
+  if(verbose) {
     printf("%i shell pairs and %i nuclei\n",(int) shpairs.size(), (int) nuclei.size());
+    fflush(stdout);
+  }
+
+  // Form the SAP shell of each nucleus. The potential is a sum of the
+  // atomic screened potentials, each a single contracted s function, so
+  // the SAP potential is a three-center integral (mu nu | sap).
+  std::vector<GaussianShell> sapshells;
+  std::vector<size_t> sapnuc;
+  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    if(nuclei[inuc].bsse)
+      continue;
+
+    // Get the SAP basis for the element
+    ElementBasisSet sapbas;
+    try {
+      // Check first if a special set is wanted for given center
+      sapbas=sapfit.get_element(nuclei[inuc].symbol,inuc+1);
+    } catch(std::runtime_error & err) {
+      // Did not find a special basis, use the general one instead.
+      sapbas=sapfit.get_element(nuclei[inuc].symbol,0);
+    }
+
+    // Get the shells on the element
+    std::vector<FunctionShell> bf=sapbas.get_shells();
+    if(bf.size() != 1 || bf[0].get_am() != 0)
+      throw std::logic_error("SAP basis should only have a single contracted S function per element!\n");
+    // Check sum rule
+    std::vector<contr_t> contr(bf[0].get_contr());
+    double Zsap=0.0;
+    for(size_t i=0;i<contr.size();i++)
+      Zsap-=contr[i].c;
+    if(std::abs(Zsap - nuclei[inuc].Z) >= 1e-3) {
+      std::ostringstream oss;
+      oss << "SAP basis on nucleus " << inuc+1 << " violates sum rule: " << Zsap << " instead of expected " << nuclei[inuc].Z << "!\n";
+      throw std::logic_error(oss.str());
+    }
+
+    // Form the SAP shell
+    GaussianShell sapsh(GaussianShell(bf[0].get_am(),false,bf[0].get_contr()));
+    // and set its center
+    sapsh.set_center(nuclei[inuc].r,inuc);
+    // Convert the contraction to unnormalized primitives
+    sapsh.convert_sap_contraction();
+
+    sapshells.push_back(sapsh);
+    sapnuc.push_back(inuc);
+  }
+
+  // libcint environment: the orbital shells, followed by the SAP shells
+  std::vector<GaussianShell> allshells(shells);
+  allshells.insert(allshells.end(),sapshells.begin(),sapshells.end());
+  CintEnv cenv(allshells);
+  const size_t Nsh=shells.size();
 
   // Construct repulsive potential
   arma::mat Jx(get_Nbf(),get_Nbf());
@@ -2391,15 +2439,11 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
 #pragma omp parallel
 #endif
   {
-    auto eri = std::make_unique<ERIWorker>(get_max_am(), std::max(get_max_Ncontr(), sapfit.get_max_Ncontr()));
+    ERIWorker eri(cenv);
     const std::vector<double> * erip;
 
-    // Dummy shell
-    GaussianShell dummy(dummyshell());
-
-    // Compute all repulsion integrals
 #ifdef _OPENMP
-#pragma omp for schedule(dynamic,1)
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++) {
       size_t is=shpairs[ip].is;
@@ -2411,46 +2455,11 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
         // Small integral
         continue;
 
-      // Loop over nuclei
-      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-        if(nuclei[inuc].bsse)
-          continue;
-
-        // Get the SAP basis for the element
-        ElementBasisSet sapbas;
-        try {
-          // Check first if a special set is wanted for given center
-          sapbas=sapfit.get_element(nuclei[inuc].symbol,inuc+1);
-        } catch(std::runtime_error & err) {
-          // Did not find a special basis, use the general one instead.
-          sapbas=sapfit.get_element(nuclei[inuc].symbol,0);
-        }
-
-        // Get the shells on the element
-        std::vector<FunctionShell> bf=sapbas.get_shells();
-        if(bf.size() != 1 || bf[0].get_am() != 0)
-          throw std::logic_error("SAP basis should only have a single contracted S function per element!\n");
-        // Check sum rule
-        std::vector<contr_t> contr(bf[0].get_contr());
-        double Zsap=0.0;
-        for(size_t i=0;i<contr.size();i++)
-          Zsap-=contr[i].c;
-        if(std::abs(Zsap - nuclei[inuc].Z) >= 1e-3) {
-          std::ostringstream oss;
-          oss << "SAP basis on nucleus " << inuc+1 << " violates sum rule: " << Zsap << " instead of expected " << nuclei[inuc].Z << "!\n";
-          throw std::logic_error(oss.str());
-        }
-
-        // Form the SAP shell
-        GaussianShell sapsh(GaussianShell(bf[0].get_am(),false,bf[0].get_contr()));
-        // and set its center
-        sapsh.set_center(nuclei[inuc].r,inuc);
-        // Convert the contraction to unnormalized primitives
-        sapsh.convert_sap_contraction();
-
+      // Loop over the SAP shells
+      for(size_t isap=0;isap<sapshells.size();isap++) {
         // Compute integrals
-        eri->compute(&shells[is],&shells[js],&sapsh,&dummy);
-        erip=eri->getp();
+        eri.compute_3c(is,js,Nsh+isap);
+        erip=eri.getp();
 
         // and store them
         size_t Ni(shells[is].get_Nbf());
@@ -2478,8 +2487,10 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
     }
   }
 
-  if(verbose)
+  if(verbose) {
     printf("SAP potential formed in %.3f s.\n",t.get());
+    fflush(stdout);
+  }
 
   return Jx;
 }
@@ -2491,11 +2502,14 @@ void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double 
   Q.zeros(shells.size(),shells.size());
   M.zeros(shells.size(),shells.size());
 
+  // libcint description of the basis
+  CintEnv cenv(*this);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    auto eri = make_eri_worker(get_max_am(), get_max_Ncontr(), omega, alpha, beta);
+    auto eri = make_eri_worker(cenv, omega, alpha, beta);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -2507,7 +2521,7 @@ void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double 
 
       // Compute (ij|ij) integrals
       {
-        eri->compute(&shells[i],&shells[j],&shells[i],&shells[j]);
+        eri->compute(i,j,i,j);
         erip=eri->getp();
         // Get maximum value
         double m=0.0;
@@ -2520,7 +2534,7 @@ void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double 
 
       // Compute (ii|jj) integrals
       {
-        eri->compute(&shells[i],&shells[i],&shells[j],&shells[j]);
+        eri->compute(i,i,j,j);
         erip=eri->getp();
         // Get maximum value
         double m=0.0;

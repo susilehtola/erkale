@@ -53,6 +53,8 @@ class ERIscreen {
 
   /// Pointer to the used basis set
   const BasisSet * basp;
+  /// libcint description of the basis, shared by the worker pools
+  CintEnv cenv;
   /// Index helper
   std::vector<size_t> iidx;
 

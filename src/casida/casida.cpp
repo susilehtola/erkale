@@ -26,6 +26,7 @@
 #include "../settings.h"
 #include "../xrs/fourierprod.h"
 #include "../linalg.h"
+#include "../cintenv.h"
 #include "../eriworker.h"
 #include "../stringutil.h"
 #include "../timer.h"
@@ -528,7 +529,9 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   std::vector<shellpair_t> auxpairs=dfitbas.get_unique_shellpairs();
 
   // Dummy shell, helper for computing ERIs
-  GaussianShell dummy=dummyshell();
+  // libcint environment: orbital shells followed by the auxiliary ones
+  CintEnv cenv(basis,dfitbas);
+  const size_t Nsh_orb=cenv.get_Nsh_orb();
 
   // First, compute the two-center integrals
   arma::mat ab(Naux,Naux);
@@ -538,7 +541,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 #pragma omp parallel
 #endif
   {
-    ERIWorker eri(dfitbas.get_max_am(),dfitbas.get_max_Ncontr());
+    ERIWorker eri(cenv);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -550,7 +553,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       size_t js=auxpairs[ip].js;
 
       // Compute (a|b)
-      eri.compute(&auxshells[is],&dummy,&auxshells[js],&dummy);
+      eri.compute_2c(Nsh_orb+is,Nsh_orb+js);
       erip=eri.getp();
 
       // Store integrals
@@ -578,7 +581,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 #pragma omp parallel
 #endif
   {
-    ERIWorker eri(basis.get_max_am(),basis.get_max_Ncontr());
+    ERIWorker eri(cenv);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -590,7 +593,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       size_t js=orbpairs[ip].js;
 
       // Compute (*Erip)
-      eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
+      eri.compute(is,js,is,js);
       erip=eri.getp();
 
       // Find out maximum absolute value. The previous version compared
@@ -615,7 +618,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 #pragma omp parallel
 #endif
   {
-    ERIWorker eri(std::max(basis.get_max_am(),dfitbas.get_max_am()),std::max(basis.get_max_Ncontr(),dfitbas.get_max_Ncontr()));
+    ERIWorker eri(cenv);
     const std::vector<double> * erip;
 
 
@@ -652,8 +655,9 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 	// Index of first function on shell
 	size_t a0=auxshells[ia].get_first_ind();
 
-	// Compute the integral over the AOs
-	eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	// Compute the integral over the AOs. The three-center integrals
+	// run the auxiliary index fastest.
+	eri.compute_3c(imu,inu,Nsh_orb+ia);
 	erip=eri.getp();
 
 	// Transform integrals to spin orbitals.
@@ -679,9 +683,9 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 		    inda=a0+af;
 
 #ifdef _OPENMP
-		    munu_wrk[ispin](mu*Norb+nu,inda)+=c*(*erip)[(af*Nmu+muf)*Nnu+nuf];
+		    munu_wrk[ispin](mu*Norb+nu,inda)+=c*(*erip)[(muf*Nnu+nuf)*Na+af];
 #else
-		    munu[ispin](mu*Norb+nu,inda)+=c*(*erip)[(af*Nmu+muf)*Nnu+nuf];
+		    munu[ispin](mu*Norb+nu,inda)+=c*(*erip)[(muf*Nnu+nuf)*Na+af];
 #endif
 		  }
 		}

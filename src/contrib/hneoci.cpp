@@ -537,14 +537,16 @@ int main_guarded(int argc, char **argv) {
   const std::vector<eripair_t> & epairs = e_scr.shpairs;
   const std::vector<eripair_t> & ppairs = p_scr.shpairs;
 
-  int max_am = std::max(basis.get_max_am(), pbasis.get_max_am());
-  int max_Ncontr = std::max(basis.get_max_Ncontr(), pbasis.get_max_Ncontr());
+  // libcint environment: the electronic shells, followed by the
+  // protonic ones
+  CintEnv cenv(basis, pbasis);
+  const size_t Nsh_e = cenv.get_Nsh_orb();
 
   // Form AO matrix of proton-electron integrals
   arma::mat V_ao(e_nbf*p_nbf,e_nbf*p_nbf,arma::fill::zeros);
 #pragma omp parallel
   {
-    ERIWorker eri(max_am, max_Ncontr);
+    ERIWorker eri(cenv);
 
 #pragma omp for collapse(2)
     for(size_t ep=0; ep<epairs.size(); ep++)
@@ -574,7 +576,7 @@ int main_guarded(int argc, char **argv) {
         size_t J_start = pshells[Js].get_first_ind();
 
         // Compute the integrals
-        eri.compute(&eshells[is],&eshells[js],&pshells[Is],&pshells[Js]);
+        eri.compute(is,js,Nsh_e+Is,Nsh_e+Js);
         const std::vector<double> & eris=eri.rget();
 
         // Store the integrals in the array

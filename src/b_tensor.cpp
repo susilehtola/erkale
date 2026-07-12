@@ -62,15 +62,13 @@ DirectDFBlocks::DirectDFBlocks(size_t Nbf, size_t Naux,
                                std::vector<std::pair<size_t, size_t>> sizes,
                                std::vector<GaussianShell> orb_shells,
                                std::vector<GaussianShell> aux_shells,
-                               GaussianShell dummy,
-                               double omega, double alpha, double beta,
-                               int max_am, int max_contr)
+                               const CintEnv & cenv,
+                               double omega, double alpha, double beta)
     : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       aux_shells_(std::move(aux_shells)),
-      dummy_(std::move(dummy)),
       omega_(omega), alpha_(alpha), beta_(beta),
-      max_am_(max_am), max_contr_(max_contr) {
+      cenv_(&cenv) {
   // Worst-case Nmu*Nnu across shellpairs; per-thread scratch is sized
   // to this at construction so get_block(ip) never reallocs.
   max_NmuNnu_ = 0;
@@ -101,7 +99,7 @@ ERIWorker * DirectDFBlocks::thread_eri() const {
   // outer parallel region; lazily fill it the first time we hit a
   // get_block on this thread.
   if(!eri_cache_[tid])
-    eri_cache_[tid] = make_eri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
+    eri_cache_[tid] = make_eri_worker(*cenv_, omega_, alpha_, beta_);
   return eri_cache_[tid].get();
 }
 
@@ -112,18 +110,16 @@ DirectDFPerturbedBlocks::DirectDFPerturbedBlocks(
     std::vector<std::pair<size_t, size_t>> sizes,
     std::vector<GaussianShell> orb_shells,
     std::vector<GaussianShell> aux_shells,
-    GaussianShell dummy,
-    double omega, double alpha, double beta,
-    int max_am, int max_contr)
+    const CintEnv & cenv,
+    double omega, double alpha, double beta)
     : Nbf_(Nbf), Naux_(Naux), Nnuc_(Nnuc),
       shellpairs_(std::move(shellpairs)),
       firsts_(std::move(firsts)),
       sizes_(std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       aux_shells_(std::move(aux_shells)),
-      dummy_(std::move(dummy)),
       omega_(omega), alpha_(alpha), beta_(beta),
-      max_am_(max_am), max_contr_(max_contr) {
+      cenv_(&cenv) {
   if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
     throw std::logic_error("DirectDFPerturbedBlocks: descriptor vectors disagree");
 
@@ -155,7 +151,7 @@ dERIWorker * DirectDFPerturbedBlocks::thread_deri() const {
   const int tid = 0;
 #endif
   if(!deri_cache_[tid])
-    deri_cache_[tid] = make_deri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
+    deri_cache_[tid] = make_deri_worker(*cenv_, omega_, alpha_, beta_);
   return deri_cache_[tid].get();
 }
 
@@ -179,16 +175,15 @@ void DirectDFPerturbedBlocks::for_each_pert(
 #endif
   arma::mat & buf = scratch_[tid];
 
-  // Iterate aux shells. For each aux shell, dERIWorker yields
-  // derivatives w.r.t. all four centers (aux, dummy, mu, nu); we
-  // skip the dummy's three components since they're identically
-  // zero, leaving 9 non-trivial perturbation slots per aux shell
-  // (anuc * xyz, inuc * xyz, jnuc * xyz). For each, hand the
-  // consumer a view of the (Na_aux x Nmu*Nnu) sub-block.
-  static const int comp_index[]  = {0, 1, 2, 6, 7, 8, 9, 10, 11};
-  static const int comp_atom[]   = {0, 0, 0, 2, 2, 2, 3, 3, 3}; // 0=anuc, 2=inuc, 3=jnuc
+  // Iterate aux shells. For each, the three-center derivative yields
+  // nine components: the cartesian derivatives with respect to the
+  // centers of mu, of nu and of the auxiliary shell, in that order.
+  // Hand the consumer a view of the (Na_aux x Nmu*Nnu) sub-block of
+  // each.
+  static const int comp_atom[]   = {2, 2, 2, 3, 3, 3, 0, 0, 0}; // 0=anuc, 2=inuc, 3=jnuc
   static const int comp_xyz[]    = {0, 1, 2, 0, 1, 2, 0, 1, 2};
 
+  const size_t Nsh_orb = cenv_->get_Nsh_orb();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
     const size_t Na = aux_shells_[ia].get_Nbf();
     const size_t a0 = aux_shells_[ia].get_first_ind();
@@ -200,10 +195,10 @@ void DirectDFPerturbedBlocks::for_each_pert(
     if(inuc==jnuc && jnuc==anuc)
       continue;
 
-    deri->compute(&aux_shells_[ia], &dummy_, &orb_shells_[imus], &orb_shells_[inus]);
+    deri->compute_3c(imus, inus, Nsh_orb+ia);
 
-    for(size_t k=0; k<sizeof(comp_index)/sizeof(comp_index[0]); k++) {
-      const int ic = comp_index[k];
+    for(size_t k=0; k<sizeof(comp_atom)/sizeof(comp_atom[0]); k++) {
+      const int ic = (int) k;
       // Map slot k to (atom, xyz).
       const size_t atom_slot = comp_atom[k];
       size_t atom_idx;
@@ -218,14 +213,15 @@ void DirectDFPerturbedBlocks::for_each_pert(
       // thread scratch, column-major with row-stride = Na (not
       // max_Na_!) so the arma::mat aux_mem view below sees a
       // contiguous Na-row matrix. dERIWorker indexing for one
-      // component: (a * Nmu + imu) * Nnu + inu.
+      // component the integrals run the auxiliary index fastest:
+      // (imu * Nnu + inu) * Na + a.
       double * buf_ptr = buf.memptr();
-      for(size_t a=0; a<Na; a++)
-        for(size_t imu=0; imu<Nmu; imu++)
-          for(size_t inu=0; inu<Nnu; inu++) {
-            const size_t j = inu*Nmu + imu;
-            buf_ptr[j * Na + a] = (*erip)[(a*Nmu+imu)*Nnu+inu];
-          }
+      for(size_t imu=0; imu<Nmu; imu++)
+        for(size_t inu=0; inu<Nnu; inu++) {
+          const size_t j = inu*Nmu + imu;
+          for(size_t a=0; a<Na; a++)
+            buf_ptr[j * Na + a] = (*erip)[(imu*Nnu+inu)*Na + a];
+        }
 
       arma::mat sub(buf_ptr, Na, Nmu*Nnu, /*copy_aux_mem*/false, /*strict*/true);
       Perturbation pert = Perturbation::nuclear((int) atom_idx, xyz);
@@ -243,12 +239,12 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
                                arma::umat pivot_index,
                                arma::uword pivot_sentinel,
                                arma::mat pivot_X,
-                               double omega, double alpha, double beta,
-                               int max_am, int max_contr)
+                               const CintEnv & cenv,
+                               double omega, double alpha, double beta)
     : DirectCDBlocks(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes),
                      orb_shells, orb_shells, std::move(pivot_shellpairs),
                      std::move(pivot_index), pivot_sentinel, std::move(pivot_X),
-                     omega, alpha, beta, max_am, max_contr) {}
+                     cenv, omega, alpha, beta) {}
 
 DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
                                std::vector<std::pair<size_t, size_t>> shellpairs,
@@ -260,8 +256,8 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
                                arma::umat pivot_index,
                                arma::uword pivot_sentinel,
                                arma::mat pivot_X,
-                               double omega, double alpha, double beta,
-                               int max_am, int max_contr)
+                               const CintEnv & cenv,
+                               double omega, double alpha, double beta)
     : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       piv_shells_(std::move(piv_shells)),
@@ -270,7 +266,11 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
       pivot_sentinel_(pivot_sentinel),
       pivot_X_(std::move(pivot_X)),
       omega_(omega), alpha_(alpha), beta_(beta),
-      max_am_(max_am), max_contr_(max_contr) {
+      cenv_(&cenv) {
+  // The pivot shells follow the orbital shells in the environment when
+  // they are not the same shells (a shared pivot basis)
+  piv_offset_ = (cenv_->get_Nsh_orb() == cenv_->get_Nsh()) ? 0 : cenv_->get_Nsh_orb();
+
   if(pivot_X_.n_cols != Naux_)
     throw std::logic_error("DirectCDBlocks: pivot_X cleaned-subspace dim does not match Naux");
   Nselected_ = pivot_X_.n_rows;
@@ -300,7 +300,7 @@ ERIWorker * DirectCDBlocks::thread_eri() const {
   const int tid = 0;
 #endif
   if(!eri_cache_[tid])
-    eri_cache_[tid] = make_eri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
+    eri_cache_[tid] = make_eri_worker(*cenv_, omega_, alpha_, beta_);
   return eri_cache_[tid].get();
 }
 
@@ -332,7 +332,7 @@ arma::mat DirectCDBlocks::get_block(size_t ip) const {
     const size_t k0 = piv_shells_[ks].get_first_ind();
     const size_t l0 = piv_shells_[ls].get_first_ind();
 
-    eri->compute(&orb_shells_[imus], &orb_shells_[inus], &piv_shells_[ks], &piv_shells_[ls]);
+    eri->compute(imus, inus, piv_offset_+ks, piv_offset_+ls);
     const std::vector<double> * erip = eri->getp();
 
     for(size_t ii=0; ii<Nmu; ii++)
@@ -381,21 +381,24 @@ arma::mat DirectDFBlocks::get_block(size_t ip) const {
   // at construction.
   std::memset(buf.memptr(), 0, sizeof(double) * Naux_ * Nmu * Nnu);
 
-  // Iterate over auxiliary shells: one integral call per (aux_shell)
-  // gives Na * Nnu * Nmu entries straight into our slice in
-  // (a, nu, mu) ordering. Matches the cached compute_a_munu layout
-  // exactly so the J/K kernels see identical block contents either
-  // way.
+  // Iterate over auxiliary shells: one three-center integral call per
+  // aux shell gives Nmu * Nnu * Na entries with the auxiliary index
+  // fastest, which is exactly the column-major layout of the block, so
+  // they go straight into our slice. Matches the cached
+  // compute_a_munu layout so the J/K kernels see identical blocks
+  // either way.
+  const size_t Nsh_orb = cenv_->get_Nsh_orb();
   double * buf_ptr = buf.memptr();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
     const size_t Na = aux_shells_[ia].get_Nbf();
     const size_t a0 = aux_shells_[ia].get_first_ind();
-    eri->compute(&aux_shells_[ia], &dummy_, &orb_shells_[inus], &orb_shells_[imus]);
+    eri->compute_3c(imus, inus, Nsh_orb+ia);
     const std::vector<double> * erip = eri->getp();
-    for(size_t a=0; a<Na; a++)
-      for(size_t imunu=0; imunu<Nmu*Nnu; imunu++)
-        // Column-major layout: buf(a0+a, imunu) = buf_ptr[imunu*Naux_ + a0+a]
-        buf_ptr[imunu * Naux_ + a0 + a] = (*erip)[a*Nnu*Nmu + imunu];
+    for(size_t imu=0; imu<Nmu; imu++)
+      for(size_t inu=0; inu<Nnu; inu++)
+        for(size_t a=0; a<Na; a++)
+          // Column-major layout: buf(a0+a, inu*Nmu+imu)
+          buf_ptr[(inu*Nmu+imu) * Naux_ + a0 + a] = (*erip)[(imu*Nnu+inu)*Na + a];
   }
   // Return a non-owning view of the populated slice. Lifetime
   // contract: valid until the next get_block call on this thread.

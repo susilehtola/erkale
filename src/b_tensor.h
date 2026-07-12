@@ -19,6 +19,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include "cintenv.h"
 #include "eriworker.h"
 
 #include <functional>
@@ -180,7 +181,8 @@ class DirectCDBlocks : public BTensorBlocksBase {
   /// Shells the pivot products are built from, owned copy. Normally the
   /// same as orb_shells_; for a multicomponent (NEO) shared pivot basis
   /// they belong to whichever species contributed the pivot, which need
-  /// not be the species carrying the bra.
+  /// not be the species carrying the bra. In the environment they then
+  /// follow the orbital shells, so their index is piv_offset_ + is.
   std::vector<GaussianShell> piv_shells_;
   /// Pivot shellpairs to iterate over inside get_block, indexing piv_shells_.
   std::vector<std::pair<size_t, size_t>> pivot_shellpairs_;
@@ -195,8 +197,10 @@ class DirectCDBlocks : public BTensorBlocksBase {
   arma::mat pivot_X_;
 
   double omega_, alpha_, beta_;
-  int max_am_;
-  int max_contr_;
+  /// libcint description of the shells (not owned; lives in DensityFit)
+  const CintEnv * cenv_;
+  /// Index of the first pivot shell in the environment
+  size_t piv_offset_;
 
   mutable std::vector<std::unique_ptr<ERIWorker>> eri_cache_;
   /// Per-thread scratch sized (Nselected x max_NmuNnu_) for the raw
@@ -219,8 +223,8 @@ class DirectCDBlocks : public BTensorBlocksBase {
                  arma::umat pivot_index,
                  arma::uword pivot_sentinel,
                  arma::mat pivot_X,
-                 double omega, double alpha, double beta,
-                 int max_am, int max_contr);
+                 const CintEnv & cenv,
+                 double omega, double alpha, double beta);
 
   /// Foreign pivot basis: the (mu nu) bra comes from orb_shells, the pivot
   /// products from piv_shells, and pivot_index is indexed over the pivot
@@ -237,8 +241,8 @@ class DirectCDBlocks : public BTensorBlocksBase {
                  arma::umat pivot_index,
                  arma::uword pivot_sentinel,
                  arma::mat pivot_X,
-                 double omega, double alpha, double beta,
-                 int max_am, int max_contr);
+                 const CintEnv & cenv,
+                 double omega, double alpha, double beta);
   ~DirectCDBlocks() override = default;
 
   arma::mat get_block(size_t ip) const override;
@@ -251,12 +255,11 @@ class DirectDFBlocks : public BTensorBlocksBase {
   /// Orbital and auxiliary shells, owned copies (cheap).
   std::vector<GaussianShell> orb_shells_;
   std::vector<GaussianShell> aux_shells_;
-  GaussianShell dummy_;
+
   /// Range separation
   double omega_, alpha_, beta_;
   /// integral worker dimensions
-  int max_am_;
-  int max_contr_;
+  const CintEnv * cenv_;
 
   /// Per-thread ERIWorker cache (lazy). Mutable because get_block
   /// is logically const but materialises a thread-local worker on
@@ -278,9 +281,8 @@ public:
                  std::vector<std::pair<size_t, size_t>> sizes,
                  std::vector<GaussianShell> orb_shells,
                  std::vector<GaussianShell> aux_shells,
-                 GaussianShell dummy,
-                 double omega, double alpha, double beta,
-                 int max_am, int max_contr);
+                 const CintEnv & cenv,
+                 double omega, double alpha, double beta);
   ~DirectDFBlocks() override = default;
 
   arma::mat get_block(size_t ip) const override;
@@ -393,10 +395,10 @@ class DirectDFPerturbedBlocks : public PerturbedBTensorBlocks {
 
   std::vector<GaussianShell> orb_shells_;
   std::vector<GaussianShell> aux_shells_;
-  GaussianShell dummy_;
+
   double omega_, alpha_, beta_;
-  int max_am_;
-  int max_contr_;
+  /// libcint description of the shells (not owned; lives in DensityFit)
+  const CintEnv * cenv_;
 
   /// Per-thread dERIWorker cache (lazy).
   mutable std::vector<std::unique_ptr<dERIWorker>> deri_cache_;
@@ -413,9 +415,8 @@ class DirectDFPerturbedBlocks : public PerturbedBTensorBlocks {
                           std::vector<std::pair<size_t, size_t>> sizes,
                           std::vector<GaussianShell> orb_shells,
                           std::vector<GaussianShell> aux_shells,
-                          GaussianShell dummy,
-                          double omega, double alpha, double beta,
-                          int max_am, int max_contr);
+                          const CintEnv & cenv,
+                          double omega, double alpha, double beta);
   ~DirectDFPerturbedBlocks() override = default;
 
   size_t n_blocks() const override { return shellpairs_.size(); }
