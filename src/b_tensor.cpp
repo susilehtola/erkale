@@ -381,7 +381,7 @@ arma::mat DirectDFBlocks::get_block(size_t ip) const {
   // at construction.
   std::memset(buf.memptr(), 0, sizeof(double) * Naux_ * Nmu * Nnu);
 
-  // Iterate over auxiliary shells: one libint call per (aux_shell)
+  // Iterate over auxiliary shells: one integral call per (aux_shell)
   // gives Na * Nnu * Nmu entries straight into our slice in
   // (a, nu, mu) ordering. Matches the cached compute_a_munu layout
   // exactly so the J/K kernels see identical block contents either

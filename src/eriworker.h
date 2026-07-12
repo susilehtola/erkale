@@ -25,12 +25,6 @@
 // Needed to define contr_t
 #include "basis.h"
 
-// The workers no longer use libint or libderiv, but the executables
-// still call init_libint_base() / init_libderiv_base(); the includes
-// go away together with those calls when libint is dropped for good.
-#include <libint/libint.h>
-#include <libderiv/libderiv.h>
-
 /// Selector for the libcint two-electron integral kernels
 typedef enum {
   CINT_ERI,      ///< int2e: plain electron repulsion integrals

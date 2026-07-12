@@ -710,7 +710,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   ab_invh.reset();
 
   // Both modes build the same L blocks: DirectCDBlocks recomputes
-  // (piv | mu nu) from libint per block and bakes cd_X so the J/K
+  // (piv | mu nu) on the fly per block and bakes cd_X so the J/K
   // kernels see L = X^T (piv|mu nu) with identity metric. In direct mode
   // the builder *is* the block store (recomputed on each get_block); in
   // cached mode we materialise it once into a CachedBlocks and keep the
@@ -1786,7 +1786,7 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
   for(size_t iden=0;iden<P.size();iden++)
     J[iden].zeros(Nbf,Nbf);
 
-  // One libint sweep over orbital shellpairs covers all densities;
+  // One integral sweep over orbital shellpairs covers all densities;
   // blocks->get_block(ip) is uniform across cached/direct backends.
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -1949,7 +1949,7 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
 void DensityFit::B_matrix(arma::mat & B) const {
   // three_center_integrals + the metric multiply work in either
   // cached or direct mode; the latter recomputes the shellpair
-  // blocks on demand via libint inside the iteration. In DF mode
+  // blocks on demand inside the iteration. In DF mode
   // ab_invh is the metric half-inverse; in CD mode the blocks are
   // already L = X^T (piv|mu nu) (metric baked in, ab_invh empty), so the
   // three-center integrals are the final B with no extra multiply.

@@ -102,7 +102,7 @@ typedef struct {
   int lj;
 } shellpair_t;
 
-/// Comparison operator for shellpairs for ordering into libint order
+/// Comparison operator for shellpairs: descending angular momentum
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 
 /// Helper for integral sorts
@@ -150,7 +150,7 @@ struct ScreeningData {
 /// so for plain Coulomb / full-range exchange we have
 /// omega=0, alpha=1, beta=0 (default); pure short-range exchange is
 /// omega=omega, alpha=0, beta=1; etc. ERIscreen, ERIchol, DensityFit,
-/// ERItable and the libint workers all store and forward this triple.
+/// ERItable and the integral workers all store and forward this triple.
 /// Bundle it so signatures stop carrying three loose doubles.
 struct RangeSeparation {
   double omega = 0.0;

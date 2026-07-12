@@ -45,9 +45,6 @@ extern "C" {
 #undef atm
 #undef bas
 
-// Debug LIBINT routines against Huzinaga integrals?
-//#define LIBINTDEBUG
-
 /// Generic libcint one-electron integral block for a shell pair:
 /// returns the ncomp cartesian component matrices of plain integrals
 /// over the bare primitives, scaled by the relative normalization
@@ -1337,7 +1334,7 @@ arma::mat BasisSet::nuclear_distances() const {
 }
 
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs) {
-  // Helper for ordering shellpairs into libint order
+  // Helper for ordering shellpairs by angular momentum
   return (lhs.li+lhs.lj)<(rhs.li+rhs.lj);
 }
 
@@ -1355,7 +1352,7 @@ void BasisSet::form_unique_shellpairs() {
       tmp.is=i;
       tmp.js=j;
 
-      // Check that libint's angular momentum rules are satisfied
+      // Order the pair with the higher angular momentum first
       if(shells[j].get_am()>shells[i].get_am())
 	std::swap(tmp.is,tmp.js);
 

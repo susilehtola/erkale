@@ -103,7 +103,6 @@ int main_guarded(int argc, char **argv) {
     double thr(atof(argv[3]));
     std::string outfile(argv[4]);
 
-    init_libint_base();
 
     settings.add_bool("UseLM","",true);
     settings.add_bool("OptLM","",false);
@@ -130,7 +129,6 @@ int main_guarded(int argc, char **argv) {
     double thr(atof(argv[3]));
     std::string outfile(argv[4]);
 
-    init_libint_base();
 
     settings.add_bool("UseLM","",true);
     settings.add_bool("OptLM","",false);
@@ -158,7 +156,6 @@ int main_guarded(int argc, char **argv) {
     double thr(atof(argv[3]));
     std::string outfile(argv[4]);
 
-    init_libint_base();
 
     settings.add_bool("UseLM","",true);
     settings.add_bool("OptLM","",false);
@@ -186,7 +183,6 @@ int main_guarded(int argc, char **argv) {
     double thr(atof(argv[3]));
     std::string outfile(argv[4]);
 
-    init_libint_base();
 
     settings.add_bool("UseLM","",true);
     settings.add_bool("OptLM","",false);
@@ -357,7 +353,6 @@ int main_guarded(int argc, char **argv) {
     settings.add_bool("UseLM","",true);
     settings.add_bool("OptLM","",false);
 
-    init_libint_base();
 
     // Basis set library to write out
     BasisSetLibrary contracted;
@@ -795,7 +790,6 @@ int main_guarded(int argc, char **argv) {
     settings.add_bool("UseLM","",true);
     settings.add_bool("OptLM","",true);
 
-    init_libint_base();
 
     // Construct basis sets
     BasisSet orbbasis, auxbasis;

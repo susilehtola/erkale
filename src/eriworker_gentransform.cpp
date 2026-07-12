@@ -68,7 +68,7 @@ int main(void) {
     const char ijkl[]="ijkl";
 
     // Individual transforms
-    for(int am=0;am<LIBINT_MAX_AM;am++) {
+    for(int am=0;am<=max_am;am++) {
       // Get transformation matrix
       arma::mat transmat=Ylm_transmat(am);
       size_t Nsph=transmat.n_rows;
@@ -129,10 +129,10 @@ int main(void) {
     /// Main driver
     printf("void IntegralWorker::transform_%c(int am, size_t %s, size_t %s, size_t %s) {\n",ijkl[it],arg1.c_str(),arg2.c_str(),arg3.c_str());
     // Table of drivers
-    printf("  static void (*f[%i])(size_t, size_t, size_t, const std::vector<double> *, std::vector<double> *)={\n",LIBINT_MAX_AM);
-    for(int am=0;am<LIBINT_MAX_AM;am++) {
+    printf("  static void (*f[%i])(size_t, size_t, size_t, const std::vector<double> *, std::vector<double> *)={\n",max_am+1);
+    for(int am=0;am<=max_am;am++) {
       printf("    transform_%c%i",ijkl[it],am);
-      if(am<LIBINT_MAX_AM-1)
+      if(am<max_am)
 	printf(",");
       printf("\n");
     }

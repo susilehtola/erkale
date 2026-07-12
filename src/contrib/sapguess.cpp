@@ -31,7 +31,6 @@
 #include "stringutil.h"
 #include "timer.h"
 
-// Needed for libint init
 #include "eriworker.h"
 
 #include <armadillo>
@@ -112,8 +111,6 @@ int main_guarded(int argc, char **argv) {
     return 0;
   }
 
-  // Initialize libint
-  init_libint_base();
 
   settings.add_string("Decontract","","");
   settings.add_bool("BasisRotate","",false);

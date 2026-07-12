@@ -63,7 +63,7 @@ public:
   /// In cached mode this returns a non-owning aux_mem view backed by
   /// the underlying flat storage; the view is valid only while *this
   /// is alive and unmodified. In direct mode this constructs a fresh
-  /// owning matrix from libint+metric on each call. Either way the
+  /// owning matrix from the ERIs and the metric on each call. Either way the
   /// caller binds the result to a local arma::mat and uses it within
   /// the call site.
   virtual arma::mat get_block(size_t ip) const = 0;
@@ -150,7 +150,7 @@ public:
 /**
  * Direct-mode block source for density fitting: each get_block(ip)
  * call computes the (alpha | mu nu) three-center integrals for the
- * ip-th orbital shellpair on demand via libint, returning an owning
+ * ip-th orbital shellpair on demand, returning an owning
  * (Naux x Nmu*Nnu) matrix. No precomputed (alpha | mu nu) storage --
  * the whole point of direct mode.
  *
@@ -254,7 +254,7 @@ class DirectDFBlocks : public BTensorBlocksBase {
   GaussianShell dummy_;
   /// Range separation
   double omega_, alpha_, beta_;
-  /// libint worker dimensions
+  /// integral worker dimensions
   int max_am_;
   int max_contr_;
 
