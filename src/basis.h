@@ -736,31 +736,17 @@ public:
                       bool do_grad, bool do_lapl,
                       bool do_hess, bool do_lgrad) const;
 
-  /// Calculate block overlap matrix between shells
-  arma::mat overlap(const GaussianShell & rhs) const;
+  /// Norms of the functions of the shell in ERKALE's normalization,
+  /// evaluated in closed form: the functions sit on a single center, so
+  /// the self-overlap factorizes over the cartesian directions
+  arma::vec function_norms() const;
   /// Calculate block Coulomb overlap matrix between shells
   arma::mat coulomb_overlap(const GaussianShell & rhs) const;
-  /// Calculate kinetic energy matrix between shells
-  arma::mat kinetic(const GaussianShell & rhs) const;
-  /// Calculate <mu|nabla|nu> between shells, derivative on the ket
-  std::vector<arma::mat> gradient_integral(const GaussianShell & rhs) const;
-  /// Calculate nuclear repulsion matrix between shells
-  arma::mat nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const;
 
-  /// Calculate nuclear Pulay forces
-  arma::vec nuclear_pulay(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const;
-  /// Calculate nuclear Hellman-Feynman force
-  arma::vec nuclear_der(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const;
-  /// Calculate kinetic Pulay forces
-  arma::vec kinetic_pulay(const arma::mat & P, const GaussianShell & rhs) const;
-  /// Calculate overlap derivative
-  arma::vec overlap_der(const arma::mat & W, const GaussianShell & rhs) const;
 
   /// Calculate integral over function (used in xc-fitting)
   arma::vec integral() const;
 
-  /// Calculate moment integrals around (x,y,z) between shells
-  std::vector<arma::mat> moment(int mom, double x, double y, double z, const GaussianShell & rhs) const;
 };
 
 /// Get dummy shell

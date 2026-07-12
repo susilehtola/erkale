@@ -45,6 +45,28 @@ typedef enum {
   CINT_NKERNEL
 } cint_kernel_t;
 
+/// The libcint one-electron kernels ERKALE uses. The operator
+/// derivatives ip and their ket-side counterparts differentiate the
+/// first resp. the second shell of the pair.
+typedef enum {
+  CINT1E_OVLP,    ///< <i|j>
+  CINT1E_KIN,     ///< <i|-1/2 nabla^2|j>
+  CINT1E_RINV,    ///< <i|1/|r-C||j>
+  CINT1E_OVLPIP,  ///< <i|nabla j>
+  CINT1E_IPOVLP,  ///< <nabla i|j>
+  CINT1E_IPKIN,   ///< bra derivative of the kinetic energy
+  CINT1E_KINIP,   ///< ket derivative of the kinetic energy
+  CINT1E_IPRINV,  ///< bra derivative of 1/|r-C|
+  CINT1E_R,       ///< first moments around the common origin
+  CINT1E_RR,      ///< second moments
+  CINT1E_RRR,     ///< third moments
+  CINT1E_RRRR,    ///< fourth moments
+  CINT1E_NKERNEL
+} cint_1e_kernel_t;
+
+/// Number of operator components of a one-electron kernel
+int cint_1e_ncomp(cint_1e_kernel_t kernel);
+
 /**
  * \class CintEnv
  *

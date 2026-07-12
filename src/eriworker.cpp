@@ -65,6 +65,39 @@ namespace {
     }
   }
 
+  /// The libcint kernel for the given one-electron operator and basis
+  CINTIntegralFunction * kernel_1e_function(cint_1e_kernel_t kernel, bool lm) {
+    switch(kernel) {
+    case CINT1E_OVLP:
+      return lm ? int1e_ovlp_sph : int1e_ovlp_cart;
+    case CINT1E_KIN:
+      return lm ? int1e_kin_sph : int1e_kin_cart;
+    case CINT1E_RINV:
+      return lm ? int1e_rinv_sph : int1e_rinv_cart;
+    case CINT1E_OVLPIP:
+      return lm ? int1e_ovlpip_sph : int1e_ovlpip_cart;
+    case CINT1E_IPOVLP:
+      return lm ? int1e_ipovlp_sph : int1e_ipovlp_cart;
+    case CINT1E_IPKIN:
+      return lm ? int1e_ipkin_sph : int1e_ipkin_cart;
+    case CINT1E_KINIP:
+      return lm ? int1e_kinip_sph : int1e_kinip_cart;
+    case CINT1E_IPRINV:
+      return lm ? int1e_iprinv_sph : int1e_iprinv_cart;
+    case CINT1E_R:
+      return lm ? int1e_r_sph : int1e_r_cart;
+    case CINT1E_RR:
+      return lm ? int1e_rr_sph : int1e_rr_cart;
+    case CINT1E_RRR:
+      return lm ? int1e_rrr_sph : int1e_rrr_cart;
+    case CINT1E_RRRR:
+      return lm ? int1e_rrrr_sph : int1e_rrrr_cart;
+    default:
+      ERROR_INFO();
+      throw std::logic_error("Unknown one-electron kernel!\n");
+    }
+  }
+
   /// The libcint kernel for the given operator and basis
   CINTIntegralFunction * kernel_function(cint_kernel_t kernel, bool lm) {
     switch(kernel) {
@@ -469,4 +502,66 @@ dERIWorker_srlr::dERIWorker_srlr(const CintEnv & cenv, double omega, double alph
 }
 
 dERIWorker_srlr::~dERIWorker_srlr() {
+}
+
+Int1eWorker::Int1eWorker(const CintEnv & cenv) : IntegralWorker(cenv) {
+}
+
+Int1eWorker::~Int1eWorker() {
+}
+
+void Int1eWorker::compute(cint_1e_kernel_t kernel, size_t is, size_t js,
+                          const double * rinv_orig, const double * common_orig) {
+  CINTIntegralFunction * intor=kernel_1e_function(kernel, envp->lm_in_use());
+  const int ncomp=cint_1e_ncomp(kernel);
+
+  // The operator origins live in the data array, of which the worker
+  // holds a private copy
+  if(rinv_orig)
+    for(int i=0;i<3;i++)
+      env[PTR_RINV_ORIG+i]=rinv_orig[i];
+  if(common_orig)
+    for(int i=0;i<3;i++)
+      env[PTR_COMMON_ORIG+i]=common_orig[i];
+
+  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js);
+  const size_t N=Ni*Nj;
+
+  // The one-electron integrals are cheap, so they are evaluated without
+  // an optimizer
+  int shls[2]={(int) is, (int) js};
+  tmp.resize(ncomp*N);
+  const size_t csize=intor(NULL,NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_bas(),envp->get_nbas(),env.data(),NULL,NULL);
+  if(csize>cache.size())
+    cache.resize(csize);
+  if(!intor(tmp.data(),NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_bas(),envp->get_nbas(),env.data(),NULL,cache.data()))
+    std::fill(tmp.begin(),tmp.end(),0.0);
+
+  // libcint runs the first shell fastest; ERKALE runs the last index
+  // fastest
+  ints.resize(ncomp*N);
+  for(int ic=0;ic<ncomp;ic++) {
+    const double * ip=tmp.data()+ic*N;
+    double * op=ints.data()+ic*N;
+    for(size_t i=0;i<Ni;i++)
+      for(size_t j=0;j<Nj;j++)
+        op[i*Nj+j]=ip[i+Ni*j];
+  }
+
+  const size_t erk[2]={is, js};
+  normalize(erk,2,ncomp,ints);
+}
+
+const std::vector<double> * Int1eWorker::getp() const {
+  return &ints;
+}
+
+arma::mat Int1eWorker::get_mat(int ic, size_t is, size_t js) const {
+  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js);
+  arma::mat M(Ni,Nj);
+  const double * ip=ints.data()+ic*Ni*Nj;
+  for(size_t i=0;i<Ni;i++)
+    for(size_t j=0;j<Nj;j++)
+      M(i,j)=ip[i*Nj+j];
+  return M;
 }

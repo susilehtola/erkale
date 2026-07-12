@@ -38,6 +38,33 @@ extern CINTOptimizerFunction int2c2e_optimizer;
 #undef atm
 #undef bas
 
+
+
+int cint_1e_ncomp(cint_1e_kernel_t kernel) {
+  switch(kernel) {
+  case CINT1E_OVLP:
+  case CINT1E_KIN:
+  case CINT1E_RINV:
+    return 1;
+  case CINT1E_OVLPIP:
+  case CINT1E_IPOVLP:
+  case CINT1E_IPKIN:
+  case CINT1E_KINIP:
+  case CINT1E_IPRINV:
+  case CINT1E_R:
+    return 3;
+  case CINT1E_RR:
+    return 9;
+  case CINT1E_RRR:
+    return 27;
+  case CINT1E_RRRR:
+    return 81;
+  default:
+    ERROR_INFO();
+    throw std::logic_error("Unknown one-electron kernel!\n");
+  }
+}
+
 CintEnv::CintEnv() : Nsh_orb(0), max_Nbf(0), lm(true) {
 }
 
@@ -156,12 +183,13 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     max_Nbf=std::max(max_Nbf,shell_Nbf[is]);
   }
 
-  // Measure the normalization of the basis functions against ERKALE's
-  // own overlap integrals: the two bases differ by a diagonal scaling,
-  // since they are the same functions with different normalization
-  // conventions. This is also what carries the Coulomb normalization of
+  // Measure the normalization of the basis functions against ERKALE's:
+  // the two conventions describe the same functions and so differ by a
+  // diagonal scaling. This is what carries the Coulomb normalization of
   // an auxiliary basis, which rescales the functions after the shells
-  // were constructed.
+  // were built. ERKALE's norms are evaluated in closed form here rather
+  // than with the overlap integrals of BasisSet, which are themselves
+  // evaluated through an environment.
   CINTIntegralFunction * ovlp = lm ? int1e_ovlp_sph : int1e_ovlp_cart;
   unit_norm=true;
   std::vector<double> buf;
@@ -174,15 +202,15 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     if(!ovlp(buf.data(),NULL,shls,cint_atm.data(),(int) centers.size(),cint_bas.data(),(int) shells.size(),cint_env.data(),NULL,NULL))
       throw std::runtime_error("CintEnv: failed to evaluate the self-overlap of a shell.\n");
 
-    const arma::mat S=shells[is].overlap(shells[is]);
-    if(S.n_rows != Nbf)
+    const arma::vec Serk=shells[is].function_norms();
+    if(Serk.n_elem != Nbf)
       throw std::logic_error("CintEnv: the shell has an unexpected number of functions.\n");
 
     for(size_t i=0;i<Nbf;i++) {
       const double scint=buf[i*Nbf+i];
       if(scint<=0.0)
         throw std::runtime_error("CintEnv: a basis function has a non-positive norm.\n");
-      fnorm[is][i]=sqrt(S(i,i)/scint);
+      fnorm[is][i]=sqrt(Serk(i)/scint);
       if(std::abs(fnorm[is][i]-1.0)>1e-12)
         unit_norm=false;
     }
