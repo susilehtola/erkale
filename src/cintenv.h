@@ -150,6 +150,10 @@ class CintEnv {
   CintEnv(const BasisSet & basis, const BasisSet & aux, bool build_opts=true);
   /// Construct for an explicit list of shells
   explicit CintEnv(const std::vector<GaussianShell> & shells, bool build_opts=true);
+  /// Construct for an explicit list of shells, of which the first
+  /// Nsh_orbital are the orbital shells and the rest auxiliary: the
+  /// auxiliary shells are then addressed as get_Nsh_orb() + i
+  CintEnv(const std::vector<GaussianShell> & shells, size_t Nsh_orbital, bool build_opts=true);
 
   /// Is the environment initialized?
   bool is_filled() const;

@@ -85,6 +85,10 @@ CintEnv::CintEnv(const std::vector<GaussianShell> & sh, bool build_opts) {
   build(sh, sh.size(), build_opts);
 }
 
+CintEnv::CintEnv(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, bool build_opts) {
+  build(sh, Nsh_orbital, build_opts);
+}
+
 CintEnv::OptSet::~OptSet() {
   for(size_t i=0;i<opts.size();i++)
     if(opts[i]) {
