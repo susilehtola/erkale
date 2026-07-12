@@ -485,13 +485,17 @@ void neo_dump(const std::string & filename,
       }
     }
 
-    // p-p Coulomb and exchange (high-spin protons)
-    double Ecoul_pp = 0.5 * arma::dot(dp_vec, Gpp * dp_vec);
+    // p-p Coulomb and exchange (high-spin): the mean field between two
+    // particles of charge q carries q^2
+    const double q2 = proton_charge*proton_charge;
+    double Ecoul_pp = 0.5 * q2 * arma::dot(dp_vec, Gpp * dp_vec);
     arma::mat Kp = calcK_from_G(Gpp, Dp);
-    double Eexch_pp = -0.5 * arma::trace(Kp * Dp);
+    double Eexch_pp = -0.5 * q2 * arma::trace(Kp * Dp);
 
-    // e-p coupling: attractive sign applied here (q_e*q_p = -1)
-    double E_ep = - arma::dot(de_vec, Gep * dp_vec);
+    // e-p coupling: the product of the charges of the electron and of
+    // the quantum particle, q_e*q_p = -q. The two-particle integrals in
+    // the dump are sign-free, so the charge is applied here.
+    double E_ep = -proton_charge * arma::dot(de_vec, Gep * dp_vec);
 
     double E_recon = E1e + E1p + Ecoul_ee + Eexch_ee + Ecoul_pp + Eexch_pp + E_ep + e_classical;
     double diff = E_recon - e_scf;

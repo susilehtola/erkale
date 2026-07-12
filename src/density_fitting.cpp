@@ -779,8 +779,10 @@ size_t DensityFit::fill_cholesky_shared(const BasisSet & orbbas,
     std::vector<GaussianShell> allsh(orbbas.get_shells());
     const size_t Norb=allsh.size();
     allsh.insert(allsh.end(),piv_shells.begin(),piv_shells.end());
-    cenv=CintEnv(allsh);
-    (void) Norb;
+    // The pivot shells follow the orbital shells: they are addressed as
+    // Norb + is, which is what DirectCDBlocks expects of a shared pivot
+    // basis
+    cenv=CintEnv(allsh,Norb);
   }
 
   // Same object as fill_cholesky produces -- L = X^T (piv|mu nu) with the
