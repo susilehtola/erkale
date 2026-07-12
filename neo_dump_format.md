@@ -162,7 +162,8 @@ operator: every two-particle quantity in it is sign-free (§2.3).
 | `restricted_electrons`     | bool   | `true` = RHF (one electron set); `false` = UHF (α/β sets) |
 | `n_quantum_protons`        | int    | number of quantum protons |
 | `proton_spin_treatment`    | string | `"high-spin"` |
-| `proton_mass`              | double | proton mass (atomic units) scaling the nuclear kinetic operator |
+| `proton_mass`              | double | mass of the quantum particle (atomic units) scaling its kinetic operator |
+| `proton_charge`            | double | charge of the quantum particle (atomic units); +1 for a proton |
 | `naux_e`                   | int    | electron fit dimension (only in `btensor` mode) |
 | `naux_p`                   | int    | proton fit dimension (only in `btensor` mode) |
 | `shared_aux`               | bool   | `true` = `B_e`/`B_p` share a vector index, `eri_ep` omitted (§1.3) |
@@ -205,7 +206,9 @@ Proton group: `nmo`, `nocc` (`= n_quantum_protons`), `C`, `occ`, `hcore`.
   *classical* nuclei only. The e-p attraction is **not** here (two-particle, via
   `eri_ep`).
 - **Proton `hcore`** `= T_p/m_p + V_p(classical)` — mass-scaled kinetic + repulsion
-  from classical nuclei (`+` sign for the positive test charge), `m_p = proton_mass`.
+  from classical nuclei (scaled by the particle's charge `q = proton_charge`, so
+  the sign follows it), `m_p = proton_mass`. The electron-particle attraction
+  likewise carries the factor `-q`, and the particle-particle mean field `q^2`.
 
 **No Fock matrix and no orbital energies are dumped.** The right proton reference
 operator is use-case dependent, and baking one in silently corrupts the density:

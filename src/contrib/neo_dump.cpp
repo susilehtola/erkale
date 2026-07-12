@@ -249,7 +249,7 @@ void neo_dump(const std::string & filename,
               const BasisSet & pbasis, const DensityFit & pfit,
               const arma::mat & Cp, const arma::vec & occp,
               const arma::mat & hcore_p,
-              int n_electrons, int n_protons, double proton_mass,
+              int n_electrons, int n_protons, double proton_mass, double proton_charge,
               double e_scf, double e_classical,
               bool shared_aux, double omega, double alpha, double beta,
               const std::string & version) {
@@ -386,6 +386,7 @@ void neo_dump(const std::string & filename,
   write_int_attr(root, "n_quantum_protons", n_protons);
   write_str_attr(root, "proton_spin_treatment", "high-spin");
   write_dbl_attr(root, "proton_mass", proton_mass);
+  write_dbl_attr(root, "proton_charge", proton_charge);
   if(!dense) {
     write_int_attr(root, "naux_e", (int) Be.n_cols);
     write_int_attr(root, "naux_p", (int) Bp.n_cols);

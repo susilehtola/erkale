@@ -27,6 +27,7 @@
 #include "properties.h"
 #include "sap.h"
 #include "settings.h"
+#include "neo_particle.h"
 #include "stringutil.h"
 #include "timer.h"
 
@@ -338,7 +339,7 @@ int main_guarded(int argc, char **argv) {
 
   settings.add_scf_settings();
   settings.add_string("ProtonBasis", "Protonic basis set", "");
-  settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
+  add_particle_settings(settings);
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_bool("H2", "Run H2+ instead of H atom?", false);
   settings.add_double("H2BondLength", "Bond length for H2+ in a.u.", 2.0);
@@ -368,7 +369,10 @@ int main_guarded(int argc, char **argv) {
   // Get parameters
   double intthr=settings.get_double("IntegralThresh");
   bool verbose=settings.get_bool("Verbose");
-  double proton_mass = settings.get_double("ProtonMass");
+  const quantum_particle_t particle = get_particle(settings);
+  const double proton_mass = particle.m;
+  const double proton_charge = particle.q;
+  print_particle(particle);
   bool dimer = settings.get_bool("H2");
   double R = settings.get_double("H2BondLength");
   bool removecom = settings.get_bool("RemoveCOM");
@@ -478,7 +482,9 @@ int main_guarded(int argc, char **argv) {
     // Classical nucleus is attractive for electrons
     V = basis.nuclear(classical_nuclei);
     // and repulsive for protons
-    Vp = -pbasis.nuclear(classical_nuclei);
+    // The electronic routines give the potential felt by a particle of
+    // charge -1
+    Vp = -proton_charge*pbasis.nuclear(classical_nuclei);
   }
 
   // External confining trap on the quantum proton (one-body). Added to the
@@ -589,7 +595,9 @@ int main_guarded(int argc, char **argv) {
                 size_t I = I_start+II;
                 size_t J = J_start+JJ;
 
-                double element = -eris[((ii*N_j+jj)*N_I+II)*N_J+JJ];
+                // The product of the charges of the electron and of
+                // the quantum particle
+                double element = -proton_charge*eris[((ii*N_j+jj)*N_I+II)*N_J+JJ];
                 // (ij|IJ)
                 V_ao(BFIDX(i,I),BFIDX(j,J)) = element;
                 // (ij|JI)

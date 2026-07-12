@@ -48,7 +48,7 @@ class DensityFit;
  * \param hcore_e         electron AO core Hamiltonian (spin-independent)
  * \param pbasis,pfit     proton basis and engine
  * \param Cp,occp,hcore_p proton SCF MOs, occupations, AO core Hamiltonian
- * \param n_electrons,n_protons,proton_mass  counts / mass
+ * \param n_electrons,n_protons,proton_mass,proton_charge  counts / particle
  * \param e_scf,e_classical  SCF total energy and classical nuclear repulsion
  * \param shared_aux      true when both species expand in one auxiliary/pivot
  *                   space, so (mu nu|a b) = B_e B_p^T; false means e-p is
@@ -69,7 +69,7 @@ void neo_dump(const std::string & filename,
               const arma::mat & Cp, const arma::vec & occp,
               const arma::mat & hcore_p,
               // scalars
-              int n_electrons, int n_protons, double proton_mass,
+              int n_electrons, int n_protons, double proton_mass, double proton_charge,
               double e_scf, double e_classical,
               bool shared_aux, double omega, double alpha, double beta,
               const std::string & version);

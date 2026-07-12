@@ -28,6 +28,7 @@
 #include "properties.h"
 #include "sap.h"
 #include "settings.h"
+#include "neo_particle.h"
 #include "stringutil.h"
 #include "timer.h"
 
@@ -81,7 +82,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_scf_settings();
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
-  settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
+  add_particle_settings(settings);
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
   settings.add_int("NAvg", "Number of states to average over", 2);
@@ -92,7 +93,10 @@ int main_guarded(int argc, char **argv) {
   int Q = settings.get_int("Charge");
   int M = settings.get_int("Multiplicity");
   int maxiter = settings.get_int("MaxIter");
-  double proton_mass = settings.get_double("ProtonMass");
+  const quantum_particle_t particle = get_particle(settings);
+  const double proton_mass = particle.m;
+  const double proton_charge = particle.q;
+  print_particle(particle);
   double intthr = settings.get_double("IntegralThresh");
   bool verbose = settings.get_bool("Verbose");
   std::string loadchk = settings.get_string("LoadChk");
@@ -186,7 +190,9 @@ int main_guarded(int argc, char **argv) {
   arma::mat Vpc, Tp;
   std::vector<arma::mat> pr;
   if(Sp.n_elem) {
-    Vpc=-pbasis.nuclear(classical_nuclei);
+    // The electronic routines give the potential felt by a particle of
+    // charge -1
+    Vpc=-proton_charge*pbasis.nuclear(classical_nuclei);
     Tp=pbasis.kinetic()/proton_mass;
     pr=pbasis.moment(1);
   }
@@ -296,7 +302,8 @@ int main_guarded(int argc, char **argv) {
   };
 
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [&](const arma::mat & Pe) {
-    arma::mat J=-multicomponent_coulomb_tei(basis, Pe, pbasis);
+    // The product of the charges of the electron and of the particle
+    arma::mat J=-proton_charge*multicomponent_coulomb_tei(basis, Pe, pbasis);
     return J;
   };
 
