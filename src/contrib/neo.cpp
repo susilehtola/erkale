@@ -34,6 +34,7 @@
 #include "jkbuilder.h"
 #include "neo_dump.h"
 #include "neo_cholesky.h"
+#include "neo_particle.h"
 
 #include "eriworker.h"
 
@@ -101,7 +102,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
-  settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
+  add_particle_settings(settings);
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
@@ -123,7 +124,10 @@ int main_guarded(int argc, char **argv) {
   int maxiter = settings.get_int("MaxIter");
   int maxinititer = settings.get_int("MaxInitIter");
   int diisorder = settings.get_int("DIISOrder");
-  double proton_mass = settings.get_double("ProtonMass");
+  const quantum_particle_t particle = get_particle(settings);
+  const double proton_mass = particle.m;
+  const double proton_charge = particle.q;
+  print_particle(particle);
   double intthr = settings.get_double("IntegralThresh");
   double init_convergence_threshold = settings.get_double("InitConvThr");
   double convergence_threshold = settings.get_double("ConvThr");
@@ -365,9 +369,12 @@ int main_guarded(int argc, char **argv) {
   arma::mat Vpc, Tp, Vpsap;
   std::vector<arma::mat> pr;
   if(Sp.n_elem) {
-    Vpc=-pbasis.nuclear(classical_nuclei);
+    // The electronic routines give the potential felt by a particle of
+    // charge -1, so the sign and the magnitude of the particle's charge
+    // carry over to the protonic terms
+    Vpc=-proton_charge*pbasis.nuclear(classical_nuclei);
     Tp=pbasis.kinetic()/proton_mass;
-    Vpsap=-pbasis.sap_potential(potlib);
+    Vpsap=-proton_charge*pbasis.sap_potential(potlib);
     pr=pbasis.moment(1);
   }
 
@@ -408,8 +415,10 @@ int main_guarded(int argc, char **argv) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J, K;
     if(vpp) {
-      J=pfit.calcJ(P);
-      K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+      // The interaction of two particles of charge q
+      const double q2=proton_charge*proton_charge;
+      J=q2*pfit.calcJ(P);
+      K=-q2*pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
     } else {
       J.zeros(P.n_rows, P.n_cols);
       K.zeros(P.n_rows, P.n_cols);
@@ -553,24 +562,26 @@ int main_guarded(int argc, char **argv) {
   // space is a Gaussian aux basis.
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_factorized = [&](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
-    arma::mat J=-pfit.calcJ_vector(c);
+    // The product of the charges of the electron and of the particle
+    arma::mat J=-proton_charge*pfit.calcJ_vector(c);
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_exact = [&](const arma::mat & Pe) {
-    arma::mat J=-multicomponent_coulomb_tei(basis, Pe, pbasis);
+    arma::mat J=-proton_charge*multicomponent_coulomb_tei(basis, Pe, pbasis);
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [&](const arma::mat & Pe) {
     return factorized_ep ? electron_proton_coulomb_factorized(Pe) : electron_proton_coulomb_exact(Pe);
   };
 
-  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_factorized = [&dfit, &pfit](const arma::mat & Pp) {
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_factorized = [&dfit, &pfit, proton_charge](const arma::mat & Pp) {
     arma::vec c(pfit.compute_expansion(Pp));
-    arma::mat J=-dfit.calcJ_vector(c);
+    // The product of the charges of the electron and of the particle
+    arma::mat J=-proton_charge*dfit.calcJ_vector(c);
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_exact = [&](const arma::mat & Pp) {
-    arma::mat J=-multicomponent_coulomb_tei(pbasis, Pp, basis);
+    arma::mat J=-proton_charge*multicomponent_coulomb_tei(pbasis, Pp, basis);
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb = [&](const arma::mat & Pp) {
@@ -1260,7 +1271,7 @@ int main_guarded(int argc, char **argv) {
       neo_dump(neodump, settings.get_string("NEODumpIntegrals"), settings.get_bool("NEODumpVerify"),
                basis, dfit, restricted_e, Ce, occe_v, hcore_e,
                pbasis, pfit, Cp_ao, occp, hcore_p,
-               Nel, (int) proton_indices.size(), proton_mass,
+               Nel, (int) proton_indices.size(), proton_mass, proton_charge,
                scfsolver.get_energy(), Ecnucr,
                factorized_ep, omega, alpha, beta, version);
     }
