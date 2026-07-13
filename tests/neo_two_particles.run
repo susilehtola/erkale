@@ -1,0 +1,13 @@
+# Multicomponent SCF with a quantum particle: the dump's self-consistency
+# check reconstructs the SCF energy from the exported tensors and throws if
+# they disagree, so the run itself validates the charge and mass factors.
+System H2O.xyz
+Basis cc-pVDZ
+ProtonBasis PB4-D
+QuantumProtons 2,3
+Method HF
+ParticleCharge 1.2
+ParticleMass 1836.15267389
+SaveChk neo_two_particles.chk
+NEODump neo_two_particles.h5
+NEODumpVerify true

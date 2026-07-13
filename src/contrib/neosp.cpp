@@ -108,7 +108,7 @@ int main_guarded(int argc, char **argv) {
   if(settings.get_string("ProtonBasis").size())
     pbaslib.load_basis(settings.get_string("ProtonBasis"));
 
-  auto atoms=load_xyz(settings.get_string("System"),!settings.get_bool("InputBohr"));
+  auto atoms=load_system(settings.get_string("System"),!settings.get_bool("InputBohr"));
   std::vector<size_t> proton_indices;
   if(stricmp(settings.get_string("QuantumProtons"),"")!=0) {
     // Check for '*'

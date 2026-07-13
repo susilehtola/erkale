@@ -52,4 +52,9 @@ void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const
 /// Print xyz
 void print_xyz(const std::vector<atom_t> & at);
 
+/// Load the geometry named by the System setting, searching the
+/// directory given by ERKALE_SYSDIR if it is not found in the working
+/// directory, as the main binary does
+std::vector<atom_t> load_system(const std::string & filename, bool inputbohr);
+
 #endif
