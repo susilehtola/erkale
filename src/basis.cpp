@@ -1168,6 +1168,53 @@ void BasisSet::form_unique_shellpairs() {
   */
 }
 
+std::vector<shellblock_t> BasisSet::get_shell_blocks() const {
+  std::vector<shellblock_t> blocks;
+
+  // Two shells belong to the same block if they sit on the same center,
+  // have the same angular momentum and the same basis (a spherical and
+  // a cartesian shell cannot be evaluated in a single call), and share
+  // their primitives.
+  auto same_block = [](const GaussianShell & lhs, const GaussianShell & rhs) {
+    if(lhs.get_center_ind() != rhs.get_center_ind())
+      return false;
+    if(lhs.get_am() != rhs.get_am())
+      return false;
+    if(lhs.lm_in_use() != rhs.lm_in_use())
+      return false;
+
+    const std::vector<contr_t> & lc=lhs.get_contr_ref();
+    const std::vector<contr_t> & rc=rhs.get_contr_ref();
+    if(lc.size() != rc.size())
+      return false;
+    for(size_t ip=0;ip<lc.size();ip++)
+      if(lc[ip].z != rc[ip].z)
+        return false;
+
+    return true;
+  };
+
+  for(size_t is=0;is<shells.size();is++) {
+    // Does the shell belong to a block we already have? The shells of a
+    // block need not be adjacent in the basis, but they usually are.
+    bool found=false;
+    for(size_t ib=0;ib<blocks.size();ib++)
+      if(same_block(shells[blocks[ib].shells[0]], shells[is])) {
+        blocks[ib].shells.push_back(is);
+        found=true;
+        break;
+      }
+
+    if(!found) {
+      shellblock_t block;
+      block.shells.push_back(is);
+      blocks.push_back(block);
+    }
+  }
+
+  return blocks;
+}
+
 std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   if(shells.size() && !shellpairs.size()) {
     throw std::runtime_error("shellpairs not initialized! Maybe you forgot to finalize?\n");

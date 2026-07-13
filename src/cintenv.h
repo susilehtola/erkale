@@ -138,8 +138,21 @@ class CintEnv {
   /// Are all the normalization factors unity?
   bool unit_norm;
 
+  /// The generally contracted shell table: the shells of a block share
+  /// their primitives, so the integrals over all their contractions
+  /// come out of a single recursion
+  std::vector<int> gc_bas;
+  /// The blocks: which shells each generally contracted shell holds
+  std::vector<shellblock_t> gc_blocks;
+  /// The block each shell belongs to, and its contraction index in it
+  std::vector<size_t> shell_block, shell_ctr;
+  /// Integral optimizers of the generally contracted tables
+  std::shared_ptr<OptSet> gc_opts;
+
   /// Fill the tables from a list of shells
   void build(const std::vector<GaussianShell> & shells, size_t Nsh_orbital, bool build_opts);
+  /// Build the generally contracted shell tables
+  void build_gc(const std::vector<GaussianShell> & shells, bool build_opts);
 
  public:
   /// Dummy constructor
@@ -190,6 +203,26 @@ class CintEnv {
 
   /// Integral optimizer for the given kernel (a libcint CINTOpt *)
   void * get_opt(cint_kernel_t kernel) const;
+
+  // ---- Generally contracted shells ----
+
+  /// Number of generally contracted shells (blocks)
+  size_t get_Nblock() const;
+  /// The shells of block ib
+  const std::vector<size_t> & get_block_shells(size_t ib) const;
+  /// The block shell ish belongs to
+  size_t get_shell_block(size_t ish) const;
+  /// The contraction index of shell ish within its block
+  size_t get_shell_ctr(size_t ish) const;
+  /// Does any block hold more than one shell?
+  bool have_gc() const;
+  /// The generally contracted shell table
+  int * get_gc_bas() const;
+  /// Number of generally contracted shells
+  int get_gc_nbas() const;
+  /// Integral optimizer of the generally contracted tables
+  void * get_gc_opt(cint_kernel_t kernel) const;
+
 };
 
 #endif

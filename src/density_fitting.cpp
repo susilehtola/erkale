@@ -357,6 +357,28 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
 
   // Remove active column c: move the last active column into slot c
   // (preserving its nvec built components) and drop the active count.
+  // Group the significant shell pairs by the blocks of their shells: the
+  // integrals of a whole block quartet come out of a single recursion,
+  // so the shell pairs of a block pair are evaluated together. A
+  // segmented basis gives one shell pair per group, and the loop below
+  // is the plain one.
+  std::vector<std::vector<size_t>> brapairs;
+  std::vector<std::pair<size_t,size_t>> brablocks;
+  {
+    std::map<std::pair<size_t,size_t>, size_t> bmap;
+    for(size_t ipair=0;ipair<shpairs.size();ipair++) {
+      const std::pair<size_t,size_t> bp(lcenv.get_shell_block(shpairs[ipair].is),
+                                        lcenv.get_shell_block(shpairs[ipair].js));
+      auto it=bmap.find(bp);
+      if(it==bmap.end()) {
+        bmap[bp]=brapairs.size();
+        brapairs.push_back(std::vector<size_t>(1,ipair));
+        brablocks.push_back(bp);
+      } else
+        brapairs[it->second].push_back(ipair);
+    }
+  }
+
   auto drop_col = [&](arma::uword c) {
     const arma::uword last = actprod.size()-1;
     const arma::uword removed = actprod[c];
@@ -388,10 +410,32 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
     size_t max_ls=basis.find_shell_ind(max_l);
     size_t max_Nk=basis.get_Nbf(max_ks);
     size_t max_Nl=basis.get_Nbf(max_ls);
-    size_t max_k0=basis.get_first_ind(max_ks);
-    size_t max_l0=basis.get_first_ind(max_ls);
 
-    arma::mat A(d.n_elem,max_Nk*max_Nl, arma::fill::zeros);
+    // The shell pairs whose integrals come out of the same recursion as
+    // the one holding the pivot: the shells of a generally contracted
+    // block share their primitives, so the products of every
+    // combination of their contractions are candidates at no further
+    // cost. In a segmented basis this is the shell pair itself, and the
+    // sweep below is the one of the paper.
+    const size_t bk=lcenv.get_shell_block(max_ks);
+    const size_t bl=lcenv.get_shell_block(max_ls);
+    std::vector<std::pair<size_t,size_t>> cols;
+    for(auto ks: lcenv.get_block_shells(bk))
+      for(auto ls: lcenv.get_block_shells(bl)) {
+        // The products of (ks, ls) and of (ls, ks) are the same, so
+        // only one orientation is taken
+        if(bk==bl && ls<ks)
+          continue;
+        cols.push_back(std::make_pair(ks,ls));
+      }
+    const size_t ncol=cols.size();
+
+    // Screening bounds of the whole set
+    double Qblk=0.0;
+    for(size_t ic=0;ic<ncol;ic++)
+      Qblk=std::max(Qblk, Q(cols[ic].first,cols[ic].second));
+
+    arma::mat A(d.n_elem,ncol*max_Nk*max_Nl, arma::fill::zeros);
     t.set();
 #ifdef _OPENMP
 #pragma omp parallel
@@ -403,32 +447,77 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
-      for(size_t ipair=0;ipair<shpairs.size();ipair++) {
-        size_t is=shpairs[ipair].is;
-        size_t js=shpairs[ipair].js;
-        double QQ=Q(is,js)*Q(max_ks,max_ls);
-        if(QQ<shell_screen_tol) continue;
-        double MM1=M_screen(is,max_ks)*M_screen(js,max_ls);
-        if(MM1<shell_screen_tol) continue;
-        double MM2=M_screen(is,max_ls)*M_screen(js,max_ks);
-        if(MM2<shell_screen_tol) continue;
-
-        eri->compute(is,js,max_ks,max_ls);
-        erip=eri->getp();
-        size_t Ni(shells[is].get_Nbf());
-        size_t Nj(shells[js].get_Nbf());
-        size_t i0(shells[is].get_first_ind());
-        size_t j0(shells[js].get_first_ind());
-        for(size_t ii=0;ii<Ni;ii++)
-          for(size_t jj=0;jj<Nj;jj++) {
-            size_t i=i0+ii;
-            size_t j=j0+jj;
-            if(prodmap(i,j)>Nbf_local*Nbf_local) continue;
-            for(size_t kk=0;kk<max_Nk;kk++)
-              for(size_t ll=0;ll<max_Nl;ll++) {
-                A(prodmap(i,j),kk*max_Nl+ll)=(*erip)[((ii*Nj+jj)*max_Nk+kk)*max_Nl+ll];
-              }
+      for(size_t ibra=0;ibra<brapairs.size();ibra++) {
+        // The shell pairs of this block pair that are significant for
+        // any of the shell pairs the pivot's block holds
+        bool any=false;
+        for(size_t ipi=0;ipi<brapairs[ibra].size() && !any;ipi++) {
+          const size_t is=shpairs[brapairs[ibra][ipi]].is;
+          const size_t js=shpairs[brapairs[ibra][ipi]].js;
+          if(Q(is,js)*Qblk<shell_screen_tol)
+            continue;
+          for(size_t ic=0;ic<ncol && !any;ic++) {
+            const size_t ks=cols[ic].first, ls=cols[ic].second;
+            if(M_screen(is,ks)*M_screen(js,ls)>=shell_screen_tol &&
+               M_screen(is,ls)*M_screen(js,ks)>=shell_screen_tol)
+              any=true;
           }
+        }
+        if(!any) continue;
+
+        // One recursion for the whole block quartet: every combination
+        // of the contractions of the four blocks comes out of it
+        const size_t bi=brablocks[ibra].first;
+        const size_t bj=brablocks[ibra].second;
+        const bool shared =
+          lcenv.get_block_shells(bi).size()*lcenv.get_block_shells(bj).size()*
+          lcenv.get_block_shells(bk).size()*lcenv.get_block_shells(bl).size() > 1;
+        if(shared)
+          eri->compute_block(bi,bj,bk,bl);
+
+        for(size_t ipi=0;ipi<brapairs[ibra].size();ipi++) {
+          const size_t ipair=brapairs[ibra][ipi];
+          const size_t is=shpairs[ipair].is;
+          const size_t js=shpairs[ipair].js;
+          if(Q(is,js)*Qblk<shell_screen_tol)
+            continue;
+
+          const size_t Ni(shells[is].get_Nbf());
+          const size_t Nj(shells[js].get_Nbf());
+          const size_t i0(shells[is].get_first_ind());
+          const size_t j0(shells[js].get_first_ind());
+
+          for(size_t ic=0;ic<ncol;ic++) {
+            const size_t ks=cols[ic].first, ls=cols[ic].second;
+            if(M_screen(is,ks)*M_screen(js,ls)<shell_screen_tol ||
+               M_screen(is,ls)*M_screen(js,ks)<shell_screen_tol)
+              continue;
+
+            if(shared)
+              erip=eri->get_ctr(is,js,ks,ls);
+            else {
+              eri->compute(is,js,ks,ls);
+              erip=eri->getp();
+            }
+
+            const size_t k0(shells[ks].get_first_ind());
+            const size_t l0(shells[ls].get_first_ind());
+            const size_t Nk(shells[ks].get_Nbf());
+            const size_t Nl(shells[ls].get_Nbf());
+            const size_t coff=ic*max_Nk*max_Nl;
+
+            for(size_t ii=0;ii<Ni;ii++)
+              for(size_t jj=0;jj<Nj;jj++) {
+                const size_t i=i0+ii;
+                const size_t j=j0+jj;
+                if(prodmap(i,j)>Nbf_local*Nbf_local) continue;
+                for(size_t kk=0;kk<Nk;kk++)
+                  for(size_t ll=0;ll<Nl;ll++)
+                    A(prodmap(i,j),coff+kk*Nl+ll)=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+              }
+            (void) k0; (void) l0;
+          }
+        }
       }
     }
     t_int+=t.get();
@@ -447,18 +536,27 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
       double blockerr=0;
       arma::uword blockc=SENT;
       size_t Aind=0;
-      for(size_t kk=0;kk<max_Nk;kk++)
-        for(size_t ll=0;ll<max_Nl;ll++) {
-          const size_t ind=prodmap(kk+max_k0,ll+max_l0);
-          if(ind>Nbf_local*Nbf_local) continue;     // not a significant product
-          const arma::uword c=colof(ind);
-          if(c==SENT) continue;                     // already a pivot, or shed
-          if(d(ind)>blockerr) {
-            Aind=kk*max_Nl+ll;
-            blockc=c;
-            blockerr=d(ind);
+      for(size_t ic=0;ic<ncol;ic++) {
+        const size_t ks=cols[ic].first, ls=cols[ic].second;
+        const size_t k0=shells[ks].get_first_ind();
+        const size_t l0=shells[ls].get_first_ind();
+        const size_t Nk=shells[ks].get_Nbf();
+        const size_t Nl=shells[ls].get_Nbf();
+        const size_t coff=ic*max_Nk*max_Nl;
+
+        for(size_t kk=0;kk<Nk;kk++)
+          for(size_t ll=0;ll<Nl;ll++) {
+            const size_t ind=prodmap(kk+k0,ll+l0);
+            if(ind>Nbf_local*Nbf_local) continue;   // not a significant product
+            const arma::uword c=colof(ind);
+            if(c==SENT) continue;                   // already a pivot, or shed
+            if(d(ind)>blockerr) {
+              Aind=coff+kk*Nl+ll;
+              blockc=c;
+              blockerr=d(ind);
+            }
           }
-        }
+      }
       if(blockerr==0.0 || blockerr<shell_reuse_thr*errmax)
         break;
       const arma::uword piv=actprod[blockc];

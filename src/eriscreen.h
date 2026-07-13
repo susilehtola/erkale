@@ -55,6 +55,20 @@ class ERIscreen {
   const BasisSet * basp;
   /// libcint description of the basis, shared by the worker pools
   CintEnv cenv;
+
+  /// Shell pairs grouped by the blocks of their shells: the integrals
+  /// over the shell pairs of a block pair come out of a single
+  /// recursion, so they are evaluated together. Empty for a basis
+  /// without generally contracted shells, which then uses the plain
+  /// shell pair loop.
+  std::vector<std::vector<size_t>> blockpairs;
+  /// The blocks of each block pair
+  std::vector<std::pair<size_t,size_t>> blockpair_blocks;
+  /// The largest Schwarz bound of the shell pairs of each block pair
+  std::vector<double> blockpair_Q;
+
+  /// Group the shell pairs into block pairs, sorted by their bound
+  void form_blockpairs();
   /// Index helper
   std::vector<size_t> iidx;
 
