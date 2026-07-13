@@ -283,6 +283,117 @@ void ERIWorker::compute_2c(size_t is, size_t js) {
   normalize(erk,2,1,ints);
 }
 
+void ERIWorker::compute_block(size_t bi, size_t bj, size_t bk, size_t bl) {
+  // libcint gives the integrals over all the contractions of the blocks
+  // in one call: the recursion over the primitives is shared, and only
+  // the contraction step is repeated. As for a single shell, the
+  // reversed quartet gives ERKALE's index order.
+  int shls[4]={(int) bl, (int) bk, (int) bj, (int) bi};
+
+  CINTIntegralFunction * intor=envp->lm_in_use() ? int2e_sph : int2e_cart;
+  CINTOpt * opt=(CINTOpt *) envp->get_gc_opt(CINT_ERI);
+
+  block[0]=bi;
+  block[1]=bj;
+  block[2]=bk;
+  block[3]=bl;
+
+  size_t N=1;
+  for(int q=0;q<4;q++) {
+    const std::vector<size_t> & bsh=envp->get_block_shells(block[q]);
+    // Every shell of a block has the same number of functions
+    block_nctr[q]=bsh.size();
+    block_nbf[q]=envp->get_Nbf(bsh[0]);
+    N*=block_nctr[q]*block_nbf[q];
+  }
+  blockints.resize(N);
+
+  auto evaluate_omega=[&](double omega, std::vector<double> & buf) {
+    env[PTR_RANGE_OMEGA]=omega;
+    const size_t csize=intor(NULL,NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_gc_bas(),envp->get_gc_nbas(),env.data(),NULL,NULL);
+    if(csize>cache.size())
+      cache.resize(csize);
+    if(!intor(buf.data(),NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_gc_bas(),envp->get_gc_nbas(),env.data(),(omega==0.0)?opt:NULL,cache.data()))
+      std::fill(buf.begin(),buf.end(),0.0);
+  };
+
+  if(rs_alpha!=0.0)
+    evaluate_omega(0.0,blockints);
+  else
+    std::fill(blockints.begin(),blockints.end(),0.0);
+
+  if(rs_beta!=0.0) {
+    srbuf.resize(N);
+    evaluate_omega(-rs_omega,srbuf);
+    for(size_t i=0;i<N;i++)
+      blockints[i]=rs_alpha*blockints[i]+rs_beta*srbuf[i];
+  } else if(rs_alpha!=1.0)
+    for(size_t i=0;i<N;i++)
+      blockints[i]*=rs_alpha;
+}
+
+const std::vector<double> * ERIWorker::get_ctr(size_t is, size_t js, size_t ks, size_t ls) {
+  size_t sh[4]={is, js, ks, ls};
+
+  // (ij|kl) = (kl|ij), so a quartet whose bra and ket sit in the ket
+  // and the bra block of the evaluated quartet is served from the same
+  // buffer, with the two halves of the index swapped.
+  bool swapped=false;
+  if(envp->get_shell_block(is) != block[0] || envp->get_shell_block(js) != block[1] ||
+     envp->get_shell_block(ks) != block[2] || envp->get_shell_block(ls) != block[3]) {
+    if(envp->get_shell_block(is) == block[2] && envp->get_shell_block(js) == block[3] &&
+       envp->get_shell_block(ks) == block[0] && envp->get_shell_block(ls) == block[1]) {
+      swapped=true;
+      sh[0]=ks;
+      sh[1]=ls;
+      sh[2]=is;
+      sh[3]=js;
+    } else {
+      ERROR_INFO();
+      throw std::logic_error("The shell does not belong to the evaluated block!\n");
+    }
+  }
+
+  // The contraction each shell is in its block, and the sizes. In the
+  // output of a generally contracted shell the contraction runs slower
+  // than the functions of the shell.
+  size_t ctr[4], nbf[4], nctr[4];
+  for(int q=0;q<4;q++) {
+    ctr[q]=envp->get_shell_ctr(sh[q]);
+    nbf[q]=block_nbf[q];
+    nctr[q]=block_nctr[q];
+  }
+
+  const size_t N=nbf[0]*nbf[1]*nbf[2]*nbf[3];
+  ints.resize(N);
+
+  // The index of a function in the block runs over the contraction and
+  // the functions of the shell; the quartet index runs over the four
+  // shells with the last one fastest, as everywhere in ERKALE. A
+  // swapped quartet is written out with its bra and ket exchanged.
+  for(size_t i=0;i<nbf[0];i++) {
+    const size_t bi=(ctr[0]*nbf[0]+i)*nctr[1]*nbf[1];
+    for(size_t j=0;j<nbf[1];j++) {
+      const size_t bj=(bi+ctr[1]*nbf[1]+j)*nctr[2]*nbf[2];
+      for(size_t k=0;k<nbf[2];k++) {
+        const size_t bk=(bj+ctr[2]*nbf[2]+k)*nctr[3]*nbf[3];
+        for(size_t l=0;l<nbf[3];l++) {
+          const double val=blockints[bk+ctr[3]*nbf[3]+l];
+          if(swapped)
+            ints[((k*nbf[3]+l)*nbf[0]+i)*nbf[1]+j]=val;
+          else
+            ints[((i*nbf[1]+j)*nbf[2]+k)*nbf[3]+l]=val;
+        }
+      }
+    }
+  }
+
+  const size_t erk[4]={is, js, ks, ls};
+  normalize(erk,4,1,ints);
+
+  return &ints;
+}
+
 void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
   const GaussianShell & shi=envp->get_shell(is);
   const GaussianShell & shj=envp->get_shell(js);
