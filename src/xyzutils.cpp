@@ -20,6 +20,7 @@
 #include "xyzutils.h"
 #include "stringutil.h"
 #include "zmatrix.h"
+#include "checkpoint.h"
 
 #include <sstream>
 #include <stdexcept>
@@ -163,4 +164,19 @@ void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const
 void print_xyz(const std::vector<atom_t> & at) {
   for(size_t i=0;i<at.size();i++)
     printf("%4i %-4s  % 10.5f  % 10.5f  % 10.5f\n",(int) i+1, at[i].el.c_str(),at[i].x/ANGSTROMINBOHR,at[i].y/ANGSTROMINBOHR,at[i].z/ANGSTROMINBOHR);
+}
+
+std::vector<atom_t> load_system(const std::string & filename, bool inputbohr) {
+  if(file_exists(filename))
+    return load_xyz(filename,inputbohr);
+
+  // The system directory, as used by the main binary
+  const char * sysdir=getenv("ERKALE_SYSDIR");
+  if(sysdir) {
+    const std::string path=std::string(sysdir)+"/"+filename;
+    if(file_exists(path))
+      return load_xyz(path,inputbohr);
+  }
+
+  throw std::runtime_error("Unable to open xyz input file \"" + filename + "\" !\n");
 }
