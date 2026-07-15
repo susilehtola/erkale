@@ -19,6 +19,10 @@
 #include "../linalg.h"
 #include "../mathf.h"
 #include "../settings.h"
+#include "../basis.h"
+#include "../basislibrary.h"
+#include "../cintenv.h"
+#include "../eriworker.h"
 
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;
@@ -196,6 +200,68 @@ void test_checkpoint() {
 
 Settings settings;
 
+/// Check that a natively generally contracted shell (built by merging
+/// two same-exponent contractions) reproduces the two separate
+/// segmented shells, both when its functions are evaluated in real
+/// space and when its integrals are computed.
+void check_general_contraction() {
+  // Two d-shells sharing three exponents but with different
+  // contraction coefficients: a generally contracted block, built in
+  // memory so the test needs no basis-set library.
+  std::vector<contr_t> c0(3), c1(3);
+  const double z[3]={4.0, 1.1, 0.35};
+  const double a0[3]={0.20, 0.55, 0.35};
+  const double a1[3]={-0.09, 0.31, 0.82};
+  for(int i=0;i<3;i++) {
+    c0[i].z=z[i]; c0[i].c=a0[i];
+    c1[i].z=z[i]; c1[i].c=a1[i];
+  }
+
+  const coords_t orig{0.0,0.0,0.0};
+  GaussianShell s0(2,true,c0), s1(2,true,c1);
+  s0.set_center(orig,0); s1.set_center(orig,0);
+  s0.normalize(); s1.normalize();
+  s0.set_first_ind(0); s1.set_first_ind(0);
+
+  GaussianShell gc=s0;
+  gc.merge_contraction(s1);
+  gc.set_first_ind(0);
+
+  if(gc.get_Nctr()!=2 || gc.get_Nbf()!=2*(2*2+1))
+    throw std::runtime_error("check_general_contraction: merged shell has the wrong shape.\n");
+
+  // Real-space evaluation
+  const double px=0.3, py=-0.2, pz=0.15;
+  const arma::vec fgc=gc.eval_func(px,py,pz);
+  const arma::vec fstack=arma::join_cols(s0.eval_func(px,py,pz), s1.eval_func(px,py,pz));
+  if(arma::abs(fgc-fstack).max() > 1e-12)
+    throw std::runtime_error("check_general_contraction: eval_func of the generally contracted shell disagrees.\n");
+
+  // Integrals: the native-GC self-quartet against the segmented one
+  std::vector<GaussianShell> gcv{gc};
+  CintEnv egc(gcv,false); ERIWorker wgc(egc);
+  wgc.compute(0,0,0,0);
+  const std::vector<double> igc(*wgc.getp());
+
+  std::vector<GaussianShell> segv{s0,s1};
+  CintEnv eseg(segv,false); ERIWorker wseg(eseg);
+  const size_t nb=gc.get_Nbf();
+  const size_t nlm=nb/gc.get_Nctr();
+  double maxd=0.0;
+  for(int ci=0;ci<2;ci++)for(int cj=0;cj<2;cj++)for(int ck=0;ck<2;ck++)for(int cl=0;cl<2;cl++) {
+    wseg.compute(ci,cj,ck,cl);
+    const std::vector<double> * p=wseg.getp();
+    for(size_t fi=0;fi<nlm;fi++)for(size_t fj=0;fj<nlm;fj++)for(size_t fk=0;fk<nlm;fk++)for(size_t fl=0;fl<nlm;fl++) {
+      const size_t gi=ci*nlm+fi, gj=cj*nlm+fj, gk=ck*nlm+fk, gl=cl*nlm+fl;
+      const double vgc=igc[((gi*nb+gj)*nb+gk)*nb+gl];
+      const double vseg=(*p)[((fi*nlm+fj)*nlm+fk)*nlm+fl];
+      maxd=std::max(maxd,std::fabs(vgc-vseg));
+    }
+  }
+  if(maxd > 1e-10)
+    throw std::runtime_error("check_general_contraction: generally contracted integrals disagree with the segmented ones.\n");
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -206,6 +272,9 @@ int main(void) {
   // Then, check checkpoint utilities
   test_checkpoint();
   printf("Checkpointing OK.\n");
+  // Generally contracted shells
+  check_general_contraction();
+  printf("General contraction OK.\n");
   // Test lapack thread safety
   try {
     check_lapack_thread();
