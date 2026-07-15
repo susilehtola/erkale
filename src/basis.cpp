@@ -163,12 +163,19 @@ GaussianShell::GaussianShell() {
 }
 
 GaussianShell::GaussianShell(int amv, bool lm, const std::vector<contr_t> & C) {
-  // Construct shell of basis functions
+  // Construct a segmented shell of basis functions (one contraction).
+  // A generally contracted shell is assembled by add_shells, which
+  // fills the coefficient matrix cf with several columns.
 
   // Store contraction
   c=C;
   // Sort the contraction
   sort();
+
+  // A single contraction: the coefficient matrix is one column
+  cf.set_size(c.size(),1);
+  for(size_t i=0;i<c.size();i++)
+    cf(i,0)=c[i].c;
 
   // Set angular momentum
   am=amv;
@@ -224,8 +231,35 @@ void GaussianShell::set_center(const coords_t & cenv, size_t cenindv) {
   cenind=cenindv;
 }
 
+void GaussianShell::sync_c() {
+  // Mirror the first contraction's coefficients back into c, whose .z
+  // fields carry the (authoritative) shared exponents
+  for(size_t i=0;i<c.size();i++)
+    c[i].c=cf(i,0);
+}
+
 void GaussianShell::sort() {
-  std::stable_sort(c.begin(),c.end());
+  // Order the primitives by decreasing exponent. When the coefficient
+  // matrix already exists (generally contracted shell) its rows follow
+  // the same permutation.
+  if(cf.n_elem==0) {
+    std::stable_sort(c.begin(),c.end());
+    return;
+  }
+
+  std::vector<size_t> idx(c.size());
+  for(size_t i=0;i<idx.size();i++)
+    idx[i]=i;
+  std::stable_sort(idx.begin(),idx.end(),[this](size_t a, size_t b){ return c[a]<c[b]; });
+
+  std::vector<contr_t> cnew(c.size());
+  arma::mat cfnew(cf.n_rows,cf.n_cols);
+  for(size_t i=0;i<idx.size();i++) {
+    cnew[i]=c[idx[i]];
+    cfnew.row(i)=cf.row(idx[i]);
+  }
+  c=cnew;
+  cf=cfnew;
 }
 
 void GaussianShell::convert_contraction() {
@@ -236,7 +270,8 @@ void GaussianShell::convert_contraction() {
   double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
 
   for(size_t i=0;i<c.size();i++)
-    c[i].c*=fac*pow(c[i].z,am/2.0+0.75);
+    cf.row(i)*=fac*pow(c[i].z,am/2.0+0.75);
+  sync_c();
 }
 
 void GaussianShell::convert_sap_contraction() {
@@ -245,7 +280,8 @@ void GaussianShell::convert_sap_contraction() {
 
   if(am != 0) throw std::logic_error("SAP basis should only have S functions!\n");
   for(size_t i=0;i<c.size();i++)
-    c[i].c*=pow(c[i].z/M_PI,1.5);
+    cf.row(i)*=pow(c[i].z/M_PI,1.5);
+  sync_c();
 }
 
 void GaussianShell::normalize(bool coeffs) {
@@ -254,25 +290,25 @@ void GaussianShell::normalize(bool coeffs) {
   // Check for dummy shell
   if(c.size()==1 && c[0].z==0.0) {
     // Yes, this is a dummy.
-    c[0].c=1.0;
+    cf(0,0)=1.0;
+    sync_c();
     return;
   }
 
   if(coeffs) {
-    double fact=0.0;
+    const double angfac=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
 
-    // Calculate overlap of exponents
-    for(size_t i=0;i<c.size();i++)
-      for(size_t j=0;j<c.size();j++)
-	fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
-
-    // Add constant part
-    fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
-
-    // The coefficients must be scaled by 1/sqrt(fact)
-    fact=1.0/sqrt(fact);
-    for(size_t i=0;i<c.size();i++)
-      c[i].c*=fact;
+    // Normalize each contraction to unit self-overlap independently
+    for(size_t ictr=0;ictr<cf.n_cols;ictr++) {
+      double fact=0.0;
+      for(size_t i=0;i<c.size();i++)
+	for(size_t j=0;j<c.size();j++)
+	  fact+=cf(i,ictr)*cf(j,ictr)/pow(c[i].z+c[j].z,am+1.5);
+      fact*=angfac;
+      fact=1.0/sqrt(fact);
+      cf.col(ictr)*=fact;
+    }
+    sync_c();
   }
 
   // FIXME: Do something more clever here.
@@ -361,10 +397,25 @@ std::vector<contr_t> GaussianShell::get_contr_normalized() const {
 }
 
 size_t GaussianShell::get_Nbf() const {
-  if(uselm)
-    return get_Nlm();
-  else
-    return get_Ncart();
+  // nctr angular blocks, one per contraction
+  return get_Nctr() * (uselm ? get_Nlm() : get_Ncart());
+}
+
+size_t GaussianShell::get_Nctr() const {
+  return cf.n_cols;
+}
+
+const arma::mat & GaussianShell::get_coefs() const {
+  return cf;
+}
+
+std::vector<contr_t> GaussianShell::get_contr(size_t ictr) const {
+  std::vector<contr_t> ret(c.size());
+  for(size_t i=0;i<c.size();i++) {
+    ret[i].z=c[i].z;
+    ret[i].c=cf(i,ictr);
+  }
+  return ret;
 }
 
 size_t GaussianShell::get_Nlm() const {
@@ -385,7 +436,7 @@ double GaussianShell::range(double eps) const {
 
     val=0.0;
     for(size_t i=0;i<c.size();i++)
-      val+=c[i].c*exp(-c[i].z*r*r);
+      val+=arma::max(arma::abs(cf.row(i)))*exp(-c[i].z*r*r);
     val*=pow(r,am);
   } while(fabs(val)>eps);
 
@@ -400,7 +451,7 @@ double GaussianShell::range(double eps) const {
     // Compute value in the middle
     val=0.0;
     for(size_t i=0;i<c.size();i++)
-      val+=c[i].c*exp(-c[i].z*middle*middle);
+      val+=arma::max(arma::abs(cf.row(i)))*exp(-c[i].z*middle*middle);
     val*=pow(middle,am);
 
     // Switch values
@@ -485,18 +536,23 @@ bool GaussianShell::operator==(const GaussianShell & rhs) const {
     return false;
   }
 
-  // Then, by exponents
-  if(c.size() != rhs.c.size()) {
-    //    fprintf(stderr,"Contraction size differs!\n");
+  // Then, by number of primitives and of contractions
+  if(c.size() != rhs.c.size())
     return false;
-  }
+  if(cf.n_cols != rhs.cf.n_cols)
+    return false;
 
-  for(size_t i=0;i<c.size();i++) {
-    if(!(c[i]==rhs.c[i])) {
-      //      fprintf(stderr,"%i:th contraction differs!\n",(int) i+1);
+  // The exponents and the first contraction (contr_t carries a tolerance)
+  for(size_t i=0;i<c.size();i++)
+    if(!(c[i]==rhs.c[i]))
       return false;
-    }
-  }
+
+  // The remaining contraction columns
+  const double tol=sqrt(DBL_EPSILON);
+  for(size_t j=1;j<cf.n_cols;j++)
+    for(size_t i=0;i<cf.n_rows;i++)
+      if(std::fabs(cf(i,j)-rhs.cf(i,j)) > tol*std::max(1.0,std::fabs(cf(i,j))))
+        return false;
 
   return true;
 }
@@ -552,53 +608,12 @@ void GaussianShell::print() const {
 }
 
 arma::vec GaussianShell::eval_func(double x, double y, double z) const {
-  // Evaluate basis functions at (x,y,z)
-
-  // Compute coordinates relative to center
-  double xrel=x-cen.x;
-  double yrel=y-cen.y;
-  double zrel=z-cen.z;
-
-  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
-
-  // Evaluate exponential factor
-  double expfac=0;
-  for(size_t i=0;i<c.size();i++)
-    expfac+=c[i].c*exp(-c[i].z*rrelsq);
-
-  // Power arrays, x^l, y^l, z^l
-  double xr[am+1], yr[am+1], zr[am+1];
-
-  xr[0]=1.0;
-  yr[0]=1.0;
-  zr[0]=1.0;
-
-  if(am) {
-    xr[1]=xrel;
-    yr[1]=yrel;
-    zr[1]=zrel;
-
-    for(int i=2;i<=am;i++) {
-      xr[i]=xr[i-1]*xrel;
-      yr[i]=yr[i-1]*yrel;
-      zr[i]=zr[i-1]*zrel;
-    }
-  }
-
-  // Values of functions
-  arma::vec ret(cart.size());
-
-  // Loop over functions
-  for(size_t i=0;i<cart.size();i++) {
-    // Value of function at (x,y,z) is
-    ret[i]=cart[i].relnorm*xr[cart[i].l]*yr[cart[i].m]*zr[cart[i].n]*expfac;
-  }
-
-  if(uselm)
-    // Transform into spherical harmonics
-    return transmat*ret;
-  else
-    return ret;
+  // Evaluate basis functions at (x,y,z) via the fused evaluator, which
+  // handles the generally contracted case
+  arma::vec fval, lval;
+  arma::mat gval, hval, lgval;
+  eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval, false, false, false, false);
+  return fval;
 }
 
 arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
@@ -660,18 +675,26 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
     }
   }
 
-  // Cartesian-basis accumulators (allocated only if requested).
-  arma::vec fbuf;  fbuf.zeros(cart.size());
-  arma::mat gbuf;  if(do_grad) gbuf.zeros(cart.size(), 3);
-  arma::vec lbuf;  if(do_lapl) lbuf.zeros(cart.size());
-  arma::mat hbuf;  if(do_hess) hbuf.zeros(cart.size(), 9);
-  arma::mat lgbuf; if(do_lgrad) lgbuf.zeros(cart.size(), 3);
+  // Cartesian-basis accumulators (allocated only if requested). One
+  // block of columns per contraction: the derivative components of
+  // contraction ictr occupy columns [ictr*ncomp, (ictr+1)*ncomp). The
+  // primitive exp() and the derivative factors are computed once (they
+  // do not depend on the contraction); only the multiply-accumulate
+  // into the columns scales with the number of contractions.
+  const size_t nctr = cf.n_cols;
+  const size_t Ncart = cart.size();
+  arma::mat fbuf;  fbuf.zeros(Ncart, nctr);
+  arma::mat gbuf;  if(do_grad) gbuf.zeros(Ncart, 3*nctr);
+  arma::mat lbuf;  if(do_lapl) lbuf.zeros(Ncart, nctr);
+  arma::mat hbuf;  if(do_hess) hbuf.zeros(Ncart, 9*nctr);
+  arma::mat lgbuf; if(do_lgrad) lgbuf.zeros(Ncart, 3*nctr);
 
   for(size_t iexp=0; iexp<c.size(); iexp++) {
     const double z_i = c[iexp].z;
-    const double exp_i = c[iexp].c * std::exp(-z_i * rrelsq);
+    // Bare Gaussian: no contraction coefficient (one exp per primitive)
+    const double e_i = std::exp(-z_i * rrelsq);
 
-    for(size_t icart=0; icart<cart.size(); icart++) {
+    for(size_t icart=0; icart<Ncart; icart++) {
       const int l = cart[icart].l;
       const int m = cart[icart].m;
       const int n = cart[icart].n;
@@ -679,11 +702,12 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
       const double ym = yr[m];
       const double zn = zr[n];
 
-      fbuf(icart) += xl * ym * zn * exp_i;
+      // Value term, bare
+      const double v = xl * ym * zn * e_i;
+      for(size_t ic=0; ic<nctr; ic++)
+        fbuf(icart, ic) += cf(iexp, ic) * v;
 
-      // Pre-compute the first / second derivatives along each axis
-      // once if any of grad / lapl / hess / lgrad needs them. The
-      // compiler will fold dead-code paths away.
+      // Derivative factors, computed once (independent of contraction)
       const bool need_d1 = do_grad || do_hess || do_lgrad;
       const bool need_d2 = do_lapl || do_hess || do_lgrad;
       const bool need_d3 = do_lgrad;
@@ -698,74 +722,93 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
       const double d3z = need_d3 ? _der3(zr, n, z_i) : 0.0;
 
       if(do_grad) {
-        gbuf(icart, 0) += d1x * ym * zn * exp_i;
-        gbuf(icart, 1) += xl  * d1y * zn * exp_i;
-        gbuf(icart, 2) += xl  * ym * d1z * exp_i;
+        const double gx = d1x * ym * zn * e_i;
+        const double gy = xl  * d1y * zn * e_i;
+        const double gz = xl  * ym * d1z * e_i;
+        for(size_t ic=0; ic<nctr; ic++) {
+          const double w = cf(iexp, ic);
+          gbuf(icart, 3*ic+0) += w * gx;
+          gbuf(icart, 3*ic+1) += w * gy;
+          gbuf(icart, 3*ic+2) += w * gz;
+        }
       }
 
       if(do_lapl) {
-        lbuf(icart) += (d2x * ym * zn
-                        + xl * d2y * zn
-                        + xl * ym * d2z) * exp_i;
+        const double lp = (d2x * ym * zn + xl * d2y * zn + xl * ym * d2z) * e_i;
+        for(size_t ic=0; ic<nctr; ic++)
+          lbuf(icart, ic) += cf(iexp, ic) * lp;
       }
 
       if(do_hess) {
-        // Diagonal entries
-        hbuf(icart, 0) += d2x * ym * zn * exp_i;     // d/dx^2
-        hbuf(icart, 4) += xl * d2y * zn * exp_i;     // d/dy^2
-        hbuf(icart, 8) += xl * ym * d2z * exp_i;     // d/dz^2
-        // Off-diagonals (each appears twice by symmetry)
-        const double dxy = d1x * d1y * zn  * exp_i;
-        hbuf(icart, 1) += dxy;
-        hbuf(icart, 3) += dxy;
-        const double dxz = d1x * ym  * d1z * exp_i;
-        hbuf(icart, 2) += dxz;
-        hbuf(icart, 6) += dxz;
-        const double dyz = xl  * d1y * d1z * exp_i;
-        hbuf(icart, 5) += dyz;
-        hbuf(icart, 7) += dyz;
+        const double hxx = d2x * ym * zn * e_i;
+        const double hyy = xl * d2y * zn * e_i;
+        const double hzz = xl * ym * d2z * e_i;
+        const double hxy = d1x * d1y * zn * e_i;
+        const double hxz = d1x * ym  * d1z * e_i;
+        const double hyz = xl  * d1y * d1z * e_i;
+        for(size_t ic=0; ic<nctr; ic++) {
+          const double w = cf(iexp, ic);
+          hbuf(icart, 9*ic+0) += w * hxx;
+          hbuf(icart, 9*ic+4) += w * hyy;
+          hbuf(icart, 9*ic+8) += w * hzz;
+          hbuf(icart, 9*ic+1) += w * hxy;
+          hbuf(icart, 9*ic+3) += w * hxy;
+          hbuf(icart, 9*ic+2) += w * hxz;
+          hbuf(icart, 9*ic+6) += w * hxz;
+          hbuf(icart, 9*ic+5) += w * hyz;
+          hbuf(icart, 9*ic+7) += w * hyz;
+        }
       }
 
       if(do_lgrad) {
-        // d^3/dx^3, d^2/dy^2 d/dx, d^2/dz^2 d/dx
-        lgbuf(icart, 0) += (d3x * ym * zn
-                            + d1x * d2y * zn
-                            + d1x * ym * d2z) * exp_i;
-        // d^2/dx^2 d/dy, d^3/dy^3, d^2/dz^2 d/dy
-        lgbuf(icart, 1) += (d2x * d1y * zn
-                            + xl * d3y * zn
-                            + xl * d1y * d2z) * exp_i;
-        // d^2/dx^2 d/dz, d^2/dy^2 d/dz, d^3/dz^3
-        lgbuf(icart, 2) += (d2x * ym * d1z
-                            + xl * d2y * d1z
-                            + xl * ym * d3z) * exp_i;
+        const double lg0 = (d3x * ym * zn + d1x * d2y * zn + d1x * ym * d2z) * e_i;
+        const double lg1 = (d2x * d1y * zn + xl * d3y * zn + xl * d1y * d2z) * e_i;
+        const double lg2 = (d2x * ym * d1z + xl * d2y * d1z + xl * ym * d3z) * e_i;
+        for(size_t ic=0; ic<nctr; ic++) {
+          const double w = cf(iexp, ic);
+          lgbuf(icart, 3*ic+0) += w * lg0;
+          lgbuf(icart, 3*ic+1) += w * lg1;
+          lgbuf(icart, 3*ic+2) += w * lg2;
+        }
       }
     }
   }
 
-  // Plug in the per-cartesian normalisation constant
-  for(size_t icart=0; icart<cart.size(); icart++) {
+  // Plug in the per-cartesian normalisation constant (shared across contractions)
+  for(size_t icart=0; icart<Ncart; icart++) {
     const double rn = cart[icart].relnorm;
-    fbuf(icart) *= rn;
-    if(do_grad)  for(int k=0;k<3;k++) gbuf(icart, k)  *= rn;
-    if(do_lapl)  lbuf(icart) *= rn;
-    if(do_hess)  for(int k=0;k<9;k++) hbuf(icart, k)  *= rn;
-    if(do_lgrad) for(int k=0;k<3;k++) lgbuf(icart, k) *= rn;
+    fbuf.row(icart) *= rn;
+    if(do_grad)  gbuf.row(icart)  *= rn;
+    if(do_lapl)  lbuf.row(icart)  *= rn;
+    if(do_hess)  hbuf.row(icart)  *= rn;
+    if(do_lgrad) lgbuf.row(icart) *= rn;
   }
 
-  // Optionally project to spherical harmonics
-  if(uselm) {
-    fval = transmat * fbuf;
-    if(do_grad)  gval  = transmat * gbuf;
-    if(do_lapl)  lval  = transmat * lbuf;
-    if(do_hess)  hval  = transmat * hbuf;
-    if(do_lgrad) lgval = transmat * lgbuf;
-  } else {
-    fval = std::move(fbuf);
-    if(do_grad)  gval  = std::move(gbuf);
-    if(do_lapl)  lval  = std::move(lbuf);
-    if(do_hess)  hval  = std::move(hbuf);
-    if(do_lgrad) lgval = std::move(lgbuf);
+  // Project each contraction's cartesian block to the output, stacking
+  // the contractions along the function (row) dimension: contraction
+  // ictr occupies output rows [ictr*Nout, (ictr+1)*Nout).
+  const size_t Nout = uselm ? get_Nlm() : Ncart;
+  fval.set_size(nctr*Nout);
+  if(do_grad)  gval.set_size(nctr*Nout, 3);
+  if(do_lapl)  lval.set_size(nctr*Nout);
+  if(do_hess)  hval.set_size(nctr*Nout, 9);
+  if(do_lgrad) lgval.set_size(nctr*Nout, 3);
+
+  for(size_t ic=0; ic<nctr; ic++) {
+    const size_t r0=ic*Nout, r1=r0+Nout-1;
+    if(uselm) {
+      fval.subvec(r0,r1) = transmat * fbuf.col(ic);
+      if(do_grad)  gval.rows(r0,r1)  = transmat * gbuf.cols(3*ic,3*ic+2);
+      if(do_lapl)  lval.subvec(r0,r1) = transmat * lbuf.col(ic);
+      if(do_hess)  hval.rows(r0,r1)  = transmat * hbuf.cols(9*ic,9*ic+8);
+      if(do_lgrad) lgval.rows(r0,r1) = transmat * lgbuf.cols(3*ic,3*ic+2);
+    } else {
+      fval.subvec(r0,r1) = fbuf.col(ic);
+      if(do_grad)  gval.rows(r0,r1)  = gbuf.cols(3*ic,3*ic+2);
+      if(do_lapl)  lval.subvec(r0,r1) = lbuf.col(ic);
+      if(do_hess)  hval.rows(r0,r1)  = hbuf.cols(9*ic,9*ic+8);
+      if(do_lgrad) lgval.rows(r0,r1) = lgbuf.cols(3*ic,3*ic+2);
+    }
   }
 }
 
@@ -875,34 +918,42 @@ namespace {
 }
 
 arma::vec GaussianShell::function_norms() const {
-  // Overlap of the cartesian functions of the shell. Both functions sit
-  // on the same center, so the integral factorizes over the cartesian
-  // directions, and vanishes unless every direction has an even total
-  // power.
-  arma::mat S(cart.size(),cart.size(),arma::fill::zeros);
-  for(size_t ic=0;ic<cart.size();ic++)
-    for(size_t jc=0;jc<cart.size();jc++) {
-      const int L[3]={cart[ic].l+cart[jc].l, cart[ic].m+cart[jc].m, cart[ic].n+cart[jc].n};
-      if(L[0]%2 || L[1]%2 || L[2]%2)
-        continue;
+  // Norms of every function of the shell, one contraction after the
+  // other. Both functions of an overlap sit on the same center, so the
+  // integral factorizes over the cartesian directions and vanishes
+  // unless every direction has an even total power. Precompute the
+  // per-primitive-pair, per-cartesian-pair angular factor once and
+  // weight it by each contraction's coefficients.
+  const size_t Nout = uselm ? get_Nlm() : cart.size();
+  arma::vec norms(get_Nctr()*Nout);
 
-      double val=0.0;
-      for(size_t ip=0;ip<c.size();ip++)
-        for(size_t jp=0;jp<c.size();jp++) {
-          const double zeta=c[ip].z+c[jp].z;
-          double term=c[ip].c*c[jp].c*pow(M_PI/zeta,1.5);
-          for(int ix=0;ix<3;ix++)
-            term*=doublefact(L[ix]-1)/pow(2.0*zeta,L[ix]/2);
-          val+=term;
-        }
-      S(ic,jc)=cart[ic].relnorm*cart[jc].relnorm*val;
-    }
+  for(size_t ictr=0;ictr<get_Nctr();ictr++) {
+    arma::mat S(cart.size(),cart.size(),arma::fill::zeros);
+    for(size_t ic=0;ic<cart.size();ic++)
+      for(size_t jc=0;jc<cart.size();jc++) {
+        const int L[3]={cart[ic].l+cart[jc].l, cart[ic].m+cart[jc].m, cart[ic].n+cart[jc].n};
+        if(L[0]%2 || L[1]%2 || L[2]%2)
+          continue;
 
-  // Spherical functions are contractions of the cartesians
-  if(uselm)
-    S=transmat*S*arma::trans(transmat);
+        double val=0.0;
+        for(size_t ip=0;ip<c.size();ip++)
+          for(size_t jp=0;jp<c.size();jp++) {
+            const double zeta=c[ip].z+c[jp].z;
+            double term=cf(ip,ictr)*cf(jp,ictr)*pow(M_PI/zeta,1.5);
+            for(int ix=0;ix<3;ix++)
+              term*=doublefact(L[ix]-1)/pow(2.0*zeta,L[ix]/2);
+            val+=term;
+          }
+        S(ic,jc)=cart[ic].relnorm*cart[jc].relnorm*val;
+      }
 
-  return arma::vec(S.diag());
+    if(uselm)
+      S=transmat*S*arma::trans(transmat);
+
+    norms.subvec(ictr*Nout, ictr*Nout+Nout-1)=S.diag();
+  }
+
+  return norms;
 }
 
 // Calculate overlaps between basis functions
@@ -939,44 +990,42 @@ arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
 
 
 arma::vec GaussianShell::integral() const {
-  // Compute integrals over the cartesian functions
-  arma::vec ints(cart.size());
-  ints.zeros();
+  // Integral over each function of the shell, one contraction after the
+  // other.
+  const size_t Nout = uselm ? get_Nlm() : cart.size();
+  arma::vec out(get_Nctr()*Nout);
 
-  // Loop over cartesians
-  for(size_t ic=0;ic<cart.size();ic++) {
-    int l=cart[ic].l;
-    int m=cart[ic].m;
-    int n=cart[ic].n;
+  for(size_t ictr=0;ictr<get_Nctr();ictr++) {
+    arma::vec ints(cart.size());
+    ints.zeros();
 
-    if(l%2 || m%2 || n%2)
-      // Odd function - zero integral
-      continue;
+    for(size_t ic=0;ic<cart.size();ic++) {
+      int l=cart[ic].l;
+      int m=cart[ic].m;
+      int n=cart[ic].n;
 
-    // Loop over exponents
-    for(size_t ix=0;ix<c.size();ix++) {
-      double zeta=c[ix].z;
+      if(l%2 || m%2 || n%2)
+        // Odd function - zero integral
+        continue;
 
-      // Integral over x gives
-      double intx=2.0*pow(0.5/sqrt(zeta),l+1)*sqrt(M_PI);
-      // Integral over y
-      double inty=2.0*pow(0.5/sqrt(zeta),m+1)*sqrt(M_PI);
-      // Integral over z
-      double intz=2.0*pow(0.5/sqrt(zeta),n+1)*sqrt(M_PI);
+      for(size_t ix=0;ix<c.size();ix++) {
+        double zeta=c[ix].z;
+        double intx=2.0*pow(0.5/sqrt(zeta),l+1)*sqrt(M_PI);
+        double inty=2.0*pow(0.5/sqrt(zeta),m+1)*sqrt(M_PI);
+        double intz=2.0*pow(0.5/sqrt(zeta),n+1)*sqrt(M_PI);
+        ints(ic)+=cf(ix,ictr)*intx*inty*intz;
+      }
 
-      // Increment total integral
-      ints(ic)+=c[ix].c*intx*inty*intz;
+      ints(ic)*=cart[ic].relnorm;
     }
 
-    // Plug in relative norm
-    ints(ic)*=cart[ic].relnorm;
+    if(uselm)
+      ints=transmat*ints;
+
+    out.subvec(ictr*Nout, ictr*Nout+Nout-1)=ints;
   }
 
-  // Do conversion to spherical basis
-  if(uselm)
-    ints=transmat*ints;
-
-  return ints;
+  return out;
 }
 
 

@@ -619,10 +619,26 @@ class GaussianShell {
   arma::mat transmat;
 
   /**
-   * Contraction of unnormalized primitives.
+   * Contraction of unnormalized primitives. This carries the shared
+   * primitive exponents (the .z fields) and, for backward
+   * compatibility, the coefficients of the FIRST contraction (.c
+   * fields) mirroring cf.col(0). The exponents are the authoritative
+   * copy; the coefficients are a synced view of cf.
    * N.B. Normalization is wrt first function of shell.
    */
   std::vector<contr_t> c;
+
+  /**
+   * Coefficient matrix of the generally contracted shell: cf(iprim,
+   * ictr) is the coefficient of primitive iprim (exponent c[iprim].z)
+   * in contraction ictr. One column per contraction; the primitives
+   * are shared. For a segmented shell nctr = cf.n_cols = 1 and cf is a
+   * single column equal to the c[*].c coefficients.
+   */
+  arma::mat cf;
+
+  /// Sync c[*].c to cf.col(0) after a coefficient change
+  void sync_c();
 
   /// Angular momentum of shell
   int am;
@@ -666,10 +682,19 @@ public:
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 
-  /// Get the exponential contraction
+  /// Get the exponential contraction (the first contraction, for a
+  /// generally contracted shell)
   std::vector<contr_t> get_contr() const;
-  /// Get the exponential contraction (reference, no copy)
+  /// Get the ictr'th contraction (exponents zipped with cf.col(ictr))
+  std::vector<contr_t> get_contr(size_t ictr) const;
+  /// Get the exponential contraction (reference, no copy). For a
+  /// generally contracted shell this is the first contraction; use
+  /// get_contr(ictr) or get_coefs() for the rest.
   const std::vector<contr_t> & get_contr_ref() const;
+  /// Number of contractions (columns of the coefficient matrix)
+  size_t get_Nctr() const;
+  /// The coefficient matrix (nprim x nctr) of the generally contracted shell
+  const arma::mat & get_coefs() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
   /// Get cartesians (reference, no copy)
