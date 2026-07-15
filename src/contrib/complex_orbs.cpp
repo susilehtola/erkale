@@ -175,7 +175,15 @@ int main_guarded(int argc, char **argv) {
   if (complexbas) {
     const auto & shells = basis.get_shells();
     for (size_t i=0; i<shells.size(); i++) {
-      D.submat(shells[i].get_first_ind(), shells[i].get_first_ind(), shells[i].get_last_ind(), shells[i].get_last_ind()) = basis_transform_mat(shells[i].get_am());
+      // The transform acts on one set of 2l+1 spherical harmonics. A
+      // generally contracted shell carries nctr such sets stacked
+      // contraction-slowest, so place the transform block-diagonally,
+      // once per contraction.
+      const arma::cx_mat Tm = basis_transform_mat(shells[i].get_am());
+      const size_t Nlm = Tm.n_rows;
+      const size_t i0 = shells[i].get_first_ind();
+      for(size_t ic=0; ic<shells[i].get_Nctr(); ic++)
+        D.submat(i0+ic*Nlm, i0+ic*Nlm, i0+(ic+1)*Nlm-1, i0+(ic+1)*Nlm-1) = Tm;
     }
   } else
     D.eye();

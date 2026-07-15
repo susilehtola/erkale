@@ -283,117 +283,6 @@ void ERIWorker::compute_2c(size_t is, size_t js) {
   normalize(erk,2,1,ints);
 }
 
-void ERIWorker::compute_block(size_t bi, size_t bj, size_t bk, size_t bl) {
-  // libcint gives the integrals over all the contractions of the blocks
-  // in one call: the recursion over the primitives is shared, and only
-  // the contraction step is repeated. As for a single shell, the
-  // reversed quartet gives ERKALE's index order.
-  int shls[4]={(int) bl, (int) bk, (int) bj, (int) bi};
-
-  CINTIntegralFunction * intor=envp->lm_in_use() ? int2e_sph : int2e_cart;
-  CINTOpt * opt=(CINTOpt *) envp->get_gc_opt(CINT_ERI);
-
-  block[0]=bi;
-  block[1]=bj;
-  block[2]=bk;
-  block[3]=bl;
-
-  size_t N=1;
-  for(int q=0;q<4;q++) {
-    const std::vector<size_t> & bsh=envp->get_block_shells(block[q]);
-    // Every shell of a block has the same number of functions
-    block_nctr[q]=bsh.size();
-    block_nbf[q]=envp->get_Nbf(bsh[0]);
-    N*=block_nctr[q]*block_nbf[q];
-  }
-  blockints.resize(N);
-
-  auto evaluate_omega=[&](double omega, std::vector<double> & buf) {
-    env[PTR_RANGE_OMEGA]=omega;
-    const size_t csize=intor(NULL,NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_gc_bas(),envp->get_gc_nbas(),env.data(),NULL,NULL);
-    if(csize>cache.size())
-      cache.resize(csize);
-    if(!intor(buf.data(),NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_gc_bas(),envp->get_gc_nbas(),env.data(),(omega==0.0)?opt:NULL,cache.data()))
-      std::fill(buf.begin(),buf.end(),0.0);
-  };
-
-  if(rs_alpha!=0.0)
-    evaluate_omega(0.0,blockints);
-  else
-    std::fill(blockints.begin(),blockints.end(),0.0);
-
-  if(rs_beta!=0.0) {
-    srbuf.resize(N);
-    evaluate_omega(-rs_omega,srbuf);
-    for(size_t i=0;i<N;i++)
-      blockints[i]=rs_alpha*blockints[i]+rs_beta*srbuf[i];
-  } else if(rs_alpha!=1.0)
-    for(size_t i=0;i<N;i++)
-      blockints[i]*=rs_alpha;
-}
-
-const std::vector<double> * ERIWorker::get_ctr(size_t is, size_t js, size_t ks, size_t ls) {
-  size_t sh[4]={is, js, ks, ls};
-
-  // (ij|kl) = (kl|ij), so a quartet whose bra and ket sit in the ket
-  // and the bra block of the evaluated quartet is served from the same
-  // buffer, with the two halves of the index swapped.
-  bool swapped=false;
-  if(envp->get_shell_block(is) != block[0] || envp->get_shell_block(js) != block[1] ||
-     envp->get_shell_block(ks) != block[2] || envp->get_shell_block(ls) != block[3]) {
-    if(envp->get_shell_block(is) == block[2] && envp->get_shell_block(js) == block[3] &&
-       envp->get_shell_block(ks) == block[0] && envp->get_shell_block(ls) == block[1]) {
-      swapped=true;
-      sh[0]=ks;
-      sh[1]=ls;
-      sh[2]=is;
-      sh[3]=js;
-    } else {
-      ERROR_INFO();
-      throw std::logic_error("The shell does not belong to the evaluated block!\n");
-    }
-  }
-
-  // The contraction each shell is in its block, and the sizes. In the
-  // output of a generally contracted shell the contraction runs slower
-  // than the functions of the shell.
-  size_t ctr[4], nbf[4], nctr[4];
-  for(int q=0;q<4;q++) {
-    ctr[q]=envp->get_shell_ctr(sh[q]);
-    nbf[q]=block_nbf[q];
-    nctr[q]=block_nctr[q];
-  }
-
-  const size_t N=nbf[0]*nbf[1]*nbf[2]*nbf[3];
-  ints.resize(N);
-
-  // The index of a function in the block runs over the contraction and
-  // the functions of the shell; the quartet index runs over the four
-  // shells with the last one fastest, as everywhere in ERKALE. A
-  // swapped quartet is written out with its bra and ket exchanged.
-  for(size_t i=0;i<nbf[0];i++) {
-    const size_t bi=(ctr[0]*nbf[0]+i)*nctr[1]*nbf[1];
-    for(size_t j=0;j<nbf[1];j++) {
-      const size_t bj=(bi+ctr[1]*nbf[1]+j)*nctr[2]*nbf[2];
-      for(size_t k=0;k<nbf[2];k++) {
-        const size_t bk=(bj+ctr[2]*nbf[2]+k)*nctr[3]*nbf[3];
-        for(size_t l=0;l<nbf[3];l++) {
-          const double val=blockints[bk+ctr[3]*nbf[3]+l];
-          if(swapped)
-            ints[((k*nbf[3]+l)*nbf[0]+i)*nbf[1]+j]=val;
-          else
-            ints[((i*nbf[1]+j)*nbf[2]+k)*nbf[3]+l]=val;
-        }
-      }
-    }
-  }
-
-  const size_t erk[4]={is, js, ks, ls};
-  normalize(erk,4,1,ints);
-
-  return &ints;
-}
-
 void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
   const GaussianShell & shi=envp->get_shell(is);
   const GaussianShell & shj=envp->get_shell(js);
@@ -406,75 +295,99 @@ void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
   const std::vector<shellf_t> & ck=shk.get_cart_ref();
   const std::vector<shellf_t> & cl=shl.get_cart_ref();
 
-  const std::vector<contr_t> coni(shi.get_contr());
-  const std::vector<contr_t> conj(shj.get_contr());
-  const std::vector<contr_t> conk(shk.get_contr());
-  const std::vector<contr_t> conl(shl.get_contr());
-
   const coords_t Ri(shi.get_center()), Rj(shj.get_center()), Rk(shk.get_center()), Rl(shl.get_center());
 
-  // Cartesian integrals over the Huzinaga routines
-  std::vector<double> cart(ci.size()*cj.size()*ck.size()*cl.size(),0.0);
-  for(size_t ic=0;ic<ci.size();ic++)
-    for(size_t jc=0;jc<cj.size();jc++)
-      for(size_t kc=0;kc<ck.size();kc++)
-        for(size_t lc=0;lc<cl.size();lc++) {
-          double el=0.0;
-          for(size_t xi=0;xi<coni.size();xi++)
-            for(size_t xj=0;xj<conj.size();xj++)
-              for(size_t xk=0;xk<conk.size();xk++)
-                for(size_t xl=0;xl<conl.size();xl++)
-                  el+=coni[xi].c*conj[xj].c*conk[xk].c*conl[xl].c*
-                    ERI_int(ci[ic].l,ci[ic].m,ci[ic].n,Ri.x,Ri.y,Ri.z,coni[xi].z,
-                            cj[jc].l,cj[jc].m,cj[jc].n,Rj.x,Rj.y,Rj.z,conj[xj].z,
-                            ck[kc].l,ck[kc].m,ck[kc].n,Rk.x,Rk.y,Rk.z,conk[xk].z,
-                            cl[lc].l,cl[lc].m,cl[lc].n,Rl.x,Rl.y,Rl.z,conl[xl].z);
-
-          cart[((ic*cj.size()+jc)*ck.size()+kc)*cl.size()+lc]=
-            ci[ic].relnorm*cj[jc].relnorm*ck[kc].relnorm*cl[lc].relnorm*el;
-        }
-
-  // Transform the indices into the basis the environment evaluates in.
-  // A cartesian shell, and any shell in a cartesian basis, transforms
-  // with the identity.
-  std::vector<double> in(cart), out;
-  size_t Ncart[4], Nbf[4];
+  // Per-index cartesian and final function counts, and per-contraction
+  // (single-column) function count Nlm[q]=Nbf[q]/nctr[q]. A generally
+  // contracted shell carries nctr[q]>1 columns; each is transformed
+  // separately and stacked contraction-slowest, matching the engine.
+  const size_t nctr[4]={shi.get_Nctr(), shj.get_Nctr(), shk.get_Nctr(), shl.get_Nctr()};
+  size_t Ncart[4], Nbf[4], Nlm[4];
   for(int q=0;q<4;q++) {
     Ncart[q]=shs[q]->get_Ncart();
     Nbf[q]=envp->get_Nbf(q==0 ? is : (q==1 ? js : (q==2 ? ks : ls)));
+    Nlm[q]=Nbf[q]/nctr[q];
   }
 
-  // The transform is done one index at a time; the index being
-  // transformed is rotated to the front and back again.
-  for(int q=0;q<4;q++) {
-    const bool trans=envp->lm_in_use() && shs[q]->lm_in_use();
-    const arma::mat T(trans ? shs[q]->get_trans() : arma::mat());
+  ints.assign(Nbf[0]*Nbf[1]*Nbf[2]*Nbf[3],0.0);
 
-    // Sizes of the indices, with the ones before q already transformed
-    size_t Nbefore=1, Nafter=1;
-    for(int r=0;r<q;r++)
-      Nbefore*=Nbf[r];
-    for(int r=q+1;r<4;r++)
-      Nafter*=Ncart[r];
+  // Loop over every combination of the four shells' contractions: the
+  // exponents are shared, only the contraction coefficients differ.
+  for(size_t di=0;di<nctr[0];di++) {
+    const std::vector<contr_t> coni(shi.get_contr(di));
+    for(size_t dj=0;dj<nctr[1];dj++) {
+      const std::vector<contr_t> conj(shj.get_contr(dj));
+      for(size_t dk=0;dk<nctr[2];dk++) {
+        const std::vector<contr_t> conk(shk.get_contr(dk));
+        for(size_t dl=0;dl<nctr[3];dl++) {
+          const std::vector<contr_t> conl(shl.get_contr(dl));
 
-    if(!trans) {
-      continue;
-    }
+          // Cartesian integrals over the Huzinaga routines
+          std::vector<double> cart(ci.size()*cj.size()*ck.size()*cl.size(),0.0);
+          for(size_t ic=0;ic<ci.size();ic++)
+            for(size_t jc=0;jc<cj.size();jc++)
+              for(size_t kc=0;kc<ck.size();kc++)
+                for(size_t lc=0;lc<cl.size();lc++) {
+                  double el=0.0;
+                  for(size_t xi=0;xi<coni.size();xi++)
+                    for(size_t xj=0;xj<conj.size();xj++)
+                      for(size_t xk=0;xk<conk.size();xk++)
+                        for(size_t xl=0;xl<conl.size();xl++)
+                          el+=coni[xi].c*conj[xj].c*conk[xk].c*conl[xl].c*
+                            ERI_int(ci[ic].l,ci[ic].m,ci[ic].n,Ri.x,Ri.y,Ri.z,coni[xi].z,
+                                    cj[jc].l,cj[jc].m,cj[jc].n,Rj.x,Rj.y,Rj.z,conj[xj].z,
+                                    ck[kc].l,ck[kc].m,ck[kc].n,Rk.x,Rk.y,Rk.z,conk[xk].z,
+                                    cl[lc].l,cl[lc].m,cl[lc].n,Rl.x,Rl.y,Rl.z,conl[xl].z);
 
-    out.assign(Nbefore*Nbf[q]*Nafter,0.0);
-    for(size_t b=0;b<Nbefore;b++)
-      for(size_t n=0;n<Nbf[q];n++)
-        for(size_t c=0;c<Ncart[q];c++) {
-          const double t=T(n,c);
-          if(t==0.0)
-            continue;
-          for(size_t a=0;a<Nafter;a++)
-            out[(b*Nbf[q]+n)*Nafter+a]+=t*in[(b*Ncart[q]+c)*Nafter+a];
+                  cart[((ic*cj.size()+jc)*ck.size()+kc)*cl.size()+lc]=
+                    ci[ic].relnorm*cj[jc].relnorm*ck[kc].relnorm*cl[lc].relnorm*el;
+                }
+
+          // Transform the indices into the basis the environment
+          // evaluates in, one index at a time. A cartesian shell, and any
+          // shell in a cartesian basis, transforms with the identity.
+          std::vector<double> in(cart), out;
+          for(int q=0;q<4;q++) {
+            const bool trans=envp->lm_in_use() && shs[q]->lm_in_use();
+            if(!trans)
+              continue;
+            const arma::mat T(shs[q]->get_trans());
+
+            // Sizes of the indices, with the ones before q already
+            // transformed (per contraction, so Nlm rather than Nbf)
+            size_t Nbefore=1, Nafter=1;
+            for(int r=0;r<q;r++)
+              Nbefore*=Nlm[r];
+            for(int r=q+1;r<4;r++)
+              Nafter*=Ncart[r];
+
+            out.assign(Nbefore*Nlm[q]*Nafter,0.0);
+            for(size_t b=0;b<Nbefore;b++)
+              for(size_t n=0;n<Nlm[q];n++)
+                for(size_t c=0;c<Ncart[q];c++) {
+                  const double t=T(n,c);
+                  if(t==0.0)
+                    continue;
+                  for(size_t a=0;a<Nafter;a++)
+                    out[(b*Nlm[q]+n)*Nafter+a]+=t*in[(b*Ncart[q]+c)*Nafter+a];
+                }
+            in.swap(out);
+          }
+
+          // Scatter this contraction combination's block into the full
+          // output at its contraction offsets (contraction slowest per
+          // index), matching the engine's layout.
+          const size_t o0=di*Nlm[0], o1=dj*Nlm[1], o2=dk*Nlm[2], o3=dl*Nlm[3];
+          for(size_t a=0;a<Nlm[0];a++)
+            for(size_t b=0;b<Nlm[1];b++)
+              for(size_t c=0;c<Nlm[2];c++)
+                for(size_t e=0;e<Nlm[3];e++)
+                  ints[(((o0+a)*Nbf[1]+o1+b)*Nbf[2]+o2+c)*Nbf[3]+o3+e]=
+                    in[((a*Nlm[1]+b)*Nlm[2]+c)*Nlm[3]+e];
         }
-    in.swap(out);
+      }
+    }
   }
-
-  ints=in;
 }
 
 std::vector<double> ERIWorker::get() const {

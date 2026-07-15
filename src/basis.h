@@ -105,16 +105,6 @@ typedef struct {
 /// Comparison operator for shellpairs: descending angular momentum
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 
-/// A group of shells that share a center, an angular momentum and a set
-/// of primitives, and differ only in their contraction coefficients: a
-/// generally contracted shell, split into segmented shells by the basis
-/// set library. The integrals over all of them come out of a single
-/// recursion, so they are evaluated together.
-typedef struct {
-  /// The shells in the block, in the order they appear in the basis
-  std::vector<size_t> shells;
-} shellblock_t;
-
 /// Helper for integral sorts
 typedef struct {
   /// First shell
@@ -324,6 +314,12 @@ public:
 
   /// Sort shells in nuclear order, then by angular momentum, then by exponents
   void sort();
+  /// Merge consecutive shells that share the same center, angular
+  /// momentum, harmonics flag and primitive exponents into a single
+  /// generally contracted shell. The shells must already be in their
+  /// final order, in which every generally contracted block is
+  /// contiguous, so the merge preserves the basis function order.
+  void merge_generally_contracted();
   /// Check numbering of basis functions
   void check_numbering();
   /// Update the nuclear list of shells
@@ -338,11 +334,6 @@ public:
   void form_unique_shellpairs();
   /// Get list of unique shell pairs
   std::vector<shellpair_t> get_unique_shellpairs() const;
-  /// Group the shells by their center, angular momentum and primitives:
-  /// shells that differ only in their contraction coefficients form a
-  /// generally contracted shell, and their integrals come out of a
-  /// single recursion. A segmented basis gives one shell per block.
-  std::vector<shellblock_t> get_shell_blocks() const;
 
   /// Build ScreeningData: Schwarz Q, distance estimate M, and a
   /// value-sorted, threshold-truncated shell-pair list. Single

@@ -98,11 +98,6 @@ class IntegralWorker {
 
 /// Worker for computing electron repulsion integrals
 class ERIWorker: public IntegralWorker {
-  /// Integrals over a quartet of generally contracted shells
-  std::vector<double> blockints;
-  /// The evaluated blocks, and their contraction and function counts
-  size_t block[4], block_nctr[4], block_nbf[4];
-
  public:
   /// Constructor
   ERIWorker(const CintEnv & env, double omega=0.0, double alpha=1.0, double beta=0.0);
@@ -119,16 +114,6 @@ class ERIWorker: public IntegralWorker {
   /// Compute the four-center integrals with the in-house Huzinaga
   /// routines: the independent reference used by integraltest
   void compute_debug(size_t is, size_t js, size_t ks, size_t ls);
-
-  /// Compute the four-center integrals over a quartet of generally
-  /// contracted shells: the integrals over every combination of their
-  /// contractions come out of a single recursion. The combinations are
-  /// then handed out one at a time by get_ctr.
-  void compute_block(size_t bi, size_t bj, size_t bk, size_t bl);
-  /// Get the integrals of one combination of contractions of the block
-  /// evaluated by compute_block. The shells are given by their index in
-  /// the basis, and have to belong to the blocks that were evaluated.
-  const std::vector<double> * get_ctr(size_t is, size_t js, size_t ks, size_t ls);
 
   /// Get the integrals
   std::vector<double> get() const;

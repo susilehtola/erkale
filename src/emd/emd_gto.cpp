@@ -124,6 +124,14 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
   for(size_t iid=0;iid<idsh.size();iid++) {
     // Angular momentum
     int l=bas.get_am(idsh[iid][0]);
+    // Number of contractions: a generally contracted shell carries nctr
+    // sets of the same angular functions (they differ only in the radial
+    // part), matching find_identical_functions / form_radial which count
+    // get_Nbf = nctr*(2l+1) functions per shell.
+    const size_t nctr=bas.get_shell(idsh[iid][0]).get_Nctr();
+
+    // The angular coefficients of one contraction's functions
+    std::vector< std::vector<ylmcoeff_t> > block;
 
     // Are spherical harmonics used?
     if(bas.lm_in_use(idsh[iid][0])) {
@@ -160,8 +168,8 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
 	  c.push_back(tmp);
 	}
 
-	// Add function to stack
-	ret.push_back(c);
+	// Add function to block
+	block.push_back(c);
       }
     } else {
       // Need to do cartesian decomposition. Loop over functions on shell.
@@ -184,11 +192,16 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
 	  for(size_t ic=0;ic<c.size();ic++)
 	    c[ic].c/=n;
 
-	  // and add them to the stack
-	  ret.push_back(c);
+	  // and add them to the block
+	  block.push_back(c);
 	}
       }
     }
+
+    // Repeat the angular block for each contraction of the shell.
+    for(size_t ic=0;ic<nctr;ic++)
+      for(size_t k=0;k<block.size();k++)
+	ret.push_back(block[k]);
   }
 
   /*
@@ -220,51 +233,58 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
     // Angular momentum
     int am=bas.get_am(idsh[iid][0]);
 
-    // Normalized contraction for shell
-    std::vector<contr_t> c=bas.get_contr_normalized(idsh[iid][0]);
+    // The shell may be generally contracted: each contraction has its own
+    // radial part, shared by that contraction's angular functions. The
+    // contractions are stacked slowest, matching find_identical_functions
+    // / form_clm (get_Nbf = nctr*Nlm functions per shell).
+    const GaussianShell shell=bas.get_shell(idsh[iid][0]);
+    const size_t nctr=shell.get_Nctr();
+    // Functions per contraction (2l+1 spherical, or the cartesian count)
+    const size_t Nlm=bas.get_Nbf(idsh[iid][0])/nctr;
 
-    // The radial part for this shell
-    std::vector<RadialGaussian> rad;
+    for(size_t ictr=0;ictr<nctr;ictr++) {
+      // Normalized contraction for this column
+      std::vector<contr_t> c=shell.get_contr_normalized(ictr);
 
-    // Are spherical harmonics used?
-    if(bas.lm_in_use(idsh[iid][0])) {
-      // Yes. We only get a single l value.
-      RadialGaussian help(am,am);
+      // The radial part for this contraction
+      std::vector<RadialGaussian> rad;
 
-      // Add the contractions.
-      for(size_t i=0;i<c.size();i++) {
-	contr_t term;
-	term.z=c[i].z;
-	term.c=c[i].c*pow(c[i].z,-am/2.0-3.0/4.0);
-	help.add_term(term);
-      }
-      rad.push_back(help);
-
-      // All functions on shell have the same radial part
-      for(size_t ind=0;ind<bas.get_Nbf(idsh[iid][0]);ind++)
-	ret.push_back(rad);
-
-    } else {
-      // No, we get multiple values of l.
-
-      // Loop over possible l values
-      for(int l=am;l>=0;l-=2) {
-	// Construct the radial gaussian
-	RadialGaussian help(am,l);
+      // Are spherical harmonics used?
+      if(bas.lm_in_use(idsh[iid][0])) {
+	// Yes. We only get a single l value.
+	RadialGaussian help(am,am);
 
 	// Add the contractions.
 	for(size_t i=0;i<c.size();i++) {
 	  contr_t term;
 	  term.z=c[i].z;
-	  term.c=c[i].c*pow(c[i].z,-l/2.0-3.0/4.0);
+	  term.c=c[i].c*pow(c[i].z,-am/2.0-3.0/4.0);
 	  help.add_term(term);
 	}
-	// and add the term
 	rad.push_back(help);
+
+      } else {
+	// No, we get multiple values of l.
+
+	// Loop over possible l values
+	for(int l=am;l>=0;l-=2) {
+	  // Construct the radial gaussian
+	  RadialGaussian help(am,l);
+
+	  // Add the contractions.
+	  for(size_t i=0;i<c.size();i++) {
+	    contr_t term;
+	    term.z=c[i].z;
+	    term.c=c[i].c*pow(c[i].z,-l/2.0-3.0/4.0);
+	    help.add_term(term);
+	  }
+	  // and add the term
+	  rad.push_back(help);
+	}
       }
 
-      // All functions on shell have the same radial part
-      for(size_t ind=0;ind<bas.get_Nbf(idsh[iid][0]);ind++)
+      // All angular functions of this contraction share its radial part
+      for(size_t ind=0;ind<Nlm;ind++)
 	ret.push_back(rad);
     }
   }
