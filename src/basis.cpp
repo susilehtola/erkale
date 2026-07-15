@@ -383,13 +383,17 @@ const std::vector<shellf_t> & GaussianShell::get_cart_ref() const {
 }
 
 std::vector<contr_t> GaussianShell::get_contr_normalized() const {
-  // Returned array
-  std::vector<contr_t> cn(c);
+  return get_contr_normalized(0);
+}
+
+std::vector<contr_t> GaussianShell::get_contr_normalized(size_t ictr) const {
+  // The ictr'th contraction, its coefficients converted to those of
+  // normalized primitives
+  std::vector<contr_t> cn(get_contr(ictr));
 
   // Note - these refer to cartesian functions!
   double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
 
-  // Convert coefficients to those of normalized primitives
   for(size_t i=0;i<cn.size();i++)
     cn[i].c/=fac*pow(cn[i].z,am/2.0+0.75);
 
@@ -403,6 +407,24 @@ size_t GaussianShell::get_Nbf() const {
 
 size_t GaussianShell::get_Nctr() const {
   return cf.n_cols;
+}
+
+bool GaussianShell::same_primitives(const GaussianShell & rhs) const {
+  if(cenind != rhs.cenind || am != rhs.am || uselm != rhs.uselm)
+    return false;
+  if(c.size() != rhs.c.size())
+    return false;
+  for(size_t i=0;i<c.size();i++)
+    if(c[i].z != rhs.c[i].z)
+      return false;
+  return true;
+}
+
+void GaussianShell::merge_contraction(const GaussianShell & rhs) {
+  if(!same_primitives(rhs))
+    throw std::logic_error("GaussianShell::merge_contraction: the shells do not share the same primitives.\n");
+  // Append rhs's contraction columns after ours, preserving order
+  cf=arma::join_rows(cf,rhs.cf);
 }
 
 const arma::mat & GaussianShell::get_coefs() const {

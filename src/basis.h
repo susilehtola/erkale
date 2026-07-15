@@ -693,6 +693,15 @@ public:
   const std::vector<contr_t> & get_contr_ref() const;
   /// Number of contractions (columns of the coefficient matrix)
   size_t get_Nctr() const;
+  /// Merge another shell in as an additional contraction: rhs must
+  /// share this shell's center, angular momentum, spherical/cartesian
+  /// choice and primitive exponents. Its contraction columns are
+  /// appended after this shell's, forming a generally contracted shell.
+  /// This is how add_shells and the checkpoint regroup build generally
+  /// contracted shells out of same-exponent segmented ones.
+  void merge_contraction(const GaussianShell & rhs);
+  /// May the other shell be merged in as an additional contraction?
+  bool same_primitives(const GaussianShell & rhs) const;
   /// The coefficient matrix (nprim x nctr) of the generally contracted shell
   const arma::mat & get_coefs() const;
   /// Get cartesians
@@ -707,6 +716,9 @@ public:
    * the input isn't really normalized..?
    */
   std::vector<contr_t> get_contr_normalized() const;
+  /// Get contraction coefficients of normalized primitives for the
+  /// ictr'th contraction
+  std::vector<contr_t> get_contr_normalized(size_t ictr) const;
 
   /// Number of functions on shell
   size_t get_Nbf() const;
