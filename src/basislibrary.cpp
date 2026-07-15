@@ -163,6 +163,28 @@ std::string find_basis(const std::string & basisname, bool verbose) {
   throw std::runtime_error(oss.str());
 }
 
+// Validate a single (exponent, coefficient) pair
+static void check_primitive(double z, double c) {
+  if(z<=0.0) {
+    std::ostringstream oss;
+    oss << "Negative gaussian exponent " << z << " in basis set!\n";
+    throw std::runtime_error(oss.str());
+  }
+  if(!std::isnormal(z)) {
+    std::ostringstream oss;
+    oss << "Abnormal gaussian exponent " << z << " in basis set!\n";
+    throw std::runtime_error(oss.str());
+  }
+  // A coefficient may legitimately be zero (a primitive absent from one
+  // contraction of a generally contracted block), so 0 is allowed here;
+  // only NaN/inf are rejected.
+  if(c!=0.0 && !std::isnormal(c)) {
+    std::ostringstream oss;
+    oss << "Abnormal contraction coefficient " << c << " in basis set!\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
 FunctionShell::FunctionShell(int amval) {
   am=amval;
 }
@@ -171,95 +193,124 @@ FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
   am=amval;
   C=c;
 
-  for(size_t i=0;i<c.size();i++) {
-    if(C[i].z<=0.0) {
-      std::ostringstream oss;
-      oss << "Negative gaussian exponent " << C[i].z << " in basis set!\n";
-      throw std::runtime_error(oss.str());
-    }
+  for(size_t i=0;i<c.size();i++)
+    check_primitive(C[i].z, C[i].c);
 
-    if(!std::isnormal(C[i].z)) {
-      std::ostringstream oss;
-      oss << "Abnormal gaussian exponent " << C[i].z << " in basis set!\n";
-      throw std::runtime_error(oss.str());
-    }
+  // A single contraction: the coefficient matrix is one column. The
+  // exponents are left in the caller's order (as before); the shell is
+  // sorted later by ElementBasisSet::sort.
+  cf.set_size(C.size(),1);
+  for(size_t i=0;i<C.size();i++)
+    cf(i,0)=C[i].c;
+}
 
-    if(!std::isnormal(C[i].c)) {
-      std::ostringstream oss;
-      oss << "Abnormal contraction coefficient " << C[i].c << " in basis set!\n";
-      throw std::runtime_error(oss.str());
-    }
+FunctionShell::FunctionShell(int amval, const std::vector<double> & z, const arma::mat & coefs) {
+  am=amval;
+  if(z.size() != coefs.n_rows)
+    throw std::runtime_error("FunctionShell: exponent count does not match the coefficient matrix.\n");
+
+  // The exponents carry the (authoritative) primitive list; C[i].c
+  // mirrors the first contraction via sync_c() below.
+  C.resize(z.size());
+  for(size_t i=0;i<z.size();i++) {
+    C[i].z=z[i];
+    C[i].c=0.0;
   }
+  cf=coefs;
+  for(size_t i=0;i<coefs.n_rows;i++)
+    for(size_t j=0;j<coefs.n_cols;j++)
+      check_primitive(z[i], coefs(i,j));
+
+  sync_c();
+  sort();
 }
 
 FunctionShell::~FunctionShell() {
 }
 
+void FunctionShell::sync_c() {
+  // Mirror the first contraction's coefficients back into C, whose .z
+  // fields carry the (authoritative) shared exponents
+  for(size_t i=0;i<C.size();i++)
+    C[i].c=cf(i,0);
+}
+
 void FunctionShell::add_exponent(double Cv, double zv) {
-  if(zv<=0.0) {
-    std::ostringstream oss;
-    oss << "Negative gaussian exponent " << zv << " in basis set!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  if(!std::isnormal(zv)) {
-    std::ostringstream oss;
-    oss << "Abnormal gaussian exponent " << zv << " in basis set!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  if(!std::isnormal(Cv)) {
-    std::ostringstream oss;
-    oss << "Abnormal contraction coefficient " << Cv << " in basis set!\n";
-    throw std::runtime_error(oss.str());
-  }
-
+  if(cf.n_cols>1)
+    throw std::runtime_error("FunctionShell::add_exponent called on a generally contracted shell.\n");
+  check_primitive(zv, Cv);
 
   contr_t tmp;
   tmp.c=Cv;
   tmp.z=zv;
   C.push_back(tmp);
+  // Grow the single coefficient column to match
+  cf.set_size(C.size(),1);
+  for(size_t i=0;i<C.size();i++)
+    cf(i,0)=C[i].c;
   sort();
 }
 
 void FunctionShell::sort() {
-  // Sort exponents in decreasing order
+  // Sort the primitives in decreasing order of exponent, permuting the
+  // coefficient matrix rows the same way.
+  std::vector<size_t> idx(C.size());
+  for(size_t i=0;i<idx.size();i++)
+    idx[i]=i;
+  std::stable_sort(idx.begin(),idx.end(),[this](size_t a, size_t b) {
+    return C[a].z > C[b].z;
+  });
 
-  std::stable_sort(C.begin(),C.end());
+  std::vector<contr_t> Csort(C.size());
+  arma::mat cfsort(cf.n_rows,cf.n_cols);
+  for(size_t i=0;i<idx.size();i++) {
+    Csort[i]=C[idx[i]];
+    cfsort.row(i)=cf.row(idx[i]);
+  }
+  C=Csort;
+  cf=cfsort;
 }
 
 void FunctionShell::normalize() {
-  // If there's a single function on the shell, its coefficient is unity.
-  if(C.size()==1) {
-    C[0].c=1.0;
-    return;
+  // Normalize each contraction (column) separately.
+  for(size_t ic=0;ic<cf.n_cols;ic++) {
+    // A single primitive normalizes to a unit coefficient.
+    if(cf.n_rows==1) {
+      cf(0,ic)=1.0;
+      continue;
+    }
+
+    // Overlap of the normalized primitives for this contraction
+    double S=0.0;
+    for(size_t i=0;i<cf.n_rows;i++)
+      for(size_t j=0;j<cf.n_rows;j++)
+        S+=cf(i,ic)*cf(j,ic)*std::pow(4*C[i].z*C[j].z/std::pow(C[i].z+C[j].z,2),am/2.0+3.0/4.0);
+
+    // Scale the coefficients by 1/sqrt(S)
+    S=sqrt(S);
+    for(size_t i=0;i<cf.n_rows;i++)
+      cf(i,ic)/=S;
+
+    // Fix the sign of the coefficient with the largest absolute value
+    double maxfabs=0.0;
+    for(size_t i=0;i<cf.n_rows;i++)
+      if(fabs(cf(i,ic))>fabs(maxfabs))
+        maxfabs=cf(i,ic);
+    if(maxfabs<0.0)
+      for(size_t i=0;i<cf.n_rows;i++)
+        cf(i,ic)*=-1.0;
   }
-
-  // Calculate overlap of normalized functions
-  double S=0.0;
-  for(size_t i=0;i<C.size();i++)
-    for(size_t j=0;j<C.size();j++)
-      S+=C[i].c*C[j].c*std::pow(4*C[i].z*C[j].z/std::pow(C[i].z+C[j].z,2),am/2.0+3.0/4.0);
-
-  // The coefficients must be scaled by 1/sqrt(S)
-  S=sqrt(S);
-  for(size_t i=0;i<C.size();i++)
-    C[i].c/=S;
-
-  // Check sign of coefficient with maximum absolute value
-  double maxfabs=0.0;
-  for(size_t i=0;i<C.size();i++)
-    if(fabs(C[i].c)>fabs(maxfabs))
-      maxfabs=C[i].c;
-  if(maxfabs<0.0)
-    for(size_t i=0;i<C.size();i++)
-      C[i].c*=-1.0;
+  sync_c();
 }
 
 void FunctionShell::print() const {
-  printf("\tam = %i, %i functions\n",am, (int) C.size());
-  for(size_t i=0;i<C.size();i++)
-    printf("\t\t% e\t%e\n",C[i].c,C[i].z);
+  printf("\tam = %i, %i primitives, %i contractions\n",am, (int) C.size(), (int) cf.n_cols);
+  for(size_t i=0;i<C.size();i++) {
+    printf("\t\t%e",C[i].z);
+    for(size_t ic=0;ic<cf.n_cols;ic++)
+      printf("\t% e",cf(i,ic));
+    printf("\n");
+  }
 }
 
 bool FunctionShell::operator<(const FunctionShell & rhs) const {
@@ -281,12 +332,20 @@ bool FunctionShell::operator==(const FunctionShell & rhs) const {
   if(am!=rhs.am)
     return false;
 
+  // Same primitive exponents
   if(C.size() != rhs.C.size())
     return false;
-
   for(size_t i=0;i<C.size();i++)
-    if(C[i].z != rhs.C[i].z || C[i].c != rhs.C[i].c)
+    if(C[i].z != rhs.C[i].z)
       return false;
+
+  // and the same coefficient matrix
+  if(cf.n_cols != rhs.cf.n_cols)
+    return false;
+  for(size_t i=0;i<cf.n_rows;i++)
+    for(size_t j=0;j<cf.n_cols;j++)
+      if(cf(i,j) != rhs.cf(i,j))
+        return false;
 
   return true;
 }
@@ -299,8 +358,27 @@ size_t FunctionShell::get_Ncontr() const {
   return C.size();
 }
 
+size_t FunctionShell::get_Nctr() const {
+  return cf.n_cols;
+}
+
 std::vector<contr_t> FunctionShell::get_contr() const {
   return C;
+}
+
+std::vector<contr_t> FunctionShell::get_contr(size_t ictr) const {
+  if(ictr>=cf.n_cols)
+    throw std::runtime_error("FunctionShell::get_contr: contraction index out of range.\n");
+  std::vector<contr_t> ret(C.size());
+  for(size_t i=0;i<C.size();i++) {
+    ret[i].z=C[i].z;
+    ret[i].c=cf(i,ictr);
+  }
+  return ret;
+}
+
+const arma::mat & FunctionShell::get_coefs() const {
+  return cf;
 }
 
 ElementBasisSet::ElementBasisSet() {
@@ -1861,14 +1939,22 @@ void BasisSetLibrary::save_gaussian94(const std::string & filename, bool append)
     fprintf(out,"%-2s %i\n",elements[iel].symbol.c_str(),(int) elements[iel].get_number());
     // Loop over shells
     for(size_t ish=0;ish<elements[iel].bf.size();ish++) {
-      // Print out type and length of shell
-      if(elements[iel].bf[ish].am<7)
-	fprintf(out,"%c   %i   1.00\n",shell_types[elements[iel].bf[ish].am],(int) elements[iel].bf[ish].C.size());
-      else
-	fprintf(out,"L=%i %i   1.00\n",elements[iel].bf[ish].am,(int) elements[iel].bf[ish].C.size());
-      // Print out contraction
-      for(size_t iexp=0;iexp<elements[iel].bf[ish].C.size();iexp++)
-	fprintf(out,"  %.10e  % .10e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
+      const FunctionShell & sh=elements[iel].bf[ish];
+      const int am=sh.get_am();
+      const size_t nprim=sh.get_Ncontr();
+      // Gaussian'94 has no generally contracted shells: a shell with
+      // nctr contractions is written as nctr shells sharing the exponents.
+      for(size_t ic=0;ic<sh.get_Nctr();ic++) {
+	const std::vector<contr_t> c=sh.get_contr(ic);
+	// Print out type and length of shell
+	if(am<7)
+	  fprintf(out,"%c   %i   1.00\n",shell_types[am],(int) nprim);
+	else
+	  fprintf(out,"L=%i %i   1.00\n",am,(int) nprim);
+	// Print out contraction
+	for(size_t iexp=0;iexp<c.size();iexp++)
+	  fprintf(out,"  %.10e  % .10e\n",c[iexp].z,c[iexp].c);
+      }
     }
     // Close entry
     fprintf(out,"****\n");

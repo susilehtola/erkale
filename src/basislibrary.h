@@ -66,18 +66,33 @@ std::string find_basis(const std::string & filename, bool verbose=true);
 class FunctionShell {
   /// Angular momentum
   int am;
-  /// Exponential contraction
+  /// The shared primitive exponents (.z is authoritative). Each .c
+  /// mirrors the first contraction, cf.col(0), kept in sync via sync_c()
+  /// so the legacy single-contraction accessors keep working.
   std::vector<contr_t> C;
+  /// Contraction coefficient matrix: nprim (= C.size()) rows, one column
+  /// per contraction. A segmented shell has a single column; a generally
+  /// contracted shell (several contractions sharing the exponents, as in
+  /// a BSE electron_shell) has one column per contraction.
+  arma::mat cf;
+
+  /// Mirror the first contraction's coefficients back into C[i].c
+  void sync_c();
 
  public:
   /// Construct a shell with angular momentum am
   FunctionShell(int am=-1);
-  /// Construct a shell with angular momentum am and given contraction
+  /// Construct a segmented shell with angular momentum am and the given
+  /// (single) contraction
   FunctionShell(int am, const std::vector<contr_t> & c);
+  /// Construct a (possibly generally contracted) shell from shared
+  /// exponents and an nprim x nctr coefficient matrix
+  FunctionShell(int am, const std::vector<double> & z, const arma::mat & coefs);
   /// Destructor
   ~FunctionShell();
 
-  /// Add exponent into contraction
+  /// Add exponent into the (single) contraction. Only valid for a
+  /// segmented shell (nctr == 1).
   void add_exponent(double C, double z);
   /// Comparison operator for ordering in decreasing angular momentum and exponent
   bool operator<(const FunctionShell &rhs) const;
@@ -86,15 +101,22 @@ class FunctionShell {
 
   /// Get angular momentum
   int get_am() const;
-  /// Get contraction length
+  /// Get contraction length (number of primitive exponents)
   size_t get_Ncontr() const;
+  /// Get the number of contractions (coefficient columns)
+  size_t get_Nctr() const;
 
-  /// Get contraction coefficients
+  /// Get the first contraction's coefficients (the whole contraction for
+  /// a segmented shell)
   std::vector<contr_t> get_contr() const;
+  /// Get the ictr'th contraction's coefficients
+  std::vector<contr_t> get_contr(size_t ictr) const;
+  /// Get the coefficient matrix (nprim x nctr)
+  const arma::mat & get_coefs() const;
 
   /// Sort exponents in decreasing order
   void sort();
-  /// Normalize coefficients
+  /// Normalize coefficients (each contraction separately)
   void normalize();
   /// Print out info
   void print() const;
