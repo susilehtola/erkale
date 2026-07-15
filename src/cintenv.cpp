@@ -232,10 +232,6 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
 
   // Build the integral optimizers. They cache the primitive pair data,
   // which is the whole point of holding on to the environment.
-  // The generally contracted tables share the data array, so they must
-  // be built before the workers copy it
-  build_gc(sh, build_opts);
-
   if(!build_opts)
     return;
 
@@ -256,121 +252,6 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     optfun[ik](&o, atmp, natm, basp, nbas, envp);
     opts->opts[ik]=(void *) o;
   }
-}
-
-void CintEnv::build_gc(const std::vector<GaussianShell> & sh, bool build_opts) {
-  // Group the shells that share a center, an angular momentum and a set
-  // of primitives: the integrals over their contractions come out of a
-  // single recursion.
-  gc_blocks.clear();
-  shell_block.assign(sh.size(),0);
-  shell_ctr.assign(sh.size(),0);
-
-  auto same_block = [](const GaussianShell & lhs, const GaussianShell & rhs) {
-    if(lhs.get_center_ind() != rhs.get_center_ind() || lhs.get_am() != rhs.get_am() || lhs.lm_in_use() != rhs.lm_in_use())
-      return false;
-    const std::vector<contr_t> & lc=lhs.get_contr_ref();
-    const std::vector<contr_t> & rc=rhs.get_contr_ref();
-    if(lc.size() != rc.size())
-      return false;
-    for(size_t ip=0;ip<lc.size();ip++)
-      if(lc[ip].z != rc[ip].z)
-        return false;
-    return true;
-  };
-
-  for(size_t is=0;is<sh.size();is++) {
-    bool found=false;
-    for(size_t ib=0;ib<gc_blocks.size();ib++)
-      if(same_block(sh[gc_blocks[ib].shells[0]], sh[is])) {
-        shell_block[is]=ib;
-        shell_ctr[is]=gc_blocks[ib].shells.size();
-        gc_blocks[ib].shells.push_back(is);
-        found=true;
-        break;
-      }
-    if(!found) {
-      shellblock_t block;
-      block.shells.push_back(is);
-      shell_block[is]=gc_blocks.size();
-      shell_ctr[is]=0;
-      gc_blocks.push_back(block);
-    }
-  }
-
-  // The generally contracted shell table. The coefficients of the block
-  // sit next to each other in the data array, one contraction after the
-  // other, which is what libcint expects of a shell with NCTR_OF > 1.
-  gc_bas.assign(BAS_SLOTS*gc_blocks.size(), 0);
-  for(size_t ib=0;ib<gc_blocks.size();ib++) {
-    const size_t is0=gc_blocks[ib].shells[0];
-    const size_t nctr=gc_blocks[ib].shells.size();
-
-    // The primitives are shared, so they can be taken from the first shell
-    for(int slot=0;slot<BAS_SLOTS;slot++)
-      gc_bas[ib*BAS_SLOTS+slot]=cint_bas[is0*BAS_SLOTS+slot];
-    gc_bas[ib*BAS_SLOTS+NCTR_OF]=(int) nctr;
-
-    if(nctr==1)
-      continue;
-
-    // The coefficients of the contractions have to be contiguous
-    const int nprim=cint_bas[is0*BAS_SLOTS+NPRIM_OF];
-    gc_bas[ib*BAS_SLOTS+PTR_COEFF]=(int) cint_env.size();
-    for(size_t ic=0;ic<nctr;ic++) {
-      const size_t is=gc_blocks[ib].shells[ic];
-      const int ptr=cint_bas[is*BAS_SLOTS+PTR_COEFF];
-      for(int ip=0;ip<nprim;ip++)
-        cint_env.push_back(cint_env[ptr+ip]);
-    }
-  }
-
-  if(!build_opts || !have_gc())
-    return;
-
-  gc_opts=std::make_shared<OptSet>();
-  gc_opts->opts.assign(CINT_NKERNEL, nullptr);
-  CINTOptimizerFunction * const optfun[CINT_NKERNEL]={
-    int2e_optimizer, int2e_ip1_optimizer, int2e_ip2_optimizer,
-    int3c2e_optimizer, int3c2e_ip1_optimizer, int3c2e_ip2_optimizer,
-    int2c2e_optimizer, int2c2e_ip1_optimizer};
-  for(int ik=0;ik<CINT_NKERNEL;ik++) {
-    CINTOpt * o=nullptr;
-    optfun[ik](&o, cint_atm.data(), get_natm(), gc_bas.data(), (int) gc_blocks.size(), cint_env.data());
-    gc_opts->opts[ik]=(void *) o;
-  }
-}
-
-size_t CintEnv::get_Nblock() const {
-  return gc_blocks.size();
-}
-
-const std::vector<size_t> & CintEnv::get_block_shells(size_t ib) const {
-  return gc_blocks[ib].shells;
-}
-
-size_t CintEnv::get_shell_block(size_t ish) const {
-  return shell_block[ish];
-}
-
-size_t CintEnv::get_shell_ctr(size_t ish) const {
-  return shell_ctr[ish];
-}
-
-bool CintEnv::have_gc() const {
-  return gc_blocks.size() != shell_block.size();
-}
-
-int * CintEnv::get_gc_bas() const {
-  return const_cast<int *>(gc_bas.data());
-}
-
-int CintEnv::get_gc_nbas() const {
-  return (int) gc_blocks.size();
-}
-
-void * CintEnv::get_gc_opt(cint_kernel_t kernel) const {
-  return gc_opts ? gc_opts->opts[kernel] : nullptr;
 }
 
 bool CintEnv::is_filled() const {

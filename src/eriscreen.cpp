@@ -130,59 +130,7 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   deri_pool_.clear();
   deri_pool_.resize(nth);
 
-  // Group the shell pairs by the blocks of their shells, so that the
-  // integrals of a generally contracted basis can be evaluated one
-  // block at a time
-  form_blockpairs();
-
   return shpairs.size();
-}
-
-void ERIscreen::form_blockpairs() {
-  blockpairs.clear();
-  blockpair_blocks.clear();
-  blockpair_Q.clear();
-
-  // A basis without generally contracted shells has nothing to gain
-  if(!cenv.have_gc())
-    return;
-
-  // Group the significant shell pairs by the blocks of their shells
-  std::map<std::pair<size_t,size_t>, size_t> map;
-  for(size_t ip=0;ip<shpairs.size();ip++) {
-    const std::pair<size_t,size_t> bp(cenv.get_shell_block(shpairs[ip].is),
-                                      cenv.get_shell_block(shpairs[ip].js));
-    auto it=map.find(bp);
-    if(it==map.end()) {
-      map[bp]=blockpairs.size();
-      blockpairs.push_back(std::vector<size_t>(1,ip));
-      blockpair_blocks.push_back(bp);
-      blockpair_Q.push_back(shpairs[ip].eri);
-    } else {
-      blockpairs[it->second].push_back(ip);
-      blockpair_Q[it->second]=std::max(blockpair_Q[it->second], shpairs[ip].eri);
-    }
-  }
-
-  // Sort the block pairs by their bound, as the shell pairs are sorted:
-  // the loop can then stop as soon as the bound drops below the
-  // threshold
-  std::vector<size_t> idx(blockpairs.size());
-  for(size_t i=0;i<idx.size();i++)
-    idx[i]=i;
-  std::stable_sort(idx.begin(), idx.end(), [&](size_t a, size_t b) { return blockpair_Q[a] > blockpair_Q[b]; });
-
-  std::vector<std::vector<size_t>> sp(blockpairs.size());
-  std::vector<std::pair<size_t,size_t>> sb(blockpairs.size());
-  std::vector<double> sq(blockpairs.size());
-  for(size_t i=0;i<idx.size();i++) {
-    sp[i]=blockpairs[idx[i]];
-    sb[i]=blockpair_blocks[idx[i]];
-    sq[i]=blockpair_Q[idx[i]];
-  }
-  blockpairs=sp;
-  blockpair_blocks=sb;
-  blockpair_Q=sq;
 }
 
 ERIWorker * ERIscreen::acquire_eri(int ith) const {
@@ -246,103 +194,9 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
     // Integral array
     const std::vector<double> * erip;
 
-    // Reused buffer for the quartets of a block pair
-    std::vector<std::pair<size_t,size_t>> quartets;
-
-    // A generally contracted basis is evaluated one block quartet at a
-    // time: the recursion over the primitives is then shared by every
-    // combination of the contractions. The shell pairs are screened one
-    // by one as in the plain loop, so nothing is lost; only the
-    // evaluation is grouped.
-    if(blockpairs.size()) {
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ib=0;ib<blockpairs.size();ib++) {
-	for(size_t jb=0;jb<=ib;jb++) {
-	  // The bound of the block pair is that of its largest shell pair
-	  if(blockpair_Q[ib]*blockpair_Q[jb]<tol)
-	    break;
-	  if(screen_thresh_>0.0 && blockpair_Q[ib]*blockpair_Q[jb]*Dmax<screen_thresh_)
-	    break;
-
-	  // The quartets of this block pair that survive the screening.
-	  // The buffer is reused: nothing is allocated in the hot loop.
-	  quartets.clear();
-	  for(size_t ipi=0;ipi<blockpairs[ib].size();ipi++)
-	    for(size_t jpi=0;jpi<blockpairs[jb].size();jpi++) {
-	      size_t ip=blockpairs[ib][ipi];
-	      size_t jp=blockpairs[jb][jpi];
-	      // Every unordered pair of shell pairs is visited once
-	      if(jp>ip) {
-		if(ib==jb)
-		  continue;
-		std::swap(ip,jp);
-	      }
-
-	      const size_t is=shpairs[ip].is, js=shpairs[ip].js;
-	      const size_t ks=shpairs[jp].is, ls=shpairs[jp].js;
-
-	      const double QQ=Q(is,js)*Q(ks,ls);
-	      if(QQ<tol)
-		continue;
-	      if(screen_thresh_>0.0 && QQ*Dmax<screen_thresh_)
-		continue;
-
-	      const double MM=std::min(M(is,ks)*M(js,ls), M(is,ls)*M(js,ks));
-	      if(MM<tol)
-		continue;
-
-	      if(screen_thresh_>0.0) {
-		double Dq=D(is,js);
-		Dq=std::max(Dq,D(ks,ls));
-		Dq=std::max(Dq,D(is,ks));
-		Dq=std::max(Dq,D(is,ls));
-		Dq=std::max(Dq,D(js,ks));
-		Dq=std::max(Dq,D(js,ls));
-		if(QQ*Dq<screen_thresh_ || MM*Dq<screen_thresh_)
-		  continue;
-	      }
-
-	      quartets.push_back(std::make_pair(ip,jp));
-	    }
-
-	  if(!quartets.size())
-	    continue;
-
-	  const size_t bi=blockpair_blocks[ib].first;
-	  const size_t bj=blockpair_blocks[ib].second;
-	  const size_t bk=blockpair_blocks[jb].first;
-	  const size_t bl=blockpair_blocks[jb].second;
-
-	  // Nothing is shared if every block holds a single shell: the
-	  // quartet is then evaluated as in a segmented basis, and going
-	  // through the block would only add a copy
-	  const bool shared =
-	    cenv.get_block_shells(bi).size()*cenv.get_block_shells(bj).size()*
-	    cenv.get_block_shells(bk).size()*cenv.get_block_shells(bl).size() > 1;
-
-	  if(shared)
-	    // One recursion for every combination of the contractions
-	    eri->compute_block(bi,bj,bk,bl);
-
-	  for(size_t iq=0;iq<quartets.size();iq++) {
-	    const size_t ip=quartets[iq].first;
-	    const size_t jp=quartets[iq].second;
-	    if(shared)
-	      erip=eri->get_ctr(shpairs[ip].is,shpairs[ip].js,shpairs[jp].is,shpairs[jp].js);
-	    else {
-	      eri->compute(shpairs[ip].is,shpairs[ip].js,shpairs[jp].is,shpairs[jp].js);
-	      erip=eri->getp();
-	    }
-	    for(size_t i=0;i<digest[ith].size();i++)
-	      digest[ith][i]->digest(shpairs,ip,jp,*erip,0);
-	  }
-	}
-      }
-
-    } else {
-
+    // Each shell is a (possibly generally contracted) shell, so
+    // compute() over a shell pair yields the whole generally contracted
+    // quartet in one recursion.
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
@@ -407,7 +261,6 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 	for(size_t i=0;i<digest[ith].size();i++)
 	  digest[ith][i]->digest(shpairs,ip,jp,*erip,0);
       }
-    }
     }
     // eri is owned by eri_pool_ -- do not delete.
   }

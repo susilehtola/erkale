@@ -421,8 +421,6 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
   remove(role+".contr");
   remove(role+".data");
 
-  // Get number of shells
-  size_t Nsh=basis.get_Nshells();
   // Get number of nuclei
   size_t Nnuc=basis.get_Nnuc();
 
@@ -478,26 +476,47 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
   H5Tclose(datatype);
   H5Tclose(symtype);
 
-  /* Write shell data, contractions first */
+  /* Write shell data, contractions first.
 
-  dimsf[0]=Nsh;
+     A generally contracted shell (nctr>1) is written as nctr consecutive
+     records, one per contraction, each carrying the shared exponents,
+     that contraction's coefficients, and its own first function index.
+     This makes the on-disk layout byte-identical to a segmented basis, so
+     a checkpoint written by a generally contracted run still matches the
+     reference files and old checkpoints load unchanged; the read side
+     regroups the consecutive records back into generally contracted
+     shells. */
+
+  const std::vector<GaussianShell> & wshells=basis.get_shells_ref();
+  std::vector< std::vector<contr_t> > excontr;
+  std::vector<shell_data_t> exdata;
+  for(size_t i=0;i<wshells.size();i++) {
+    const GaussianShell & sh=wshells[i];
+    const size_t Nlm=sh.lm_in_use() ? sh.get_Nlm() : sh.get_Ncart();
+    for(size_t ic=0;ic<sh.get_Nctr();ic++) {
+      excontr.push_back(sh.get_contr(ic));
+      shell_data_t sd;
+      sd.indstart=sh.get_first_ind()+ic*Nlm;
+      sd.am=sh.get_am();
+      sd.uselm=sh.lm_in_use();
+      sd.cenind=sh.get_center_ind();
+      exdata.push_back(sd);
+    }
+  }
+  const size_t Nrec=excontr.size();
+
+  dimsf[0]=Nrec;
   dataspace = H5Screate_simple(1,dimsf,NULL);
 
-  // Create array holding exponents and contraction coefficients of shells.
-  hvl_t contrs[Nsh];
+  // Create array holding exponents and contraction coefficients.
+  hvl_t contrs[Nrec];
 
   // Initialize data.
-  for(size_t i=0;i<Nsh;i++) {
-    // Get contraction on shell
-    std::vector<contr_t> cntr=basis.get_contr(i);
-
-    // Allocate memory
-    contrs[i].p=malloc(cntr.size()*sizeof(contr_t));
-    contrs[i].len=cntr.size();
-
-    // Store contractions
-    for(size_t j=0;j<cntr.size();j++)
-      ((contr_t *) contrs[i].p)[j]=cntr[j];
+  for(size_t i=0;i<Nrec;i++) {
+    contrs[i].p=malloc(excontr[i].size()*sizeof(contr_t));
+    contrs[i].len=excontr[i].size();
+    for(size_t j=0;j<excontr[i].size();j++)
+      ((contr_t *) contrs[i].p)[j]=excontr[i][j];
   }
 
   // Create compound datatype
@@ -519,18 +538,14 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Tclose(contrdata);
-  for(size_t i=0;i<Nsh;i++)
+  for(size_t i=0;i<Nrec;i++)
     free(contrs[i].p);
 
   /* Done with contractions, write other (fixed-length) data. */
 
-  shell_data_t shdata[Nsh];
-  for(size_t i=0;i<Nsh;i++) {
-    shdata[i].indstart=basis.get_first_ind(i);
-    shdata[i].am=basis.get_am(i);
-    shdata[i].uselm=basis.lm_in_use(i);
-    shdata[i].cenind=basis.get_shell_center_ind(i);
-  }
+  shell_data_t shdata[Nrec];
+  for(size_t i=0;i<Nrec;i++)
+    shdata[i]=exdata[i];
 
   // Create dataset for shared data
   datatype = H5Tcreate(H5T_COMPOUND, sizeof(shell_data_t));

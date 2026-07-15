@@ -96,17 +96,18 @@ std::vector<int> form_shelltypes(const BasisSet & basis) {
   // Get the shells
   std::vector<GaussianShell> shells=basis.get_shells();
 
-  // Get shell types.
-  std::vector<int> shtypes(shells.size());
+  // Get shell types. Gaussian has no generally contracted shells, so a
+  // shell with nctr contractions is written as nctr segmented shells of
+  // the same type, matching the contraction-slowest basis function order.
+  std::vector<int> shtypes;
   for(size_t i=0;i<shells.size();i++) {
     // Get angular momentum
     int am=shells[i].get_am();
-
     // Use spherical harmonics?
-    if(shells[i].lm_in_use())
-      shtypes[i]=-am;
-    else
-      shtypes[i]=am;
+    const int t = shells[i].lm_in_use() ? -am : am;
+
+    for(size_t ic=0;ic<shells[i].get_Nctr();ic++)
+      shtypes.push_back(t);
   }
 
   return shtypes;
@@ -232,42 +233,38 @@ void write_basis(const BasisSet & basis, FILE *out) {
   // Get the shells
   std::vector<GaussianShell> shells=basis.get_shells();
 
-  // Print shell types.
+  // Print shell types (one Gaussian shell per contraction).
   std::vector<int> shtypes=form_shelltypes(basis);
   print("Shell types",shtypes,out);
 
-  // Print shell to atom map
-  std::vector<int> shmap(shells.size());
-  for(size_t i=0;i<shells.size();i++)
-    shmap[i]=(int) shells[i].get_center_ind()+1;
-  print("Shell to atom map",shmap,out);
-
-  // Print the coordinates of the shells
-  std::vector<double> shcoords(3*shells.size());
-  for(size_t i=0;i<shells.size();i++) {
-    coords_t r=shells[i].get_center();
-
-    shcoords[3*i]=r.x;
-    shcoords[3*i+1]=r.y;
-    shcoords[3*i+2]=r.z;
-  }
-  print("Coordinates of each shell",shcoords,out);
-
-  // Print number of primitives per shell, exponents and contraction coefficients.
+  // The remaining per-shell arrays explode a generally contracted shell
+  // into one Gaussian shell per contraction, matching form_shelltypes and
+  // the contraction-slowest basis function order.
+  std::vector<int> shmap;
+  std::vector<double> shcoords;
+  std::vector<int> nprim;
   std::vector<double> exps;
   std::vector<double> contr;
-  std::vector<int> nprim(shells.size());
   for(size_t i=0;i<shells.size();i++) {
-    // Get the contraction of *normalized* primitives
-    std::vector<contr_t> c=shells[i].get_contr_normalized();
-    nprim[i]=(int) c.size();
+    const coords_t r=shells[i].get_center();
+    for(size_t ic=0;ic<shells[i].get_Nctr();ic++) {
+      // Shell to atom map and shell coordinates
+      shmap.push_back((int) shells[i].get_center_ind()+1);
+      shcoords.push_back(r.x);
+      shcoords.push_back(r.y);
+      shcoords.push_back(r.z);
 
-    // Save exponents and *primitive* contraction coefficients
-    for(size_t j=0;j<c.size();j++) {
-      exps.push_back(c[j].z);
-      contr.push_back(c[j].c);
+      // Contraction of *normalized* primitives for this contraction
+      std::vector<contr_t> c=shells[i].get_contr_normalized(ic);
+      nprim.push_back((int) c.size());
+      for(size_t j=0;j<c.size();j++) {
+        exps.push_back(c[j].z);
+        contr.push_back(c[j].c);
+      }
     }
   }
+  print("Shell to atom map",shmap,out);
+  print("Coordinates of each shell",shcoords,out);
   print("Number of primitives per shell",nprim,out);
   print("Primitive exponents",exps,out);
   print("Contraction coefficients",contr,out);
