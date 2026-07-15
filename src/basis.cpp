@@ -1149,15 +1149,16 @@ void BasisSet::add_shells(size_t nucind, ElementBasisSet el, bool dosort) {
 
   // Loop over shells in element basis
   for(size_t i=0;i<bf.size();i++) {
-    // Create shell
-    GaussianShell sh;
-    if(!optlm || bf[i].get_am()>=2)
-      sh=GaussianShell(bf[i].get_am(),uselm,bf[i].get_contr());
-    else
-      sh=GaussianShell(bf[i].get_am(),false,bf[i].get_contr());
+    // Spherical harmonics for this shell?
+    const bool lm = (!optlm || bf[i].get_am()>=2) ? uselm : false;
 
-    // and add it
-    add_shell(nucind,sh,dosort);
+    // A library shell may be generally contracted: add one GaussianShell
+    // per contraction. They share the exponents, so finalize's
+    // merge_generally_contracted regroups them into a single native
+    // generally contracted shell (segmented shells with nctr==1 add just
+    // one, as before).
+    for(size_t ic=0;ic<bf[i].get_Nctr();ic++)
+      add_shell(nucind,GaussianShell(bf[i].get_am(),lm,bf[i].get_contr(ic)),dosort);
   }
 }
 

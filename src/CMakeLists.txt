@@ -57,6 +57,8 @@ endif()
 # It is an imported target, so include directories and the link
 # requirement propagate transitively to consumers of liberkale.
 target_link_libraries(liberkale wignernj::wignernj)
+# Basis Set Exchange JSON parsing (BasisSetLibrary::load_bse_json).
+target_link_libraries(liberkale nlohmann_json::nlohmann_json)
 
 # Create the ERKALE main executable
 add_executable (erkale main.cpp)
