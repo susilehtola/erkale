@@ -162,26 +162,36 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   for(size_t is=0;is<shells.size();is++) {
     const GaussianShell & sh=shells[is];
     const int l=sh.get_am();
-    const std::vector<contr_t> c=sh.get_contr_normalized();
+    const size_t nprim=sh.get_Ncontr();
+    const size_t nctr=sh.get_Nctr();
 
     cint_bas[is*BAS_SLOTS+ATOM_OF]=(int) shell_center[is];
     cint_bas[is*BAS_SLOTS+ANG_OF]=l;
-    cint_bas[is*BAS_SLOTS+NPRIM_OF]=(int) c.size();
-    cint_bas[is*BAS_SLOTS+NCTR_OF]=1;
+    cint_bas[is*BAS_SLOTS+NPRIM_OF]=(int) nprim;
+    cint_bas[is*BAS_SLOTS+NCTR_OF]=(int) nctr;
     cint_bas[is*BAS_SLOTS+KAPPA_OF]=0;
 
+    // Shared primitive exponents
     cint_bas[is*BAS_SLOTS+PTR_EXP]=(int) cint_env.size();
-    for(size_t ip=0;ip<c.size();ip++)
-      cint_env.push_back(c[ip].z);
+    {
+      const std::vector<contr_t> c0=sh.get_contr_normalized(0);
+      for(size_t ip=0;ip<nprim;ip++)
+        cint_env.push_back(c0[ip].z);
+    }
 
-    // libcint contracts normalized primitives
+    // The coefficient columns, one contraction after the other, each
+    // over normalized primitives (libcint contracts normalized primitives)
     cint_bas[is*BAS_SLOTS+PTR_COEFF]=(int) cint_env.size();
-    for(size_t ip=0;ip<c.size();ip++)
-      cint_env.push_back(c[ip].c*CINTgto_norm(l,c[ip].z));
+    for(size_t ic=0;ic<nctr;ic++) {
+      const std::vector<contr_t> cc=sh.get_contr_normalized(ic);
+      for(size_t ip=0;ip<nprim;ip++)
+        cint_env.push_back(cc[ip].c*CINTgto_norm(l,cc[ip].z));
+    }
 
-    // Number of functions: spherical mode evaluates every shell in the
-    // spherical basis (s and p coincide with the cartesian ones)
-    shell_Nbf[is]= lm ? (size_t) (2*l+1) : (size_t) ((l+1)*(l+2)/2);
+    // Number of functions: nctr angular blocks. Spherical mode
+    // evaluates every shell in the spherical basis (s and p coincide
+    // with the cartesian ones).
+    shell_Nbf[is]= nctr * (lm ? (size_t) (2*l+1) : (size_t) ((l+1)*(l+2)/2));
     shell_first[is]=ibf;
     ibf+=shell_Nbf[is];
     max_Nbf=std::max(max_Nbf,shell_Nbf[is]);
