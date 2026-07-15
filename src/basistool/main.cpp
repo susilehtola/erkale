@@ -27,7 +27,7 @@
 #include "../version.h"
 #endif
 
-std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "contractaux", "daug", "decontract", "densityfit", "dump", "dumpdec", "dropaux_yang", "dropaux", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "contractaux", "daug", "decontract", "densityfit", "dump", "dumpdec", "dropaux_yang", "dropaux", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savejson", "savemolpro", "sort", "taug"};
 
 void help() {
   printf("Valid commands:\n");
@@ -1027,6 +1027,20 @@ int main_guarded(int argc, char **argv) {
 
     std::string fileout=argv[3];
     bas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"savejson")==0) {
+    // Save basis in Basis Set Exchange (BSE) JSON format. Combined with
+    // the .json auto-detection in load_basis, this converts either way:
+    //   erkale_basistool cc-pVTZ.gbs  savejson cc-pVTZ.json
+    //   erkale_basistool cc-pVTZ.json savejson cc-pVTZ.gbs   (via save)
+
+    if(argc!=4) {
+      printf("\nUsage: %s input savejson output.json\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.save_bse_json(fileout);
 
   } else if(stricmp(cmd,"savecfour")==0) {
     // Save basis in CFOUR format

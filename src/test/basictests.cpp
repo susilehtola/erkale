@@ -24,6 +24,9 @@
 #include "../cintenv.h"
 #include "../eriworker.h"
 
+#include <cstdio>
+#include <fstream>
+
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;
 /// Tolerance for orthonormality
@@ -262,6 +265,109 @@ void check_general_contraction() {
     throw std::runtime_error("check_general_contraction: generally contracted integrals disagree with the segmented ones.\n");
 }
 
+/// Load minimal BSE-format JSON and verify (1) a segmented STO-3G
+/// hydrogen shell parses to the canonical contraction and dispatches
+/// through load_basis, and (2) a two-row electron_shell sharing its
+/// exponents loads as a single generally contracted FunctionShell and
+/// round-trips through save_bse_json bit-for-bit.
+void test_bse_json() {
+  // STO-3G hydrogen: one s shell, three primitives (segmented). Plus a
+  // synthetic carbon s shell with two coefficient rows over the same
+  // three exponents -- a generally contracted block.
+  const std::string json_str = R"JSON({
+  "molssi_bse_schema": {"schema_type":"complete","schema_version":"0.1"},
+  "name": "test-mixed",
+  "elements": {
+    "1": {
+      "electron_shells": [
+        {
+          "function_type": "gto", "region": "valence",
+          "angular_momentum": [0],
+          "exponents": ["3.42525091", "0.62391373", "0.16885540"],
+          "coefficients": [["0.15432897", "0.53532814", "0.44463454"]]
+        }
+      ]
+    },
+    "6": {
+      "electron_shells": [
+        {
+          "function_type": "gto", "region": "valence",
+          "angular_momentum": [0],
+          "exponents": ["4.0", "1.1", "0.35"],
+          "coefficients": [["0.20", "0.55", "0.35"], ["-0.09", "0.31", "0.82"]]
+        }
+      ]
+    }
+  }
+})JSON";
+
+  const std::string tmpname = "bse_test_mixed";
+  const std::string tmpfile = tmpname + ".json";
+  {
+    std::ofstream of(tmpfile);
+    of << json_str;
+  }
+
+  // Direct API and the load_basis dispatch (a "<name>.json" in the cwd
+  // must win over any legacy .gbs entry).
+  BasisSetLibrary lib;
+  lib.load_bse_json(tmpfile, false);
+  BasisSetLibrary lib_dispatch;
+  lib_dispatch.load_basis(tmpname, false);
+  remove(tmpfile.c_str());
+
+  if(lib.get_Nel() != 2)
+    throw std::runtime_error("BSE JSON: expected 2 elements.\n");
+
+  // Segmented hydrogen shell
+  std::vector<FunctionShell> Hsh = lib.get_element("H").get_shells();
+  if(Hsh.size() != 1 || Hsh[0].get_am() != 0 || Hsh[0].get_Nctr() != 1)
+    throw std::runtime_error("BSE JSON: expected one segmented s shell on H.\n");
+  const std::vector<contr_t> Hc = Hsh[0].get_contr();
+  const double z_ref[] = {3.42525091, 0.62391373, 0.16885540};
+  const double c_ref[] = {0.15432897, 0.53532814, 0.44463454};
+  if(Hc.size() != 3)
+    throw std::runtime_error("BSE JSON: expected 3 primitives in the H s shell.\n");
+  for(size_t k=0; k<3; k++)
+    if(std::abs(Hc[k].z - z_ref[k]) > DBL_EPSILON*std::abs(z_ref[k]) ||
+       std::abs(Hc[k].c - c_ref[k]) > DBL_EPSILON*std::abs(c_ref[k]))
+      throw std::runtime_error("BSE JSON: H primitive mismatch.\n");
+
+  // Generally contracted carbon shell: one shell, two contractions
+  std::vector<FunctionShell> Csh = lib.get_element("C").get_shells();
+  if(Csh.size() != 1 || Csh[0].get_am() != 0 || Csh[0].get_Nctr() != 2)
+    throw std::runtime_error("BSE JSON: expected one generally contracted (nctr=2) s shell on C.\n");
+  const arma::mat cf = Csh[0].get_coefs();
+  const double cf_ref[3][2] = {{0.20,-0.09},{0.55,0.31},{0.35,0.82}};
+  if(cf.n_rows != 3 || cf.n_cols != 2)
+    throw std::runtime_error("BSE JSON: C coefficient matrix has the wrong shape.\n");
+  for(size_t i=0;i<3;i++)
+    for(size_t jc=0;jc<2;jc++)
+      if(std::abs(cf(i,jc)-cf_ref[i][jc]) > DBL_EPSILON*std::abs(cf_ref[i][jc]))
+        throw std::runtime_error("BSE JSON: C generally contracted coefficient mismatch.\n");
+
+  // Dispatch path agrees
+  if(lib_dispatch.get_element("C").get_shells().at(0).get_Nctr() != 2)
+    throw std::runtime_error("BSE JSON: load_basis dispatch lost the general contraction.\n");
+
+  // Round-trip: save and reload, and require the generally contracted
+  // carbon shell to come back bit-for-bit (writer uses %.17g).
+  const std::string rt = "bse_test_roundtrip.json";
+  lib.save_bse_json(rt);
+  BasisSetLibrary lib_rt;
+  lib_rt.load_bse_json(rt, false);
+  remove(rt.c_str());
+  const arma::mat cf_rt = lib_rt.get_element("C").get_shells().at(0).get_coefs();
+  if(cf_rt.n_rows != cf.n_rows || cf_rt.n_cols != cf.n_cols)
+    throw std::runtime_error("BSE JSON: round-trip changed the C shell shape.\n");
+  for(size_t i=0;i<cf.n_rows;i++)
+    for(size_t jc=0;jc<cf.n_cols;jc++)
+      if(cf_rt(i,jc) != cf(i,jc))
+        throw std::runtime_error("BSE JSON: generally contracted round-trip is not bit-exact.\n");
+
+  printf("BSE JSON reader OK.\n");
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -275,6 +381,8 @@ int main(void) {
   // Generally contracted shells
   check_general_contraction();
   printf("General contraction OK.\n");
+  // BSE JSON basis-set reader / writer
+  test_bse_json();
   // Test lapack thread safety
   try {
     check_lapack_thread();
