@@ -314,50 +314,59 @@ std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std
   // Compute the expansions of the non-identical shells
   std::vector< std::vector<GTO_Fourier> > fourier;
   for(size_t i=0;i<idents.size();i++) {
-    // Get exponents, contraction coefficients and cartesians
-    std::vector<contr_t> contr=bas.get_contr(idents[i][0]);
-    std::vector<shellf_t> cart=bas.get_cart(idents[i][0]);
+    // Representative shell of this identical group
+    const size_t rep=idents[i][0];
+    // Cartesians and (if used) the spherical-harmonic transform are the
+    // same for every contraction of the shell
+    const std::vector<shellf_t> cart=bas.get_cart(rep);
+    const bool lm=bas.lm_in_use(rep);
+    const arma::mat transmat= lm ? bas.get_trans(rep) : arma::mat();
+    const int l=bas.get_am(rep);
+    // The shell may be generally contracted: expand each contraction and
+    // stack the results contraction-slowest, matching the basis function
+    // order (get_Nbf = nctr*(2l+1)).
+    const GaussianShell sh=bas.get_shell(rep);
 
-    // Compute expansion of basis functions on shell
-    // Form expansions of cartesian functions
-    std::vector<GTO_Fourier> cart_expansion;
-    for(size_t icart=0;icart<cart.size();icart++) {
-      // Expansion of current function
-      GTO_Fourier func;
-      for(size_t iexp=0;iexp<contr.size();iexp++)
-        func+=contr[iexp].c*GTO_Fourier(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
-      // Plug in the normalization factor
-      func=cart[icart].relnorm*func;
-      // Clean out terms with zero contribution
-      func.clean();
-      // Add to cartesian expansion
-      cart_expansion.push_back(func);
+    std::vector<GTO_Fourier> shell_expansion;
+    for(size_t ic=0;ic<sh.get_Nctr();ic++) {
+      const std::vector<contr_t> contr=sh.get_contr(ic);
+
+      // Form expansions of cartesian functions for this contraction
+      std::vector<GTO_Fourier> cart_expansion;
+      for(size_t icart=0;icart<cart.size();icart++) {
+        // Expansion of current function
+        GTO_Fourier func;
+        for(size_t iexp=0;iexp<contr.size();iexp++)
+          func+=contr[iexp].c*GTO_Fourier(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
+        // Plug in the normalization factor
+        func=cart[icart].relnorm*func;
+        // Clean out terms with zero contribution
+        func.clean();
+        // Add to cartesian expansion
+        cart_expansion.push_back(func);
+      }
+
+      // If spherical harmonics are used, transform this contraction's
+      // functions into the spherical harmonics basis; otherwise keep the
+      // cartesians. Either way, append to the shell's expansion.
+      if(lm) {
+        for(int m=-l;m<=l;m++) {
+          // Expansion for current term
+          GTO_Fourier mcomp;
+          // Form expansion
+          for(size_t icart=0;icart<transmat.n_cols;icart++)
+            mcomp+=transmat(l+m,icart)*cart_expansion[icart];
+          // clean it
+          mcomp.clean();
+          // and add it to the stack
+          shell_expansion.push_back(mcomp);
+        }
+      } else
+        for(size_t icart=0;icart<cart_expansion.size();icart++)
+          shell_expansion.push_back(cart_expansion[icart]);
     }
 
-    // If spherical harmonics are used, we need to transform the
-    // functions into the spherical harmonics basis.
-    if(bas.lm_in_use(idents[i][0])) {
-      std::vector<GTO_Fourier> sph_expansion;
-      // Get transformation matrix
-      arma::mat transmat=bas.get_trans(idents[i][0]);
-      // Form expansion
-      int l=bas.get_am(idents[i][0]);
-      for(int m=-l;m<=l;m++) {
-        // Expansion for current term
-        GTO_Fourier mcomp;
-        // Form expansion
-        for(size_t icart=0;icart<transmat.n_cols;icart++)
-          mcomp+=transmat(l+m,icart)*cart_expansion[icart];
-        // clean it
-        mcomp.clean();
-        // and add it to the stack
-        sph_expansion.push_back(mcomp);
-      }
-      // Now we have all components, add everything to the stack
-      fourier.push_back(sph_expansion);
-    } else
-      // No need to transform, cartesians are used.
-      fourier.push_back(cart_expansion);
+    fourier.push_back(shell_expansion);
   }
 
   return fourier;

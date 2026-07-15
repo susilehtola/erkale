@@ -328,6 +328,7 @@ void GaussianShell::coulomb_normalize() {
   // Normalize functions using Coulomb norm
   size_t Ncart=cart.size();
   size_t Nbf=get_Nbf();
+  const size_t nctr=get_Nctr();
 
   // The Coulomb self-repulsion (i|j) of the functions on this shell.
   // The environment measures the current normalization of the shell, so
@@ -337,33 +338,66 @@ void GaussianShell::coulomb_normalize() {
   eri.compute_2c(0,0);
   const std::vector<double> * erip=eri.getp();
 
-  if(!uselm) {
-    // Cartesian functions
-    for(size_t i=0;i<Ncart;i++)
-      cart[i].relnorm*=1.0/sqrt((*erip)[i*Nbf+i]);
-  } else {
-    // Spherical normalization, need to distribute the normalization
-    // coefficient among the cartesians, so all the functions of the
-    // shell must have the same norm
-    int diff=0;
-    for(size_t i=1;i<Nbf;i++)
-      if(fabs((*erip)[i*Nbf+i]-(*erip)[0])>sqrt(DBL_EPSILON)*(*erip)[0]) {
-	printf("%e != %e, diff %e\n",(*erip)[i*Nbf+i],(*erip)[0],(*erip)[i*Nbf+i]-(*erip)[0]);
-	fflush(stdout);
-	diff++;
+  if(nctr==1) {
+    if(!uselm) {
+      // Cartesian functions
+      for(size_t i=0;i<Ncart;i++)
+        cart[i].relnorm*=1.0/sqrt((*erip)[i*Nbf+i]);
+    } else {
+      // Spherical normalization, need to distribute the normalization
+      // coefficient among the cartesians, so all the functions of the
+      // shell must have the same norm
+      int diff=0;
+      for(size_t i=1;i<Nbf;i++)
+        if(fabs((*erip)[i*Nbf+i]-(*erip)[0])>sqrt(DBL_EPSILON)*(*erip)[0]) {
+          printf("%e != %e, diff %e\n",(*erip)[i*Nbf+i],(*erip)[0],(*erip)[i*Nbf+i]-(*erip)[0]);
+          fflush(stdout);
+          diff++;
+        }
+
+      if(diff) {
+        ERROR_INFO();
+        std::ostringstream oss;
+        oss << "\nSpherical functions have different norms!\n";
+        throw std::runtime_error(oss.str());
       }
 
+      // Scale coefficients
+      for(size_t i=0;i<Ncart;i++)
+        cart[i].relnorm*=1.0/sqrt((*erip)[0]);
+    }
+    return;
+  }
+
+  // Generally contracted shell: the cartesian relnorm is shared by all
+  // contractions, but the contractions have different Coulomb norms, so
+  // normalize each one by scaling its coefficient column instead. Within
+  // a single spherical contraction all 2l+1 functions have the same norm.
+  if(!uselm) {
+    ERROR_INFO();
+    throw std::runtime_error("Coulomb normalization of a generally contracted cartesian shell is not supported.\n");
+  }
+  const size_t Nfunc=Nbf/nctr;
+  for(size_t ic=0;ic<nctr;ic++) {
+    const size_t i0=ic*Nfunc;
+    const double n0=(*erip)[i0*Nbf+i0];
+    int diff=0;
+    for(size_t i=1;i<Nfunc;i++)
+      if(fabs((*erip)[(i0+i)*Nbf+(i0+i)]-n0)>sqrt(DBL_EPSILON)*n0) {
+        printf("%e != %e, diff %e\n",(*erip)[(i0+i)*Nbf+(i0+i)],n0,(*erip)[(i0+i)*Nbf+(i0+i)]-n0);
+        fflush(stdout);
+        diff++;
+      }
     if(diff) {
       ERROR_INFO();
       std::ostringstream oss;
       oss << "\nSpherical functions have different norms!\n";
       throw std::runtime_error(oss.str());
     }
-
-    // Scale coefficients
-    for(size_t i=0;i<Ncart;i++)
-      cart[i].relnorm*=1.0/sqrt((*erip)[0]);
+    cf.col(ic)*=1.0/sqrt(n0);
   }
+  // Mirror the (scaled) first column back into the exponent carrier
+  sync_c();
 }
 
 std::vector<contr_t> GaussianShell::get_contr() const {
@@ -1163,6 +1197,34 @@ void BasisSet::sort() {
   update_nuclear_shell_list();
 }
 
+void BasisSet::merge_generally_contracted() {
+  // Group consecutive shells that share the same center, angular
+  // momentum, harmonics flag and primitive exponents into one generally
+  // contracted shell. The shells arrive already in their final order, in
+  // which the segmented sort has made every generally contracted block
+  // contiguous, so a single consecutive-merge pass captures all general
+  // contraction without disturbing the basis function order (the merged
+  // shell emits [ctr0][ctr1]... in the same span the segmented shells
+  // occupied).
+  if(shells.empty())
+    return;
+
+  std::vector<GaussianShell> merged;
+  merged.reserve(shells.size());
+  merged.push_back(shells[0]);
+  for(size_t i=1;i<shells.size();i++) {
+    if(merged.back().same_primitives(shells[i]))
+      merged.back().merge_contraction(shells[i]);
+    else
+      merged.push_back(shells[i]);
+  }
+  shells=std::move(merged);
+
+  // Renumber the basis functions and rebuild the per-nucleus shell lists.
+  check_numbering();
+  update_nuclear_shell_list();
+}
+
 void BasisSet::compute_nuclear_distances() {
   // Amount of nuclei
   size_t N=nuclei.size();
@@ -1239,53 +1301,6 @@ void BasisSet::form_unique_shellpairs() {
   */
 }
 
-std::vector<shellblock_t> BasisSet::get_shell_blocks() const {
-  std::vector<shellblock_t> blocks;
-
-  // Two shells belong to the same block if they sit on the same center,
-  // have the same angular momentum and the same basis (a spherical and
-  // a cartesian shell cannot be evaluated in a single call), and share
-  // their primitives.
-  auto same_block = [](const GaussianShell & lhs, const GaussianShell & rhs) {
-    if(lhs.get_center_ind() != rhs.get_center_ind())
-      return false;
-    if(lhs.get_am() != rhs.get_am())
-      return false;
-    if(lhs.lm_in_use() != rhs.lm_in_use())
-      return false;
-
-    const std::vector<contr_t> & lc=lhs.get_contr_ref();
-    const std::vector<contr_t> & rc=rhs.get_contr_ref();
-    if(lc.size() != rc.size())
-      return false;
-    for(size_t ip=0;ip<lc.size();ip++)
-      if(lc[ip].z != rc[ip].z)
-        return false;
-
-    return true;
-  };
-
-  for(size_t is=0;is<shells.size();is++) {
-    // Does the shell belong to a block we already have? The shells of a
-    // block need not be adjacent in the basis, but they usually are.
-    bool found=false;
-    for(size_t ib=0;ib<blocks.size();ib++)
-      if(same_block(shells[blocks[ib].shells[0]], shells[is])) {
-        blocks[ib].shells.push_back(is);
-        found=true;
-        break;
-      }
-
-    if(!found) {
-      shellblock_t block;
-      block.shells.push_back(is);
-      blocks.push_back(block);
-    }
-  }
-
-  return blocks;
-}
-
 std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   if(shells.size() && !shellpairs.size()) {
     throw std::runtime_error("shellpairs not initialized! Maybe you forgot to finalize?\n");
@@ -1341,6 +1356,13 @@ bool operator<(const eripair_t & lhs, const eripair_t & rhs) {
 
 void BasisSet::finalize(bool convert, bool donorm) {
   // Finalize basis set structure for use.
+
+  // Group same-primitive shells into generally contracted shells before
+  // anything downstream (ranges, contraction conversion, normalization,
+  // shell pairs) is computed, so all of it sees the native generally
+  // contracted shells. A segmented basis (no two shells share primitives)
+  // is left untouched.
+  merge_generally_contracted();
 
   // Compute nuclear distances.
   compute_nuclear_distances();

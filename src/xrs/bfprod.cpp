@@ -396,60 +396,68 @@ void prod_gaussian_3d::print() const {
 
 
 std::vector<prod_gaussian_3d> compute_product(const BasisSet & bas, size_t is, size_t js) {
-  // Contractions on shells
-  std::vector<contr_t> icontr=bas.get_contr(is);
-  std::vector<contr_t> jcontr=bas.get_contr(js);
+  // Shells (may be generally contracted)
+  const GaussianShell shi=bas.get_shell(is);
+  const GaussianShell shj=bas.get_shell(js);
 
-  // Cartesian functions on shells
-  std::vector<shellf_t> icart=bas.get_cart(is);
-  std::vector<shellf_t> jcart=bas.get_cart(js);
+  // Cartesian functions on shells (shared by every contraction)
+  const std::vector<shellf_t> icart=bas.get_cart(is);
+  const std::vector<shellf_t> jcart=bas.get_cart(js);
 
   // Centers of shells
-  coords_t icen=bas.get_shell_center(is);
-  coords_t jcen=bas.get_shell_center(js);
+  const coords_t icen=bas.get_shell_center(is);
+  const coords_t jcen=bas.get_shell_center(js);
 
-  // Returned array
-  std::vector<prod_gaussian_3d> ret;
-  ret.reserve(icart.size()*jcart.size());
+  // Per-contraction function counts and the whole-shell (generally
+  // contracted) target sizes get_Nbf = nctr*Nlm.
+  const bool lm_i=bas.lm_in_use(is), lm_j=bas.lm_in_use(js);
+  const size_t Ni_lm= lm_i ? (size_t)(2*bas.get_am(is)+1) : icart.size();
+  const size_t Nj_lm= lm_j ? (size_t)(2*bas.get_am(js)+1) : jcart.size();
+  const size_t Nj_tgt=shj.get_Nctr()*Nj_lm;
 
-  // Form products
-  for(size_t ii=0;ii<icart.size();ii++)
-    for(size_t jj=0;jj<jcart.size();jj++) {
+  // Returned array, indexed [i-function][j-function] with the whole-shell
+  // (contraction-slowest) function order.
+  std::vector<prod_gaussian_3d> ret(shi.get_Nctr()*Ni_lm*Nj_tgt);
 
-      // Result;
-      prod_gaussian_3d tmp;
+  // Loop over the contractions of the two shells: each pair gives a
+  // single-contraction product block, which is transformed and scattered
+  // into the generally contracted output at its contraction offset.
+  for(size_t ci=0;ci<shi.get_Nctr();ci++) {
+    const std::vector<contr_t> icontr=shi.get_contr(ci);
+    for(size_t cj=0;cj<shj.get_Nctr();cj++) {
+      const std::vector<contr_t> jcontr=shj.get_contr(cj);
 
-      // Loop over exponents
-      for(size_t ix=0;ix<icontr.size();ix++)
-	for(size_t jx=0;jx<jcontr.size();jx++) {
-	  // Compute product
-	  prod_gaussian_3d term(icen.x,jcen.x,icen.y,jcen.y,icen.z,jcen.z,icart[ii].l,jcart[jj].l,icart[ii].m,jcart[jj].m,icart[ii].n,jcart[jj].n,icontr[ix].z,jcontr[jx].z);
-	  // Add to partial result
-	  tmp+=term*(icontr[ix].c*jcontr[jx].c);
-
-	  /*
-	  printf("Product gaussian of (%i,%i,%i) centered at (% e,% e,% e) and (%i,%i,%i) centered at (% e,% e,% e) is\n",icart[ii].l,icart[ii].m,icart[ii].n,icen.x,icen.y,icen.z,jcart[jj].l,jcart[jj].m,jcart[jj].n,jcen.x,jcen.y,jcen.z);
-	  term.print();
-	  */
+      // Cartesian products for this contraction pair
+      std::vector<prod_gaussian_3d> block;
+      block.reserve(icart.size()*jcart.size());
+      for(size_t ii=0;ii<icart.size();ii++)
+	for(size_t jj=0;jj<jcart.size();jj++) {
+	  prod_gaussian_3d tmp;
+	  for(size_t ix=0;ix<icontr.size();ix++)
+	    for(size_t jx=0;jx<jcontr.size();jx++) {
+	      prod_gaussian_3d term(icen.x,jcen.x,icen.y,jcen.y,icen.z,jcen.z,icart[ii].l,jcart[jj].l,icart[ii].m,jcart[jj].m,icart[ii].n,jcart[jj].n,icontr[ix].z,jcontr[jx].z);
+	      tmp+=term*(icontr[ix].c*jcontr[jx].c);
+	    }
+	  // Plug in normalization factors
+	  tmp=tmp*(icart[ii].relnorm*jcart[jj].relnorm);
+	  block.push_back(tmp);
 	}
 
-      // Plug in normalization factors
-      tmp=tmp*(icart[ii].relnorm*jcart[jj].relnorm);
+      // Transform this block into the spherical basis if necessary
+      if(lm_i || lm_j)
+	block=spherical_transform(bas,is,js,block);
+      else
+	for(size_t i=0;i<block.size();i++)
+	  block[i].clean();
 
-      // Add to stack
-      ret.push_back(tmp);
+      // Scatter into the generally contracted output
+      for(size_t fi=0;fi<Ni_lm;fi++)
+	for(size_t fj=0;fj<Nj_lm;fj++)
+	  ret[(ci*Ni_lm+fi)*Nj_tgt + (cj*Nj_lm+fj)]=block[fi*Nj_lm+fj];
     }
-
-  // Transform into spherical basis if necessary
-  if(bas.lm_in_use(is) || bas.lm_in_use(js))
-    return spherical_transform(bas,is,js,ret);
-  else {
-    // Clean out terms with zero contribution
-    for(size_t i=0;i<ret.size();i++)
-      ret[i].clean();
-    // Return result
-    return ret;
   }
+
+  return ret;
 }
 
 std::vector<prod_gaussian_3d> spherical_transform(const BasisSet & bas, size_t is, size_t js, std::vector<prod_gaussian_3d> & res) {
@@ -459,8 +467,11 @@ std::vector<prod_gaussian_3d> spherical_transform(const BasisSet & bas, size_t i
   const size_t Ni_cart=bas.get_Ncart(is);
   const size_t Nj_cart=bas.get_Ncart(js);
 
-  const size_t Ni_tgt=bas.get_Nbf(is);
-  const size_t Nj_tgt=bas.get_Nbf(js);
+  // Single-contraction block: the target sizes are the per-contraction
+  // spherical-harmonic (or cartesian) counts, not the whole shell's
+  // get_Nbf, which for a generally contracted shell spans nctr blocks.
+  const size_t Ni_tgt= lm_i ? (size_t)(2*bas.get_am(is)+1) : Ni_cart;
+  const size_t Nj_tgt= lm_j ? (size_t)(2*bas.get_am(js)+1) : Nj_cart;
 
   // First, transform over j. Helper array
   std::vector<prod_gaussian_3d> tmp(Ni_cart*Nj_tgt);
