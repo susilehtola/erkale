@@ -3723,6 +3723,17 @@ void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const 
       elbas=baslib.get_element(el,0);
     }
 
+    // ERKALE is all-electron: refuse a basis that carries an effective
+    // core potential for a used element (e.g. a BSE JSON set that pairs
+    // valence shells with ecp_potentials). Reading only the valence
+    // shells and dropping the ECP would be physically wrong, so fail
+    // loudly rather than silently.
+    if(elbas.has_ecp()) {
+      std::ostringstream oss;
+      oss << "The basis set for element " << el << " carries an effective core potential (ecp_potentials), which ERKALE does not support.\n";
+      throw std::runtime_error(oss.str());
+    }
+
     // Decontract set?
     bool decon=false;
     if(decall)

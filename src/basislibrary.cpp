@@ -387,11 +387,13 @@ ElementBasisSet::ElementBasisSet() {
   // Default values
   symbol="";
   number=0;
+  ecp=false;
 }
 
 ElementBasisSet::ElementBasisSet(std::string sym, size_t num) {
   symbol=sym;
   number=num;
+  ecp=false;
 }
 
 ElementBasisSet::~ElementBasisSet() {
@@ -448,6 +450,14 @@ size_t ElementBasisSet::get_number() const {
 
 void ElementBasisSet::set_number(size_t num) {
   number=num;
+}
+
+bool ElementBasisSet::has_ecp() const {
+  return ecp;
+}
+
+void ElementBasisSet::set_ecp(bool ecpv) {
+  ecp=ecpv;
 }
 
 bool ElementBasisSet::operator<(const ElementBasisSet &rhs) const {
@@ -1827,8 +1837,18 @@ void BasisSetLibrary::load_bse_json(const std::string & filename, bool verbose) 
     ElementBasisSet el(element_symbols[Z]);
 
     const auto & el_json = it.value();
+
+    // Flag an effective core potential. ERKALE is all-electron and does
+    // not evaluate ECPs, so rather than silently reading only the (small)
+    // valence electron_shells and dropping the core potential -- which
+    // would be a nonsense all-electron calculation -- the element is
+    // marked here and construct_basis refuses it if it is actually used.
+    if(el_json.contains("ecp_potentials") && !el_json["ecp_potentials"].empty())
+      el.set_ecp(true);
+
     if(!el_json.contains("electron_shells")) {
-      // Pure ECP entry (or empty); skip for orbital-basis loading.
+      // No orbital shells (pure ECP or empty entry); nothing to load, but
+      // keep the element so its ECP flag reaches construct_basis.
       add_element(el);
       continue;
     }
