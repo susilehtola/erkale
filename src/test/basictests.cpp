@@ -23,6 +23,7 @@
 #include "../basislibrary.h"
 #include "../cintenv.h"
 #include "../eriworker.h"
+#include "../xyzutils.h"
 
 #include <cstdio>
 #include <fstream>
@@ -368,6 +369,74 @@ void test_bse_json() {
   printf("BSE JSON reader OK.\n");
 }
 
+/// A BSE JSON basis that carries an effective core potential on an
+/// element must be flagged, and construct_basis must refuse it -- but
+/// only when that element is actually used (ERKALE is all-electron).
+void test_bse_json_ecp() {
+  // Hydrogen with a plain s shell; sodium with a valence s shell *and*
+  // an ecp_potentials block (as a def2-style ECP set would carry).
+  const std::string json_str = R"JSON({
+  "name": "ecp-test",
+  "elements": {
+    "1": {
+      "electron_shells": [
+        {"angular_momentum":[0],"exponents":["1.0"],"coefficients":[["1.0"]]}
+      ]
+    },
+    "11": {
+      "electron_shells": [
+        {"angular_momentum":[0],"exponents":["0.5"],"coefficients":[["1.0"]]}
+      ],
+      "ecp_electrons": 10,
+      "ecp_potentials": [
+        {"angular_momentum":[0],"r_exponents":[2],
+         "gaussian_exponents":["1.0"],"coefficients":[["1.0"]]}
+      ]
+    }
+  }
+})JSON";
+
+  const std::string tmpfile = "bse_test_ecp.json";
+  {
+    std::ofstream of(tmpfile);
+    of << json_str;
+  }
+  BasisSetLibrary lib;
+  lib.load_bse_json(tmpfile, false);
+  remove(tmpfile.c_str());
+
+  // The ECP is detected on Na, and not on H
+  if(lib.get_element("H").has_ecp())
+    throw std::runtime_error("BSE JSON: H wrongly flagged as carrying an ECP.\n");
+  if(!lib.get_element("Na").has_ecp())
+    throw std::runtime_error("BSE JSON: the Na effective core potential was not detected.\n");
+
+  // A molecule that does not use the ECP element builds fine
+  {
+    std::vector<atom_t> atoms(1);
+    atoms[0].el="H"; atoms[0].num=0; atoms[0].x=atoms[0].y=atoms[0].z=0.0; atoms[0].Q=0;
+    BasisSet bas;
+    construct_basis(bas, atoms, lib); // must not throw
+  }
+
+  // ...but a molecule that uses the ECP element must be refused
+  {
+    std::vector<atom_t> atoms(1);
+    atoms[0].el="Na"; atoms[0].num=0; atoms[0].x=atoms[0].y=atoms[0].z=0.0; atoms[0].Q=0;
+    BasisSet bas;
+    bool threw=false;
+    try {
+      construct_basis(bas, atoms, lib);
+    } catch(std::runtime_error &) {
+      threw=true;
+    }
+    if(!threw)
+      throw std::runtime_error("BSE JSON: construct_basis accepted an element carrying an ECP.\n");
+  }
+
+  printf("BSE JSON ECP rejection OK.\n");
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -383,6 +452,8 @@ int main(void) {
   printf("General contraction OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
+  // BSE JSON effective-core-potential rejection
+  test_bse_json_ecp();
   // Test lapack thread safety
   try {
     check_lapack_thread();

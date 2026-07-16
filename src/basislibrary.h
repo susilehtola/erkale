@@ -144,6 +144,11 @@ class ElementBasisSet {
   size_t number;
   /// List of shells
   std::vector<FunctionShell> bf;
+  /// The source basis carried an effective core potential
+  /// (ecp_potentials) for this element. ERKALE is all-electron and does
+  /// not support ECPs, so construct_basis refuses to build a basis for a
+  /// used element flagged here.
+  bool ecp;
 
  public:
   /// Dummy constructor
@@ -166,6 +171,12 @@ class ElementBasisSet {
   size_t get_number() const;
   /// Set the number
   void set_number(size_t num);
+
+  /// Whether the source basis carried an effective core potential
+  /// (ecp_potentials) for this element
+  bool has_ecp() const;
+  /// Flag that the source basis carried an effective core potential
+  void set_ecp(bool ecp);
 
   /// Comparison operator for sorting
   bool operator<(const ElementBasisSet &rhs) const;
