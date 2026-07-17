@@ -9,4 +9,14 @@ ERKALE -- HF/DFT from Hel
 
 * **List of functionals** [on libxc page](http://www.tddft.org/programs/libxc/functionals/)
 
-* [**Compile script**](https://raw.githubusercontent.com/susilehtola/erkale/master/compile.sh)
+* **Building:** see [INSTALL](INSTALL). In short, with the prerequisites
+  installed from your distribution:
+
+  ```
+  cmake -B build
+  cmake --build build -j
+  ```
+
+  CMake finds the system libraries and automatically fetches and builds
+  any of the CMake-based dependencies (libxc, libcint, HDF5, Armadillo,
+  libwignernj, nlohmann/json) that are missing.

@@ -6,22 +6,47 @@ Susi Lehtola
 
 To compile ERKALE you need
 
-* CMake ( http://cmake.org ), at least version 2.6
-* The GNU Scientific Library ( http://www.gnu.org/s/gsl/ ), at least version 1.4
-* HDF5 ( http://www.hdfgroup.org/HDF5/ ), at least version 1.8
-* libint ( http://sourceforge.net/p/libint/home )
-* libxc ( http://www.tddft.org/programs/octopus/wiki/index.php/Libxc )
+* CMake ( http://cmake.org ), at least version 3.24
+* A C++17 compiler and a Fortran compiler (for LAPACK linkage)
+* A LAPACK/BLAS library (OpenBLAS, FlexiBLAS, Intel MKL, ... )
+* The GNU Scientific Library ( http://www.gnu.org/s/gsl/ )
+
+These are found on the system with find_package and must be installed
+from your distribution. The remaining dependencies
+
+* libxc     ( https://libxc.gitlab.io/ )
+* libcint   ( https://github.com/sunqm/libcint , or the API-compatible qcint )
+* HDF5      ( http://www.hdfgroup.org/HDF5/ )
 * Armadillo ( http://arma.sourceforge.net/ )
+* libwignernj ( https://github.com/susilehtola/libwignernj )
+* nlohmann/json ( https://github.com/nlohmann/json )
 
-Naturally, you also need a decent LAPACK library installed. The use of
-an optimized library such as ATLAS, Intel MKL or AMD ACML is recommended.
+are used if installed, and otherwise fetched and built from source
+automatically by CMake at configure time (so a network connection is
+needed only when a dependency is missing).
 
-To compile, please use the attached script compile.sh and modify it to
-suit your needs. Note that by default the build system creates an
-OpenMP parallellized version of ERKALE. The parallellization is quite
-trivial, but should still give about 80% of speedup. If you don't want
-ERKALE to be parallellized, give the argument "-DUSE_OPENMP=OFF" to
-cmake.
+** Compiling **
+
+Out of source, from the top of the source tree:
+
+    $ cmake -B build
+    $ cmake --build build -j
+
+By default this builds the OpenMP-parallel version; the executables get
+an "_omp" suffix. For a serial build, pass -DUSE_OPENMP=OFF (e.g. into a
+separate build directory):
+
+    $ cmake -B build-serial -DUSE_OPENMP=OFF
+    $ cmake --build build-serial -j
+
+To install, add -DCMAKE_INSTALL_PREFIX=<prefix> and run
+"cmake --install build". The tests are run with "ctest" from the build
+directory.
+
+Useful options:
+* -DERKALE_SYSTEM_LIBRARY=<path>  system-wide basis-set repository
+* -DERKALE_BLAS_INT64=ON|OFF|AUTO 64-bit (ILP64) BLAS integers (AUTO probes)
+* -DBUILD_SHARED_LIBS=ON          build shared liberkale
 
 If you wish to create the developer documentation, you need a working
 installation of doxygen and LaTeX. The documentation can be created by

@@ -20,7 +20,7 @@
 #include "../basis.h"
 
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 Settings settings;

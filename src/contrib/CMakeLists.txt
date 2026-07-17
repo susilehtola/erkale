@@ -1,254 +1,82 @@
-add_executable (erkale_dumpxc dumpxc.cpp)
-set_target_properties(erkale_dumpxc PROPERTIES OUTPUT_NAME "erkale_dumpxc${SUFFIX}")
-target_link_libraries(erkale_dumpxc liberkale_cmp)
-target_link_libraries(erkale_dumpxc liberkale_emd)
-target_link_libraries(erkale_dumpxc liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_dumpxc -lrt)
- target_link_libraries(erkale_dumpxc ${GSL_LIBRARIES})
- target_link_libraries(erkale_dumpxc ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_dumpxc ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_dumpxc ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_dumpxc ${HDF5_LIBRARIES})
-endif()
+# Research / experimental executables. Not installed. Each links the
+# completeness, EMD and base libraries; the external dependencies arrive
+# transitively through liberkale.
+foreach(prog dumpxc moints formchk guessbench densproj rimp2 oovl sapguess)
+  add_executable(erkale_${prog} ${prog}.cpp)
+  set_target_properties(erkale_${prog} PROPERTIES OUTPUT_NAME "erkale_${prog}${SUFFIX}")
+  target_link_libraries(erkale_${prog} liberkale_cmp liberkale_emd liberkale)
+endforeach()
 
-add_executable (erkale_moints moints.cpp)
-set_target_properties(erkale_moints PROPERTIES OUTPUT_NAME "erkale_moints${SUFFIX}")
-target_link_libraries(erkale_moints liberkale_cmp)
-target_link_libraries(erkale_moints liberkale_emd)
-target_link_libraries(erkale_moints liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_moints -lrt)
- target_link_libraries(erkale_moints ${GSL_LIBRARIES})
- target_link_libraries(erkale_moints ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_moints ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_moints ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_moints ${HDF5_LIBRARIES})
-endif()
-
-add_executable (erkale_formchk formchk.cpp)
-set_target_properties(erkale_formchk PROPERTIES OUTPUT_NAME "erkale_formchk${SUFFIX}")
-target_link_libraries(erkale_formchk liberkale_cmp)
-target_link_libraries(erkale_formchk liberkale_emd)
-target_link_libraries(erkale_formchk liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_formchk -lrt)
- target_link_libraries(erkale_formchk ${GSL_LIBRARIES})
- target_link_libraries(erkale_formchk ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_formchk ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_formchk ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_formchk ${HDF5_LIBRARIES})
-endif()
-
-add_executable (erkale_guessbench guessbench.cpp)
-set_target_properties(erkale_guessbench PROPERTIES OUTPUT_NAME "erkale_guessbench${SUFFIX}")
-target_link_libraries(erkale_guessbench liberkale_cmp)
-target_link_libraries(erkale_guessbench liberkale_emd)
-target_link_libraries(erkale_guessbench liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_guessbench -lrt)
- target_link_libraries(erkale_guessbench ${GSL_LIBRARIES})
- target_link_libraries(erkale_guessbench ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_guessbench ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_guessbench ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_guessbench ${HDF5_LIBRARIES})
-endif()
-
-add_executable (erkale_densproj densproj.cpp)
-set_target_properties(erkale_densproj PROPERTIES OUTPUT_NAME "erkale_densproj${SUFFIX}")
-target_link_libraries(erkale_densproj liberkale_cmp)
-target_link_libraries(erkale_densproj liberkale_emd)
-target_link_libraries(erkale_densproj liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_densproj -lrt)
- target_link_libraries(erkale_densproj ${GSL_LIBRARIES})
- target_link_libraries(erkale_densproj ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_densproj ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_densproj ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_densproj ${HDF5_LIBRARIES})
-endif()
-
-add_executable (erkale_rimp2 rimp2.cpp)
-set_target_properties(erkale_rimp2 PROPERTIES OUTPUT_NAME "erkale_rimp2${SUFFIX}")
-target_link_libraries(erkale_rimp2 liberkale_cmp)
-target_link_libraries(erkale_rimp2 liberkale_emd)
-target_link_libraries(erkale_rimp2 liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_rimp2 -lrt)
- target_link_libraries(erkale_rimp2 ${GSL_LIBRARIES})
- target_link_libraries(erkale_rimp2 ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_rimp2 ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_rimp2 ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_rimp2 ${HDF5_LIBRARIES})
-endif()
-
-add_executable (erkale_oovl oovl.cpp)
-set_target_properties(erkale_oovl PROPERTIES OUTPUT_NAME "erkale_oovl${SUFFIX}")
-target_link_libraries(erkale_oovl liberkale_cmp)
-target_link_libraries(erkale_oovl liberkale_emd)
-target_link_libraries(erkale_oovl liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_oovl -lrt)
- target_link_libraries(erkale_oovl ${GSL_LIBRARIES})
- target_link_libraries(erkale_oovl ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_oovl ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_oovl ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_oovl ${HDF5_LIBRARIES})
-endif()
-
-add_executable (erkale_sapguess sapguess.cpp)
-set_target_properties(erkale_sapguess PROPERTIES OUTPUT_NAME "erkale_sapguess${SUFFIX}")
-target_link_libraries(erkale_sapguess liberkale_cmp)
-target_link_libraries(erkale_sapguess liberkale_emd)
-target_link_libraries(erkale_sapguess liberkale)
-# Link other libraries if necessary
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(erkale_sapguess -lrt)
- target_link_libraries(erkale_sapguess ${GSL_LIBRARIES})
- target_link_libraries(erkale_sapguess ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_sapguess ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_sapguess ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_sapguess ${HDF5_LIBRARIES})
-endif()
-
-# neo / neosp / hneoci depend on the openorbitaloptimizer header-only
-# library (https://github.com/susilehtola/OpenOrbitalOptimizer).
-# Probe a configurable include hint first; if the header isn't on
-# disk, fall back to FetchContent so CI builds still work.
-set(OPENORBITAL_INCLUDE_DIR "" CACHE PATH "Path to openorbitaloptimizer include dir (containing openorbitaloptimizer/scfsolver.hpp)")
+# --- NEO / complex-orbital drivers ---
+# These depend on the header-only, Eigen-based OpenOrbitalOptimizer
+# (https://github.com/susilehtola/OpenOrbitalOptimizer). The drivers use
+# its Armadillo compatibility shim, which pulls in Eigen. Find the headers
+# (with a configurable hint) or fetch them; likewise for Eigen3.
+set(OPENORBITAL_INCLUDE_DIR "" CACHE PATH
+    "Path to the openorbitaloptimizer include dir (containing openorbitaloptimizer/scfsolver.hpp)")
 find_path(OPENORBITAL_HEADER openorbitaloptimizer/scfsolver.hpp
-  HINTS ${OPENORBITAL_INCLUDE_DIR} /home/work/openorbital)
+  HINTS ${OPENORBITAL_INCLUDE_DIR})
 
+# OpenOrbitalOptimizer and Eigen are used header-only; we deliberately
+# populate their sources without running their CMakeLists (FetchContent_-
+# Populate). Opt into the classic Populate semantics so newer CMake does
+# not warn about the deprecated single-argument form.
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 OLD)
+endif()
 if(NOT OPENORBITAL_HEADER)
-  message(STATUS "openorbitaloptimizer header not found locally; fetching from GitHub")
-  include(FetchContent)
+  message(STATUS "openorbitaloptimizer not found; fetching from GitHub (header-only).")
+  # Populate the sources WITHOUT running OpenOrbitalOptimizer's own
+  # CMakeLists: it builds a test suite (helfem/legendre/diatomic) and
+  # requires an armadillo CMake target that we do not provide. We only
+  # want its headers.
   FetchContent_Declare(openorbitaloptimizer
     GIT_REPOSITORY https://github.com/susilehtola/OpenOrbitalOptimizer.git
     GIT_TAG        master
     GIT_SHALLOW    TRUE)
-  # Download-only — we use OpenOrbitalOptimizer as a header-only
-  # library and don't want its CMakeLists.txt to execute, since it
-  # expects an `armadillo` CMake target that erkale's bare
-  # find_package(Armadillo) (variable-style) doesn't create.
   FetchContent_GetProperties(openorbitaloptimizer)
   if(NOT openorbitaloptimizer_POPULATED)
     FetchContent_Populate(openorbitaloptimizer)
   endif()
-  # Header lives in <src>/openorbitaloptimizer/, parent dir is the include root
   set(OPENORBITAL_HEADER "${openorbitaloptimizer_SOURCE_DIR}")
 endif()
 
-if(OPENORBITAL_HEADER)
-  message(STATUS "openorbitaloptimizer headers: ${OPENORBITAL_HEADER}; building NEO targets")
-
-  # OpenOrbitalOptimizer is Eigen-based, so the targets need Eigen3
-  # headers even though ERKALE uses Armadillo: the drivers use OOO's
-  # Armadillo compatibility shim (openorbitaloptimizer/armadillo_compat.hpp,
-  # OpenOrbitalOptimizer::Armadillo::), which converts at the solver
-  # boundary and pulls in Eigen.
-  find_package(Eigen3 QUIET NO_MODULE)
-  if(TARGET Eigen3::Eigen)
-    get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+find_package(Eigen3 QUIET NO_MODULE)
+if(NOT TARGET Eigen3::Eigen)
+  message(STATUS "Eigen3 not found; fetching v3.4.0 (header-only).")
+  FetchContent_Declare(Eigen3
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG        3.4.0
+    GIT_SHALLOW    TRUE)
+  FetchContent_GetProperties(Eigen3)
+  if(NOT eigen3_POPULATED)
+    FetchContent_Populate(Eigen3)
   endif()
-  if(NOT EIGEN3_INCLUDE_DIR)
-    find_path(EIGEN3_INCLUDE_DIR Eigen/Core
-      HINTS ${EIGEN3_ROOT_DIR} ${EIGEN3_ROOT} /usr/include /usr/local/include
-      PATH_SUFFIXES eigen3 include/eigen3)
-  endif()
-  if(NOT EIGEN3_INCLUDE_DIR)
-    # Header-only; fetch when no system copy is found, like openorbitaloptimizer
-    # and libwignernj. Populate-only -- we just need the include directory.
-    message(STATUS "Eigen3 not found locally; fetching v3.4.0 from GitLab (header-only).")
-    include(FetchContent)
-    FetchContent_Declare(eigen3
-      GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-      GIT_TAG        3.4.0
-      GIT_SHALLOW    TRUE)
-    FetchContent_GetProperties(eigen3)
-    if(NOT eigen3_POPULATED)
-      FetchContent_Populate(eigen3)
-    endif()
-    set(EIGEN3_INCLUDE_DIR "${eigen3_SOURCE_DIR}")
-  endif()
-  message(STATUS "Eigen3 headers for OpenOrbitalOptimizer targets: ${EIGEN3_INCLUDE_DIR}")
-
-  add_executable (erkale_neo neo.cpp neo_dump.cpp neo_cholesky.cpp)
-  target_include_directories(erkale_neo PUBLIC "${EIGEN3_INCLUDE_DIR}")
-  set_target_properties(erkale_neo PROPERTIES OUTPUT_NAME "erkale_neo${SUFFIX}")
-  target_include_directories(erkale_neo PUBLIC "${OPENORBITAL_HEADER}")
-  target_link_libraries(erkale_neo liberkale_cmp)
-  target_link_libraries(erkale_neo liberkale_emd)
-  target_link_libraries(erkale_neo liberkale)
-  if(NOT BUILD_SHARED_LIBS)
-   target_link_libraries(erkale_neo -lrt)
-   target_link_libraries(erkale_neo ${GSL_LIBRARIES})
-   target_link_libraries(erkale_neo ${LAPACK_LIBRARIES})
-   target_link_libraries(erkale_neo ${LIBCINT_LIBRARIES})
-   target_link_libraries(erkale_neo ${LIBXC_LIBRARIES})
-   target_link_libraries(erkale_neo ${HDF5_LIBRARIES})
-  endif()
-
-  add_executable (erkale_neosp neosp.cpp)
-  set_target_properties(erkale_neosp PROPERTIES OUTPUT_NAME "erkale_neosp${SUFFIX}")
-  target_include_directories(erkale_neosp PUBLIC "${OPENORBITAL_HEADER}")
-  target_include_directories(erkale_neosp PUBLIC "${EIGEN3_INCLUDE_DIR}")
-  target_link_libraries(erkale_neosp liberkale_cmp)
-  target_link_libraries(erkale_neosp liberkale_emd)
-  target_link_libraries(erkale_neosp liberkale)
-  if(NOT BUILD_SHARED_LIBS)
-   target_link_libraries(erkale_neosp -lrt)
-   target_link_libraries(erkale_neosp ${GSL_LIBRARIES})
-   target_link_libraries(erkale_neosp ${LAPACK_LIBRARIES})
-   target_link_libraries(erkale_neosp ${LIBCINT_LIBRARIES})
-   target_link_libraries(erkale_neosp ${LIBXC_LIBRARIES})
-   target_link_libraries(erkale_neosp ${HDF5_LIBRARIES})
-  endif()
-
-  add_executable (erkale_hneoci hneoci.cpp)
-  set_target_properties(erkale_hneoci PROPERTIES OUTPUT_NAME "erkale_hneoci${SUFFIX}")
-  target_include_directories(erkale_hneoci PUBLIC "${OPENORBITAL_HEADER}")
-  target_link_libraries(erkale_hneoci liberkale_cmp)
-  target_link_libraries(erkale_hneoci liberkale_emd)
-  target_link_libraries(erkale_hneoci liberkale)
-  if(NOT BUILD_SHARED_LIBS)
-   target_link_libraries(erkale_hneoci -lrt)
-   target_link_libraries(erkale_hneoci ${GSL_LIBRARIES})
-   target_link_libraries(erkale_hneoci ${LAPACK_LIBRARIES})
-   target_link_libraries(erkale_hneoci ${LIBCINT_LIBRARIES})
-   target_link_libraries(erkale_hneoci ${LIBXC_LIBRARIES})
-   target_link_libraries(erkale_hneoci ${HDF5_LIBRARIES})
-  endif()
-
-  add_executable (erkale_complex_orbs complex_orbs.cpp)
-  set_target_properties(erkale_complex_orbs PROPERTIES OUTPUT_NAME "erkale_complex_orbs${SUFFIX}")
-  target_include_directories(erkale_complex_orbs PUBLIC "${OPENORBITAL_HEADER}")
-  target_include_directories(erkale_complex_orbs PUBLIC "${EIGEN3_INCLUDE_DIR}")
-  target_link_libraries(erkale_complex_orbs liberkale_cmp)
-  target_link_libraries(erkale_complex_orbs liberkale_emd)
-  target_link_libraries(erkale_complex_orbs liberkale)
-  if(NOT BUILD_SHARED_LIBS)
-   target_link_libraries(erkale_complex_orbs -lrt)
-   target_link_libraries(erkale_complex_orbs ${GSL_LIBRARIES})
-   target_link_libraries(erkale_complex_orbs ${LAPACK_LIBRARIES})
-   target_link_libraries(erkale_complex_orbs ${LIBCINT_LIBRARIES})
-   target_link_libraries(erkale_complex_orbs ${LIBXC_LIBRARIES})
-   target_link_libraries(erkale_complex_orbs ${HDF5_LIBRARIES})
-  endif()
-else()
-  message(STATUS "openorbitaloptimizer header not found; skipping NEO targets (set OPENORBITAL_INCLUDE_DIR to enable)")
+  add_library(Eigen3::Eigen INTERFACE IMPORTED)
+  set_target_properties(Eigen3::Eigen PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${eigen3_SOURCE_DIR}")
 endif()
+
+message(STATUS "Building NEO targets (openorbitaloptimizer: ${OPENORBITAL_HEADER})")
+
+# Shared usage requirements of the NEO drivers.
+add_library(erkale_neo_deps INTERFACE)
+target_include_directories(erkale_neo_deps INTERFACE "${OPENORBITAL_HEADER}")
+target_link_libraries(erkale_neo_deps INTERFACE
+  Eigen3::Eigen liberkale_cmp liberkale_emd liberkale)
+
+add_executable(erkale_neo neo.cpp neo_dump.cpp neo_cholesky.cpp)
+set_target_properties(erkale_neo PROPERTIES OUTPUT_NAME "erkale_neo${SUFFIX}")
+target_link_libraries(erkale_neo erkale_neo_deps)
+
+add_executable(erkale_neosp neosp.cpp)
+set_target_properties(erkale_neosp PROPERTIES OUTPUT_NAME "erkale_neosp${SUFFIX}")
+target_link_libraries(erkale_neosp erkale_neo_deps)
+
+add_executable(erkale_hneoci hneoci.cpp)
+set_target_properties(erkale_hneoci PROPERTIES OUTPUT_NAME "erkale_hneoci${SUFFIX}")
+target_link_libraries(erkale_hneoci erkale_neo_deps)
+
+add_executable(erkale_complex_orbs complex_orbs.cpp)
+set_target_properties(erkale_complex_orbs PROPERTIES OUTPUT_NAME "erkale_complex_orbs${SUFFIX}")
+target_link_libraries(erkale_complex_orbs erkale_neo_deps)

@@ -1,256 +1,145 @@
-# make sure cmake addes the binary directory for the project to
-# the include path, since some sources are generated on-the-fly
-# We also want to find the electron momentum density stuff
-# and the completeness profile
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+# liberkale: the ERKALE engine library. All dependencies are attached
+# PUBLIC so their include directories and link requirements propagate
+# transitively to every executable and sublibrary that links liberkale.
 
-# Add the armadillo include directory
-INCLUDE_DIRECTORIES(${ARMADILLO_INCLUDE_DIRS})
-# Add the GSL include directory
-INCLUDE_DIRECTORIES(${GSL_INCLUDE_DIRS})
-LINK_DIRECTORIES(${GSL_LIBRARY_DIRS})
-# Add libxc include directory
-INCLUDE_DIRECTORIES(${LIBXC_INCLUDE_DIRS})
-LINK_DIRECTORIES(${LIBXC_LIBRARY_DIRS})
-# Add libcint include directory
-INCLUDE_DIRECTORIES(${LIBCINT_INCLUDE_DIRS})
-# Add HDF5 include directory
-INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
-LINK_DIRECTORIES(${HDF5_LIBRARY_DIRS})
+add_library(liberkale
+  basis.cpp basislibrary.cpp
+  stringutil.cpp mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp
+  eriscreen.cpp timer.cpp linalg.cpp solidharmonics.cpp
+  diis.cpp scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
+  scf-force.cpp elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp
+  broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
+  checkpoint.cpp guess.cpp external/storage.cpp
+  external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
+  trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
+  density_fitting.cpp jkbuilder.cpp lebedev.cpp eriworker.cpp cintenv.cpp unitary.cpp
+  pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
+  stockholder.cpp b_tensor.cpp lbfgs.cpp gdm.cpp
+  slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
+  sap.cpp)
 
-# Create the ERKALE base library "erkale" which includes the following
-#sources
-
-add_library (liberkale basis.cpp basislibrary.cpp
-stringutil.cpp mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp
-eriscreen.cpp timer.cpp linalg.cpp solidharmonics.cpp
-diis.cpp scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
-scf-force.cpp elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp
-broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
-checkpoint.cpp guess.cpp external/storage.cpp
-external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
-trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
-density_fitting.cpp jkbuilder.cpp lebedev.cpp eriworker.cpp cintenv.cpp unitary.cpp
-pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
-stockholder.cpp b_tensor.cpp lbfgs.cpp gdm.cpp
-slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
-sap.cpp)
-
-# The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
-
-# If we build shared libraries, they must be linked to the other libraries
 if(BUILD_SHARED_LIBS)
- set_target_properties(liberkale PROPERTIES
-  VERSION ${VERSION} SOVERSION ${SOVERSION} )
- if(UNIX AND NOT APPLE)
-  target_link_libraries(liberkale -lrt)
- endif()
- target_link_libraries(liberkale ${GSL_LIBRARIES})
- target_link_libraries(liberkale ${LAPACK_LIBRARIES})
- target_link_libraries(liberkale ${LIBCINT_LIBRARIES})
- target_link_libraries(liberkale ${LIBXC_LIBRARIES})
- target_link_libraries(liberkale ${HDF5_LIBRARIES})
+  set_target_properties(liberkale PROPERTIES
+    VERSION ${PROJECT_VERSION} SOVERSION ${SOVERSION})
 endif()
 
-# Wigner 3j symbols come from libwignernj (see top-level CMakeLists).
-# It is an imported target, so include directories and the link
-# requirement propagate transitively to consumers of liberkale.
-target_link_libraries(liberkale wignernj::wignernj)
-# Basis Set Exchange JSON parsing (BasisSetLibrary::load_bse_json).
-target_link_libraries(liberkale nlohmann_json::nlohmann_json)
+# Own headers (source tree + the binary dir holding generated sources and
+# version.h) plus every dependency, all PUBLIC.
+target_include_directories(liberkale PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  $<INSTALL_INTERFACE:include/erkale>)
+target_link_libraries(liberkale PUBLIC
+  erkale_arma GSL::gsl Libxc::xc cint erkale_hdf5
+  wignernj::wignernj nlohmann_json::nlohmann_json)
 
-# Create the ERKALE main executable
-add_executable (erkale main.cpp)
-# The name of the executable is
+# OpenMP: PUBLIC so the -fopenmp compile/link flags reach every consumer
+# (and _OPENMP is defined consistently with the scf-*.cpp.in code generator,
+# which is invoked with the same OpenMP flags).
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(liberkale PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+# System-wide default basis-set repository, if one was configured.
+if(ERKALE_SYSTEM_LIBRARY)
+  target_compile_definitions(liberkale PUBLIC
+    ERKALE_SYSTEM_LIBRARY="${ERKALE_SYSTEM_LIBRARY}")
+endif()
+
+# Version information. When building from a git checkout, generate
+# version.h (into the binary dir, which is on liberkale's include path)
+# and define SVNRELEASE so the executables print the revision. Tarball
+# builds skip this silently.
+find_package(Git QUIET)
+if(Git_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+  execute_process(COMMAND ${GIT_EXECUTABLE} rev-list --count --first-parent HEAD
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_REVCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_HASH OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  if(GIT_HASH)
+    string(SUBSTRING "${GIT_HASH}" 0 8 GIT_SHORT)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/version.h @ONLY)
+    target_compile_definitions(liberkale PUBLIC SVNRELEASE)
+  endif()
+endif()
+
+# --- Executables. Each links liberkale (+ the sublibraries it needs);
+# the external dependencies arrive transitively. ---
+
+add_executable(erkale main.cpp)
 set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
-target_link_libraries(erkale liberkale)
-target_link_libraries(erkale liberkale_emd)
+target_link_libraries(erkale liberkale liberkale_emd)
 
-# Link libraries
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE) 
-  target_link_libraries(erkale -lrt)
- endif()
- target_link_libraries(erkale ${GSL_LIBRARIES})
- target_link_libraries(erkale ${LAPACK_LIBRARIES})
- target_link_libraries(erkale ${LIBXC_LIBRARIES})
- target_link_libraries(erkale ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale ${HDF5_LIBRARIES})
-endif()
-
-# Create the ERKALE geometry optimization executable
-add_executable (erkale_geom geometry.cpp)
-# The name of the executable is
+add_executable(erkale_geom geometry.cpp)
 set_target_properties(erkale_geom PROPERTIES OUTPUT_NAME "erkale_geom${SUFFIX}")
-target_link_libraries(erkale_geom liberkale)
-target_link_libraries(erkale_geom liberkale_emd)
+target_link_libraries(erkale_geom liberkale liberkale_emd)
 
-# Link libraries
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE)				  
-  target_link_libraries(erkale_geom -lrt)
- endif()
- target_link_libraries(erkale_geom ${GSL_LIBRARIES})
- target_link_libraries(erkale_geom ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_geom ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_geom ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_geom ${HDF5_LIBRARIES})
-endif()
-
-
-# Create the ERKALE localization executable
-add_executable (erkale_loc localize.cpp)
-# The name of the executable is
+add_executable(erkale_loc localize.cpp)
 set_target_properties(erkale_loc PROPERTIES OUTPUT_NAME "erkale_loc${SUFFIX}")
-target_link_libraries(erkale_loc liberkale)
-target_link_libraries(erkale_loc liberkale_emd)
+target_link_libraries(erkale_loc liberkale liberkale_emd)
 
-# Link libraries
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE)
-  target_link_libraries(erkale_loc -lrt)
- endif()
- target_link_libraries(erkale_loc ${GSL_LIBRARIES})
- target_link_libraries(erkale_loc ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_loc ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_loc ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_loc ${HDF5_LIBRARIES})
-endif()
-
-
-# Density cube tool
-add_executable (erkale_cube cube.cpp)
-# The name of the executable is
+add_executable(erkale_cube cube.cpp)
 set_target_properties(erkale_cube PROPERTIES OUTPUT_NAME "erkale_cube${SUFFIX}")
 target_link_libraries(erkale_cube liberkale)
 
-# Link libraries
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE)
-  target_link_libraries(erkale_cube -lrt)
- endif()
- target_link_libraries(erkale_cube ${GSL_LIBRARIES})
- target_link_libraries(erkale_cube ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_cube ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_cube ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_cube ${HDF5_LIBRARIES})
-endif()
-
-# Linear configurations
-add_executable (erkale_genlinconf genlinconf.cpp)
-# The name of the executable is
+add_executable(erkale_genlinconf genlinconf.cpp)
 set_target_properties(erkale_genlinconf PROPERTIES OUTPUT_NAME "erkale_genlinconf${SUFFIX}")
 target_link_libraries(erkale_genlinconf liberkale)
 
-# Link libraries
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE)
-  target_link_libraries(erkale_genlinconf -lrt)
- endif()
- target_link_libraries(erkale_genlinconf ${GSL_LIBRARIES})
- target_link_libraries(erkale_genlinconf ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_genlinconf ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_genlinconf ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_genlinconf ${HDF5_LIBRARIES})
-endif()
-
-# Population analysis tool
-add_executable (erkale_pop population.cpp)
-# The name of the executable is
+add_executable(erkale_pop population.cpp)
 set_target_properties(erkale_pop PROPERTIES OUTPUT_NAME "erkale_pop${SUFFIX}")
 target_link_libraries(erkale_pop liberkale)
 
-# Link libraries
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE)
-  target_link_libraries(erkale_pop -lrt)
- endif()
- target_link_libraries(erkale_pop ${GSL_LIBRARIES})
- target_link_libraries(erkale_pop ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_pop ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_pop ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_pop ${HDF5_LIBRARIES})
-endif()
-
-
-
-# Install targets
-install (TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
-install (TARGETS erkale DESTINATION bin)
-install (TARGETS erkale_cube DESTINATION bin)
-install (TARGETS erkale_geom DESTINATION bin)
-install (TARGETS erkale_genlinconf DESTINATION bin)
-install (TARGETS erkale_loc DESTINATION bin)
-install (TARGETS erkale_pop DESTINATION bin)
-
-# Install headers
+# --- Install ---
+install(TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
+install(TARGETS erkale erkale_cube erkale_geom erkale_genlinconf erkale_loc erkale_pop
+        DESTINATION bin)
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 install(FILES ${headers} DESTINATION include/erkale)
 
-# Create the ERKALE electron momentum density library
-add_subdirectory(emd)
-# Create the completeness profile tool
-add_subdirectory(completeness)
-# Create the Casida executable
-add_subdirectory(casida)
-# Create the XRS executable
-add_subdirectory(xrs)
+# --- Subdirectory libraries and tools ---
+add_subdirectory(emd)          # electron momentum density
+add_subdirectory(completeness) # completeness profiles
+add_subdirectory(casida)       # Casida TDDFT
+add_subdirectory(xrs)          # X-ray spectra
+add_subdirectory(slaterfit)    # Slater -> Gaussian fits
+add_subdirectory(test)         # unit / integral tests
+add_subdirectory(basistool)    # basis-set manipulation
+add_subdirectory(external)     # ADF / Gaussian interop
+add_subdirectory(contrib)      # research / experimental tools
 
-# Create the Slater fit tool
-add_subdirectory(slaterfit)
-# Create test tool
-add_subdirectory(test)
-# Create basis set tool
-add_subdirectory(basistool)
-# Compile support programs for external programs
-add_subdirectory(external)
+# ---------------------------- SCF code generation ----------------------------
+# The spin/method specialisations of the SCF driver are produced by running
+# the C++ preprocessor over the *.cpp.in templates with combinations of
+# -DRESTRICTED/-DUNRESTRICTED and -DHF/-DDFT/-D_ROHF. scf-includes.cpp.in is
+# prepended once.
 
-# Compile the extra programs
-add_subdirectory(contrib)
+# Generate <name>.cpp from <name>.cpp.in for the given -D macro combinations.
+# Each element of ARGN is one space-separated set of flags (one preprocessed
+# block appended per set).
+function(erkale_gen_scf name)
+  set(out ${CMAKE_CURRENT_BINARY_DIR}/${name}.cpp)
+  set(tmpl ${CMAKE_CURRENT_SOURCE_DIR}/${name}.cpp.in)
+  set(inc ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in)
+  set(commands COMMAND ${CAT} ${inc} >${out})
+  foreach(flags IN LISTS ARGN)
+    separate_arguments(flaglist UNIX_COMMAND "${flags}")
+    list(APPEND commands COMMAND ${PPROC} ${flaglist} ${tmpl} >>${out})
+  endforeach()
+  add_custom_command(OUTPUT ${out} DEPENDS ${inc} ${tmpl} ${commands})
+endfunction()
 
-# Recipe for building SCF
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
-
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
-)
-
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in
-
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-)
-
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in
-
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-#  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-)
+erkale_gen_scf(scf-solvers
+  "-DRESTRICTED -DHF" "-DUNRESTRICTED -DHF" "-DUNRESTRICTED -D_ROHF"
+  "-DRESTRICTED -DDFT" "-DUNRESTRICTED -DDFT")
+erkale_gen_scf(scf-fock
+  "-DRESTRICTED -DHF" "-DUNRESTRICTED -DHF" "-DUNRESTRICTED -D_ROHF"
+  "-DRESTRICTED -DDFT" "-DUNRESTRICTED -DDFT")
+# scf-force omits the ROHF specialisation.
+erkale_gen_scf(scf-force
+  "-DRESTRICTED -DHF" "-DUNRESTRICTED -DHF"
+  "-DRESTRICTED -DDFT" "-DUNRESTRICTED -DDFT")
