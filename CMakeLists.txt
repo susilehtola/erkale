@@ -118,6 +118,11 @@ else()
     GIT_REPOSITORY https://github.com/sunqm/libcint.git
     GIT_TAG        v6.1.3)
   FetchContent_MakeAvailable(cint)
+  # libcint generates cint_funcs.h into its binary include dir; the fetched
+  # `cint` target does not expose it to consumers, so add both the source
+  # and binary include dirs to its interface.
+  target_include_directories(cint INTERFACE
+    "${cint_SOURCE_DIR}/include" "${cint_BINARY_DIR}/include")
 endif()
 
 # --- HDF5 (C API only). System first; fetch fallback is heavy. Normalise

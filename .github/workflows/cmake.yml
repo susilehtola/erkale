@@ -12,10 +12,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Resolve dependencies
-        run: sudo apt-get update && sudo apt-get install -y libarmadillo-dev libeigen3-dev cmake gfortran libgsl-dev libxc-dev libint1 libint-dev libhdf5-serial-dev
+        # System packages for the deps that Ubuntu ships. libcint and
+        # libwignernj are not packaged and are fetched and built from
+        # source by CMake automatically.
+        run: sudo apt-get update && sudo apt-get install -y cmake gfortran libgsl-dev liblapack-dev libarmadillo-dev libeigen3-dev libxc-dev libhdf5-serial-dev nlohmann-json3-dev
 
       - name: Compile
-        run: mkdir build && cd build && cmake -E env CXXFLAGS="-DARMA_DONT_USE_WRAPPER" cmake .. && make -j$(nproc)
+        run: cmake -B build && cmake --build build -j$(nproc)
 
       - name: Test
-        run: cd ./build && ctest --output-on-failure
+        run: ctest --test-dir build --output-on-failure
