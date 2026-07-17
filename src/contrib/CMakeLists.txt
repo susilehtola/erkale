@@ -43,10 +43,10 @@ endif()
 
 find_package(Eigen3 QUIET NO_MODULE)
 if(NOT TARGET Eigen3::Eigen)
-  message(STATUS "Eigen3 not found; fetching v3.4.0 (header-only).")
+  message(STATUS "Eigen3 not found; fetching v5.0.1 (header-only).")
   FetchContent_Declare(Eigen3
     GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-    GIT_TAG        3.4.0
+    GIT_TAG        5.0.1
     GIT_SHALLOW    TRUE)
   FetchContent_GetProperties(Eigen3)
   if(NOT eigen3_POPULATED)
