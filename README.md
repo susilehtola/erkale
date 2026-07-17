@@ -7,7 +7,7 @@ ERKALE -- HF/DFT from Hel
 
 * [**Users' guide**](doc/userguide.pdf)
 
-* **List of functionals** [on libxc page](http://www.tddft.org/programs/libxc/functionals/)
+* **List of functionals** [on libxc page](https://libxc.gitlab.io/functionals/)
 
 * **Building:** see [INSTALL](INSTALL). In short, with the prerequisites
   installed from your distribution:
