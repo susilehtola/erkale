@@ -152,15 +152,17 @@ else()
 endif()
 
 # --- Wigner 3j symbols (libwignernj). System config, else fetch. Same
-# target name (wignernj::wignernj) either way.
-set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(BUILD_CXX_TESTS OFF CACHE BOOL "" FORCE)
-set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(BUILD_FORTRAN OFF CACHE BOOL "" FORCE)
+# target name (wignernj::wignernj) either way. When fetched, only the C
+# library is needed, so its tests / examples / extra interfaces are off
+# (0.8.0 renamed these options to the WIGNERNJ_BUILD_* namespace).
+set(WIGNERNJ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(WIGNERNJ_BUILD_CXX_TESTS OFF CACHE BOOL "" FORCE)
+set(WIGNERNJ_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(WIGNERNJ_BUILD_FORTRAN OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(wignernj
   GIT_REPOSITORY https://github.com/susilehtola/libwignernj.git
-  GIT_TAG        v0.7.0
-  FIND_PACKAGE_ARGS 0.7.0 CONFIG)
+  GIT_TAG        v0.8.0
+  FIND_PACKAGE_ARGS 0.8.0 CONFIG)
 FetchContent_MakeAvailable(wignernj)
 # FetchContent's add_subdirectory exposes only the bare "wignernj" target;
 # the namespaced alias exists only on the install/export (find) path.
