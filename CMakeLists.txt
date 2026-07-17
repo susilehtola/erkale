@@ -1,217 +1,249 @@
-# The name of our project is "ERKALE".  CMakeLists files in this project can
-# refer to the root source directory of the project as ${ERKALE_SOURCE_DIR} and
-# to the root binary directory of the project as ${ERKALE_BINARY_DIR}.
-project (ERKALE)
-set(PROJECT_TYPE CXX)
+# ERKALE - DFT from Hel.
+#
+# Modern CMake build. Dependencies are found on the system first and, for
+# the CMake-based ones, fetched and built from source when missing
+# (FetchContent + FIND_PACKAGE_ARGS). GSL and LAPACK/BLAS are system-only.
+cmake_minimum_required(VERSION 3.24)
+# C for the ADF reader sources and the BLAS integer-width probe; Fortran
+# for LAPACK/BLAS linkage.
+project(ERKALE VERSION 0.1.0 LANGUAGES C CXX Fortran)
 
-# CMake 3.14 is required for FetchContent_MakeAvailable, used to
-# fetch libwignernj when no installed copy is detected.
-cmake_minimum_required(VERSION 3.14)
-# Enable Fortran for LAPACK
-enable_language (Fortran)
+# Version of the shared libraries
+set(SOVERSION 0.1.0)
 
 # We use C++17 standard library facilities: std::tgamma, <random>,
 # std::sph_bessel, std::sph_legendre, std::legendre.
 if(NOT CMAKE_CXX_STANDARD)
- set(CMAKE_CXX_STANDARD 17)
- set(CMAKE_CXX_STANDARD_REQUIRED ON)
- set(CMAKE_CXX_EXTENSIONS OFF)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
 
-# Set version
-set(VERSION 0.1.0)
-# Version of libraries
-set(SOVERSION 0.1.0)
-
-# Cmake modules/macros are in a subdirectory to keep the root directory cleaner
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
-# Configuration where to find Armadillo is in current directory
-set(Armadillo_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
-
-# System default basis set repository (need not exist)
-option(ERKALE_SYSTEM_LIBRARY "System default basis set repository (need not exist)" OFF)
-if(ERKALE_SYSTEM_LIBRARY)
- message("Using ${ERKALE_SYSTEM_LIBRARY} as default basis set repository.")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DERKALE_SYSTEM_LIBRARY=\\\"${ERKALE_SYSTEM_LIBRARY}\\\"" )
-else()
- message("Using default location for basis set repository.")
-endif()
-
-# Catch C++ exceptions?
-option(CATCH_EXCEPTIONS "Catch C++ exceptions?" OFF)
-if(CATCH_EXCEPTIONS)
-  add_definitions(-DCATCH_EXCEPTIONS)
-endif()
-
-# Suppress GCC 13+ -Wfree-nonheap-object false-positives that fire from
-# inside Armadillo's small-vector destructor path. The warning's
-# inlined call chain crosses header boundaries, so a localised pragma
-# at the declaration site doesn't reach the destructor expansion.
+include(FetchContent)
 include(CheckCXXCompilerFlag)
+include(CheckSourceCompiles)
+include(CheckSourceRuns)
+
+# ---------------------------------------------------------------- Options
+# System-wide default basis-set repository (need not exist). Consumed as a
+# compile definition on liberkale (see src/CMakeLists.txt).
+set(ERKALE_SYSTEM_LIBRARY "" CACHE STRING
+    "System-wide default basis-set repository (need not exist)")
+
+# Catch C++ exceptions in the executables' main()?
+option(CATCH_EXCEPTIONS "Catch C++ exceptions?" OFF)
+
+# Build the OpenMP-parallel version (executables get an _omp suffix)?
+option(USE_OPENMP "Compile the OpenMP-parallel version?" ON)
+
+# 64-bit (ILP64) BLAS/LAPACK integers. AUTO probes the found BLAS; ON/OFF
+# force it. Sets Armadillo's ARMA_BLAS_LONG_LONG when 64-bit.
+set(ERKALE_BLAS_INT64 "AUTO" CACHE STRING
+    "Use 64-bit (ILP64) BLAS/LAPACK integers: AUTO, ON or OFF")
+set_property(CACHE ERKALE_BLAS_INT64 PROPERTY STRINGS AUTO ON OFF)
+
+# ------------------------------------------------------ Compiler warnings
+# Suppress GCC 13+ -Wfree-nonheap-object false-positives that fire from
+# inside Armadillo's small-vector destructor path (the inlined call chain
+# crosses header boundaries, so a localised pragma cannot reach it).
 check_cxx_compiler_flag(-Wno-free-nonheap-object HAS_NO_FREE_NONHEAP_OBJECT)
 if(HAS_NO_FREE_NONHEAP_OBJECT)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-free-nonheap-object")
+  add_compile_options(-Wno-free-nonheap-object)
 endif()
 
-# Compile SMP version?
-option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" ON)
-# Find OpenMP support
+# ---------------------------------------------------------------- OpenMP
 if(USE_OPENMP)
- find_package( OpenMP )
- if(OPENMP_FOUND)
-  # Add flags to CXX flags
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-  # Set suffix
-  set(SUFFIX "_omp")
-  # Set OMP flags for preprocessor
-  set(PPROC_FLAGS "${OpenMP_CXX_FLAGS}")
- else()
-   set(SUFFIX "")
-   set(PPROC_FLAGS "")
- endif()
+  find_package(OpenMP)
+  if(OpenMP_CXX_FOUND)
+    set(SUFFIX "_omp")
+  else()
+    set(SUFFIX "")
+  endif()
 else()
- # No flags
- set(OpenMP_C_FLAGS "" )
- set(OpenMP_CXX_FLAGS "" )
- set(PPROC_FLAGS "")
- # No suffix
- set(SUFFIX "")
+  set(SUFFIX "")
 endif()
 
-# Add in svn version information?
-option(SVN_VERSION "Add in svn version information? (Need to generate version.h)" OFF)
-if(SVN_VERSION)
-  # Add flag to CXX flags
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSVNRELEASE")
-endif()
-
-# Find cat
-find_program(CAT cat)
-
-# Find LAPACK
-find_package(LAPACK REQUIRED)
-message("LAPACK headers are in ${LAPACK_INCLUDE_DIRS}")
-message("LAPACK library is ${LAPACK_LIBRARIES}")
-message("")
-
-# Find Armadillo
-find_package(Armadillo REQUIRED)
-message("ARMADILLO headers are in ${ARMADILLO_INCLUDE_DIRS}")
-message("ARMADILLO library is ${ARMADILLO_LIBRARIES}")
-message("")
-
-# Find GSL
-find_package(GSL REQUIRED)
-message("GSL headers are in ${GSL_INCLUDE_DIRS}")
-message("GSL library is ${GSL_LIBRARIES}")
-message("")
-
-# Find libxc
-find_package(libxc REQUIRED)
-message("libxc headers are in ${LIBXC_INCLUDE_DIRS}")
-message("libxc linker flags are ${LIBXC_LIBRARIES}")
-message("")
-
-# Find libcint (also satisfied by the API-compatible qcint); if it is
-# not available, fetch and build it from source
-find_path(LIBCINT_INCLUDE_DIRS cint.h)
-find_library(LIBCINT_LIBRARIES NAMES cint)
-if(NOT LIBCINT_INCLUDE_DIRS OR NOT LIBCINT_LIBRARIES)
- message(STATUS "libcint not found, building it from source")
- include(FetchContent)
- FetchContent_Declare(libcint
-  GIT_REPOSITORY https://github.com/sunqm/libcint.git
-  GIT_TAG v6.1.3)
- FetchContent_MakeAvailable(libcint)
- set(LIBCINT_LIBRARIES cint)
- set(LIBCINT_INCLUDE_DIRS ${libcint_BINARY_DIR}/include ${libcint_SOURCE_DIR}/include)
-endif()
-message("libcint headers are in ${LIBCINT_INCLUDE_DIRS}")
-message("libcint linker flags are ${LIBCINT_LIBRARIES}")
-message("")
-
-# Find HDF5
-find_package(HDF5 REQUIRED)
-message("HDF5 headers are in ${HDF5_INCLUDE_DIRS}")
-message("HDF5 linker flags are ${HDF5_LIBRARIES}")
-message("")
-
-# Find libwignernj for Wigner 3j symbols. If a system install is not
-# present, fetch and build from source. Either path exposes the
-# wignernj::wignernj imported target.
-find_package(wignernj 0.7.0 QUIET CONFIG)
-if(wignernj_FOUND)
- message("Found libwignernj ${wignernj_VERSION}: ${wignernj_DIR}")
+# Preprocessor used for the scf-*.cpp.in / xrsscf-*.cpp.in code
+# generation (the C++ compiler invoked as -E). The OpenMP flags are
+# included so that any _OPENMP conditionals expand consistently with the
+# compiled objects.
+set(PPROC_FLAGS ${OpenMP_CXX_FLAGS})
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|IntelLLVM|Intel|PGI|NVHPC|PathScale")
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|IntelLLVM|Intel")
+    set(PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${PPROC_FLAGS})
+  else()
+    set(PPROC ${CMAKE_CXX_COMPILER} -E ${PPROC_FLAGS})
+  endif()
 else()
- message("libwignernj not found; fetching v0.7.0 from GitHub.")
- include(FetchContent)
- # Disable libwignernj's own tests / examples / extra interfaces so the
- # subbuild only produces the C library we link against.
- set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
- set(BUILD_CXX_TESTS OFF CACHE BOOL "" FORCE)
- set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
- set(BUILD_FORTRAN OFF CACHE BOOL "" FORCE)
- FetchContent_Declare(
-   wignernj
-   GIT_REPOSITORY https://github.com/susilehtola/libwignernj.git
-   GIT_TAG        v0.7.0
- )
- FetchContent_MakeAvailable(wignernj)
- # FetchContent's add_subdirectory only exposes the bare "wignernj"
- # target; the "wignernj::wignernj" namespaced name only exists in the
- # install/export path. Provide an alias so consumers can use the same
- # name regardless of how libwignernj was acquired.
- if(NOT TARGET wignernj::wignernj)
-   add_library(wignernj::wignernj ALIAS wignernj)
- endif()
+  message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER_ID} not supported for the code generator.")
 endif()
-message("")
+find_program(CAT cat REQUIRED)
 
-# nlohmann/json for Basis Set Exchange (BSE) JSON parsing. If a system
-# install isn't present, fetch v3.11.3 from GitHub. Either path exposes
-# the nlohmann_json::nlohmann_json imported target.
-find_package(nlohmann_json 3.11 QUIET CONFIG)
-if(nlohmann_json_FOUND)
- message("Found nlohmann_json ${nlohmann_json_VERSION}: ${nlohmann_json_DIR}")
+# ============================================================ Dependencies
+
+# BLAS integer width: request ILP64 up front when explicitly asked, so
+# find_package(BLAS) validates the 64-bit interface.
+if(ERKALE_BLAS_INT64 STREQUAL "ON")
+  set(BLA_SIZEOF_INTEGER 8)
+endif()
+
+# --- System-only (autotools/Make upstreams; ubiquitous) ---
+find_package(LAPACK REQUIRED)   # provides LAPACK::LAPACK and BLAS::BLAS
+find_package(GSL REQUIRED)       # provides GSL::gsl
+
+# --- libxc (CMake). System LibxcConfig, else fetch. Normalise to Libxc::xc.
+FetchContent_Declare(Libxc
+  GIT_REPOSITORY https://gitlab.com/libxc/libxc.git
+  GIT_TAG        7.0.0
+  FIND_PACKAGE_ARGS NAMES Libxc libxc CONFIG)
+FetchContent_MakeAvailable(Libxc)
+if(NOT TARGET Libxc::xc AND TARGET xc)
+  add_library(Libxc::xc ALIAS xc)
+endif()
+
+# --- libcint (also satisfied by API-compatible qcint). No upstream CMake
+# config package, so find header+library and wrap them in an imported
+# target named "cint"; otherwise fetch and build (which exports "cint").
+find_path(LIBCINT_INCLUDE_DIR cint.h)
+find_library(LIBCINT_LIBRARY NAMES cint)
+if(LIBCINT_INCLUDE_DIR AND LIBCINT_LIBRARY)
+  add_library(cint UNKNOWN IMPORTED)
+  set_target_properties(cint PROPERTIES
+    IMPORTED_LOCATION "${LIBCINT_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${LIBCINT_INCLUDE_DIR}")
+  message(STATUS "Found libcint: ${LIBCINT_LIBRARY}")
 else()
- message("nlohmann_json not found; fetching v3.11.3 from GitHub.")
- include(FetchContent)
- set(JSON_BuildTests OFF CACHE INTERNAL "")
- set(JSON_Install OFF CACHE INTERNAL "")
- FetchContent_Declare(
-   nlohmann_json
-   GIT_REPOSITORY https://github.com/nlohmann/json.git
-   GIT_TAG        v3.11.3
- )
- FetchContent_MakeAvailable(nlohmann_json)
+  message(STATUS "libcint not found; fetching and building from source.")
+  FetchContent_Declare(cint
+    GIT_REPOSITORY https://github.com/sunqm/libcint.git
+    GIT_TAG        v6.1.3)
+  FetchContent_MakeAvailable(cint)
 endif()
-message("")
 
-
-# Find out how to preprocess C++ source code files
-if(CMAKE_COMPILER_IS_GNUCXX)
- set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${PPROC_FLAGS})
-elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" )
- set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${PPROC_FLAGS})
-elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "PGI" )
- set( PPROC ${CMAKE_CXX_COMPILER} -E ${DFTFLAGS} ${PPROC_FLAGS})
-elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "PathScale" )
- set( PPROC ${CMAKE_CXX_COMPILER} -E ${DFTFLAGS} ${PPROC_FLAGS})
-elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel" )
- set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${PPROC_FLAGS})
+# --- HDF5 (C API only). System first; fetch fallback is heavy. Normalise
+# to the erkale_hdf5 interface target regardless of how it was provided.
+find_package(HDF5 QUIET COMPONENTS C)
+if(NOT HDF5_FOUND)
+  message(STATUS "HDF5 not found; fetching and building from source.")
+  set(HDF5_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+  set(HDF5_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(HDF5_BUILD_HL_LIB OFF CACHE BOOL "" FORCE)
+  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(HDF5
+    GIT_REPOSITORY https://github.com/HDFGroup/hdf5.git
+    GIT_TAG        hdf5_1.14.4.3)
+  FetchContent_MakeAvailable(HDF5)
+endif()
+add_library(erkale_hdf5 INTERFACE)
+if(TARGET hdf5::hdf5)
+  target_link_libraries(erkale_hdf5 INTERFACE hdf5::hdf5)
+elseif(TARGET HDF5::HDF5)
+  target_link_libraries(erkale_hdf5 INTERFACE HDF5::HDF5)
+elseif(TARGET hdf5-static)
+  target_link_libraries(erkale_hdf5 INTERFACE hdf5-static)
 else()
- set( PPROC "" )
- message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER_ID} not supported." )
+  target_link_libraries(erkale_hdf5 INTERFACE ${HDF5_C_LIBRARIES} ${HDF5_LIBRARIES})
+  target_include_directories(erkale_hdf5 INTERFACE ${HDF5_C_INCLUDE_DIRS} ${HDF5_INCLUDE_DIRS})
 endif()
 
-# Recurse into the "src" subdirectory.
-add_subdirectory (src)
+# --- Wigner 3j symbols (libwignernj). System config, else fetch. Same
+# target name (wignernj::wignernj) either way.
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_CXX_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_FORTRAN OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(wignernj
+  GIT_REPOSITORY https://github.com/susilehtola/libwignernj.git
+  GIT_TAG        v0.7.0
+  FIND_PACKAGE_ARGS 0.7.0 CONFIG)
+FetchContent_MakeAvailable(wignernj)
+# FetchContent's add_subdirectory exposes only the bare "wignernj" target;
+# the namespaced alias exists only on the install/export (find) path.
+if(NOT TARGET wignernj::wignernj AND TARGET wignernj)
+  add_library(wignernj::wignernj ALIAS wignernj)
+endif()
+
+# --- nlohmann/json for Basis Set Exchange JSON parsing. System config,
+# else fetch. Same target name (nlohmann_json::nlohmann_json) either way.
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
+FetchContent_Declare(nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.11.3
+  FIND_PACKAGE_ARGS 3.11 CONFIG)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# ------------------------------------------- Armadillo + BLAS/LAPACK config
+# ERKALE uses Armadillo header-only (ARMA_DONT_USE_WRAPPER): it links
+# BLAS/LAPACK directly rather than the libarmadillo wrapper. So we only
+# need Armadillo's headers. Find the config package (or fetch its source).
+find_package(Armadillo QUIET)
+if(Armadillo_FOUND OR ARMADILLO_INCLUDE_DIRS)
+  set(_arma_includes "${ARMADILLO_INCLUDE_DIRS}")
+else()
+  message(STATUS "Armadillo not found; fetching headers from source.")
+  # SOURCE_SUBDIR points at a non-existent directory so MakeAvailable
+  # populates the sources but does NOT add_subdirectory (we want the
+  # headers only, not Armadillo's wrapper library).
+  FetchContent_Declare(armadillo
+    GIT_REPOSITORY https://gitlab.com/conradsnicta/armadillo-code.git
+    GIT_TAG        14.0.x
+    SOURCE_SUBDIR  do-not-build)
+  FetchContent_MakeAvailable(armadillo)
+  set(_arma_includes "${armadillo_SOURCE_DIR}/include")
+endif()
+
+# The interface target carrying Armadillo's headers and configuration
+# macros (moved out of src/global.h) plus the BLAS/LAPACK link.
+add_library(erkale_arma INTERFACE)
+target_include_directories(erkale_arma INTERFACE ${_arma_includes})
+target_link_libraries(erkale_arma INTERFACE LAPACK::LAPACK BLAS::BLAS)
+target_compile_definitions(erkale_arma INTERFACE
+  ARMA_DONT_USE_WRAPPER ARMA_USE_BLAS ARMA_USE_LAPACK
+  # Disable Armadillo bounds checking except in Debug builds.
+  $<$<NOT:$<CONFIG:Debug>>:ARMA_NO_DEBUG>)
+
+# 64-bit BLAS integers -> Armadillo's ARMA_BLAS_LONG_LONG.
+if(ERKALE_BLAS_INT64 STREQUAL "ON")
+  target_compile_definitions(erkale_arma INTERFACE ARMA_BLAS_LONG_LONG)
+elseif(ERKALE_BLAS_INT64 STREQUAL "AUTO")
+  # Probe the found BLAS. First confirm we can link a ddot call at all;
+  # then run it with the vector length passed through a 32-bit int. A
+  # correct result (1+4+9 = 14) means a 32-bit (LP64) interface; a wrong
+  # result from a program that *does* link means the library read a
+  # 64-bit (ILP64) integer. A link failure is inconclusive -> assume
+  # LP64 (the historical default) and let the user override.
+  set(CMAKE_REQUIRED_LIBRARIES BLAS::BLAS)
+  check_source_compiles(C "
+    extern double ddot_(const int*, const double*, const int*, const double*, const int*);
+    int main(void){ const int n=1, i=1; double x=1.0; return ddot_(&n,&x,&i,&x,&i) > 0.0 ? 0 : 1; }
+    " ERKALE_BLAS_LINKS)
+  if(ERKALE_BLAS_LINKS)
+    check_source_runs(C "
+      extern double ddot_(const int*, const double*, const int*, const double*, const int*);
+      int main(void){
+        const int n=3, one=1; double x[3]={1.0,2.0,3.0};
+        double r = ddot_(&n,x,&one,x,&one);
+        return (r>13.5 && r<14.5) ? 0 : 1;   /* 0 == LP64 */
+      }" ERKALE_BLAS_LP64)
+    if(NOT ERKALE_BLAS_LP64)
+      message(STATUS "BLAS uses 64-bit (ILP64) integers; defining ARMA_BLAS_LONG_LONG.")
+      target_compile_definitions(erkale_arma INTERFACE ARMA_BLAS_LONG_LONG)
+    else()
+      message(STATUS "BLAS uses 32-bit (LP64) integers.")
+    endif()
+  else()
+    message(WARNING "Could not probe the BLAS integer width; assuming 32-bit (LP64). "
+                    "Pass -DERKALE_BLAS_INT64=ON if your BLAS/LAPACK is ILP64.")
+  endif()
+  unset(CMAKE_REQUIRED_LIBRARIES)
+endif()
+
+# =========================================================================
+
+# Recurse into the source tree.
+add_subdirectory(src)
 
 # Testing
-if((${CMAKE_MAJOR_VERSION} GREATER 2) OR (${CMAKE_MAJOR_VERSION} EQUAL 2 AND (${CMAKE_MINOR_VERSION} EQUAL 8 OR ${CMAKE_MINOR_VERSION} GREATER 8)))
-  enable_testing()
-  add_subdirectory (tests)
-  message("Can run tests.")
-elseif()
-  message("Version of CMake too old to run tests; at least version 2.8 required.")
-endif()
+enable_testing()
+add_subdirectory(tests)

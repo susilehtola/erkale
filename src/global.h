@@ -65,22 +65,10 @@
 #ifndef ERKALE_GLOBAL
 #define ERKALE_GLOBAL
 
-// Disable bounds checking in Armadillo.
-#ifndef ARMA_NO_DEBUG
-#define ARMA_NO_DEBUG
-#endif
-// Don't use Armadillo wrapper library
-#ifndef ARMA_DONT_USE_WRAPPER
-#define ARMA_DONT_USE_WRAPPER
-#endif
-// We need BLAS
-#ifndef ARMA_USE_BLAS
-#define ARMA_USE_BLAS
-#endif
-// and LAPACK
-#ifndef ARMA_USE_LAPACK
-#define ARMA_USE_LAPACK
-#endif
+// The Armadillo configuration macros (ARMA_DONT_USE_WRAPPER, ARMA_USE_BLAS,
+// ARMA_USE_LAPACK, ARMA_NO_DEBUG, and ARMA_BLAS_LONG_LONG for 64-bit BLAS
+// integers) are supplied by the build system via the erkale_arma target
+// (see the top-level CMakeLists.txt), not defined here.
 
 // Bohr in Ångström, CODATA 2014 value
 #define BOHRINANGSTROM 0.52917721067

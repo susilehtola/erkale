@@ -43,7 +43,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 void print(const std::string & entry, int val, FILE *out) {

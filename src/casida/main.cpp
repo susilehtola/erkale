@@ -34,7 +34,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 void print_spectrum(const std::string & fname, const arma::mat & m) {

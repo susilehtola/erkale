@@ -1,23 +1,8 @@
+# Slater -> Gaussian fitting tool.
 add_executable(erkale_slaterfit main.cpp)
-# The name of the executable is
 set_target_properties(erkale_slaterfit PROPERTIES OUTPUT_NAME "erkale_slaterfit${SUFFIX}")
-
 target_link_libraries(erkale_slaterfit liberkale)
-if(BUILD_SHARED_LIBS)
-else()
- if(UNIX AND NOT APPLE)
-  target_link_libraries(erkale_slaterfit -lrt)
- endif()
- target_link_libraries(erkale_slaterfit ${GSL_LIBRARIES})
- target_link_libraries(erkale_slaterfit ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_slaterfit ${LIBCINT_LIBRARIES})
- target_link_libraries(erkale_slaterfit ${LIBXC_LIBRARIES})
- target_link_libraries(erkale_slaterfit ${HDF5_LIBRARIES})
-endif()
 
-
-
-install (TARGETS erkale_slaterfit DESTINATION bin)
-# Install headers
+install(TARGETS erkale_slaterfit DESTINATION bin)
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 install(FILES ${headers} DESTINATION include/erkale/slaterfit)

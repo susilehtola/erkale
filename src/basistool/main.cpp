@@ -24,7 +24,7 @@
 #include "../linalg.h"
 #include "../elements.h"
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "contractaux", "daug", "decontract", "densityfit", "dump", "dumpdec", "dropaux_yang", "dropaux", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savejson", "savemolpro", "sort", "taug"};

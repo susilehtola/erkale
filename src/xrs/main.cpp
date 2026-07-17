@@ -49,7 +49,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 Settings settings;

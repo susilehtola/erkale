@@ -27,7 +27,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 arma::mat e_os_MP2(const arma::mat & Bph, const arma::mat & delta) {
