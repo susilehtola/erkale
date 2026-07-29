@@ -32,7 +32,7 @@ if(NOT OPENORBITAL_HEADER)
   # want its headers.
   FetchContent_Declare(openorbitaloptimizer
     GIT_REPOSITORY https://github.com/susilehtola/OpenOrbitalOptimizer.git
-    GIT_TAG        master
+    GIT_TAG        v0.4.0
     GIT_SHALLOW    TRUE)
   FetchContent_GetProperties(openorbitaloptimizer)
   if(NOT openorbitaloptimizer_POPULATED)
