@@ -19,6 +19,9 @@
 #include "eriworker.h"
 
 #include "openorbitaloptimizer/scfsolver.hpp"
+// The Armadillo compatibility shim (OpenOrbitalOptimizer::Armadillo::) is a
+// separate header that scfsolver.hpp no longer pulls in automatically.
+#include "openorbitaloptimizer/armadillo_compat.hpp"
 
 #include <armadillo>
 #include <cstdio>
