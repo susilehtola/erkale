@@ -21,8 +21,6 @@ endif()
 
 include(FetchContent)
 include(CheckCXXCompilerFlag)
-include(CheckSourceCompiles)
-include(CheckSourceRuns)
 
 # ---------------------------------------------------------------- Options
 # System-wide default basis-set repository (need not exist). Consumed as a
@@ -36,8 +34,9 @@ option(CATCH_EXCEPTIONS "Catch C++ exceptions?" OFF)
 # Build the OpenMP-parallel version (executables get an _omp suffix)?
 option(USE_OPENMP "Compile the OpenMP-parallel version?" ON)
 
-# 64-bit (ILP64) BLAS/LAPACK integers. AUTO probes the found BLAS; ON/OFF
-# force it. Sets Armadillo's ARMA_BLAS_LONG_LONG when 64-bit.
+# 64-bit (ILP64) BLAS/LAPACK integers. AUTO prefers a 64-bit interface
+# when one is installed and falls back to 32-bit (LP64); ON/OFF force it.
+# Sets Armadillo's ARMA_BLAS_LONG_LONG when 64-bit.
 set(ERKALE_BLAS_INT64 "AUTO" CACHE STRING
     "Use 64-bit (ILP64) BLAS/LAPACK integers: AUTO, ON or OFF")
 set_property(CACHE ERKALE_BLAS_INT64 PROPERTY STRINGS AUTO ON OFF)
@@ -81,14 +80,42 @@ find_program(CAT cat REQUIRED)
 
 # ============================================================ Dependencies
 
-# BLAS integer width: request ILP64 up front when explicitly asked, so
-# find_package(BLAS) validates the 64-bit interface.
+# --- BLAS/LAPACK (system-only), with an optional 64-bit (ILP64) integer
+# interface. ERKALE_BLAS_INT64: ON forces ILP64, OFF forces the 32-bit
+# (LP64) interface, AUTO prefers ILP64 when a 64-bit library is available
+# and otherwise falls back to LP64. ILP64 lets Armadillo pass 64-bit
+# dimensions to BLAS/LAPACK, which is needed for very large matrices (e.g.
+# FlexiBLAS ships libflexiblas64 alongside libflexiblas). Requesting
+# BLA_SIZEOF_INTEGER=8 makes find_package select and validate that
+# interface.
+set(ERKALE_USE_ILP64 OFF)
 if(ERKALE_BLAS_INT64 STREQUAL "ON")
   set(BLA_SIZEOF_INTEGER 8)
+  find_package(LAPACK REQUIRED)   # provides LAPACK::LAPACK and BLAS::BLAS
+  set(ERKALE_USE_ILP64 ON)
+elseif(ERKALE_BLAS_INT64 STREQUAL "OFF")
+  find_package(LAPACK REQUIRED)
+else()   # AUTO: prefer ILP64, fall back to LP64
+  set(BLA_SIZEOF_INTEGER 8)
+  find_package(LAPACK QUIET)
+  if(LAPACK_FOUND)
+    set(ERKALE_USE_ILP64 ON)
+  else()
+    # No 64-bit interface found; retry with the default 32-bit one.
+    unset(BLA_SIZEOF_INTEGER)
+    unset(BLAS_FOUND)
+    unset(LAPACK_FOUND)
+    unset(BLAS_LIBRARIES CACHE)
+    unset(LAPACK_LIBRARIES CACHE)
+    find_package(LAPACK REQUIRED)
+  endif()
+endif()
+if(ERKALE_USE_ILP64)
+  message(STATUS "Using a 64-bit (ILP64) BLAS/LAPACK interface: ${LAPACK_LIBRARIES}")
+else()
+  message(STATUS "Using a 32-bit (LP64) BLAS/LAPACK interface: ${LAPACK_LIBRARIES}")
 endif()
 
-# --- System-only (autotools/Make upstreams; ubiquitous) ---
-find_package(LAPACK REQUIRED)   # provides LAPACK::LAPACK and BLAS::BLAS
 find_package(GSL REQUIRED)       # provides GSL::gsl
 
 # --- libxc (CMake). System LibxcConfig, else fetch. Normalise to Libxc::xc.
@@ -159,10 +186,12 @@ set(WIGNERNJ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WIGNERNJ_BUILD_CXX_TESTS OFF CACHE BOOL "" FORCE)
 set(WIGNERNJ_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(WIGNERNJ_BUILD_FORTRAN OFF CACHE BOOL "" FORCE)
+# Accept any installed libwignernj >= 0.7.0 (do not force a re-fetch of a
+# usable system copy); fetch 0.8.0 only when none is found.
 FetchContent_Declare(wignernj
   GIT_REPOSITORY https://github.com/susilehtola/libwignernj.git
   GIT_TAG        v0.8.0
-  FIND_PACKAGE_ARGS 0.8.0 CONFIG)
+  FIND_PACKAGE_ARGS 0.7.0 CONFIG)
 FetchContent_MakeAvailable(wignernj)
 # FetchContent's add_subdirectory exposes only the bare "wignernj" target;
 # the namespaced alias exists only on the install/export (find) path.
@@ -210,40 +239,10 @@ target_compile_definitions(erkale_arma INTERFACE
   # Disable Armadillo bounds checking except in Debug builds.
   $<$<NOT:$<CONFIG:Debug>>:ARMA_NO_DEBUG>)
 
-# 64-bit BLAS integers -> Armadillo's ARMA_BLAS_LONG_LONG.
-if(ERKALE_BLAS_INT64 STREQUAL "ON")
+# 64-bit BLAS integers -> Armadillo's ARMA_BLAS_LONG_LONG. Whether the
+# ILP64 interface is in use was decided at the find_package step above.
+if(ERKALE_USE_ILP64)
   target_compile_definitions(erkale_arma INTERFACE ARMA_BLAS_LONG_LONG)
-elseif(ERKALE_BLAS_INT64 STREQUAL "AUTO")
-  # Probe the found BLAS. First confirm we can link a ddot call at all;
-  # then run it with the vector length passed through a 32-bit int. A
-  # correct result (1+4+9 = 14) means a 32-bit (LP64) interface; a wrong
-  # result from a program that *does* link means the library read a
-  # 64-bit (ILP64) integer. A link failure is inconclusive -> assume
-  # LP64 (the historical default) and let the user override.
-  set(CMAKE_REQUIRED_LIBRARIES BLAS::BLAS)
-  check_source_compiles(C "
-    extern double ddot_(const int*, const double*, const int*, const double*, const int*);
-    int main(void){ const int n=1, i=1; double x=1.0; return ddot_(&n,&x,&i,&x,&i) > 0.0 ? 0 : 1; }
-    " ERKALE_BLAS_LINKS)
-  if(ERKALE_BLAS_LINKS)
-    check_source_runs(C "
-      extern double ddot_(const int*, const double*, const int*, const double*, const int*);
-      int main(void){
-        const int n=3, one=1; double x[3]={1.0,2.0,3.0};
-        double r = ddot_(&n,x,&one,x,&one);
-        return (r>13.5 && r<14.5) ? 0 : 1;   /* 0 == LP64 */
-      }" ERKALE_BLAS_LP64)
-    if(NOT ERKALE_BLAS_LP64)
-      message(STATUS "BLAS uses 64-bit (ILP64) integers; defining ARMA_BLAS_LONG_LONG.")
-      target_compile_definitions(erkale_arma INTERFACE ARMA_BLAS_LONG_LONG)
-    else()
-      message(STATUS "BLAS uses 32-bit (LP64) integers.")
-    endif()
-  else()
-    message(WARNING "Could not probe the BLAS integer width; assuming 32-bit (LP64). "
-                    "Pass -DERKALE_BLAS_INT64=ON if your BLAS/LAPACK is ILP64.")
-  endif()
-  unset(CMAKE_REQUIRED_LIBRARIES)
 endif()
 
 # =========================================================================
