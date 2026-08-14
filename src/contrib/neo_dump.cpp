@@ -123,7 +123,7 @@ namespace {
     // libcint environment: the electronic shells, followed by the
     // protonic ones
     CintEnv cenv(ebasis, pbasis);
-    const size_t Nsh_e = cenv.get_Nsh_orb();
+    const size_t Nsh_e = cenv.Nsh_orb();
     auto eri_owner = make_eri_worker(cenv, omega, alpha, beta);
     ERIWorker * eri = eri_owner.get();
 

@@ -183,7 +183,7 @@ void DirectDFPerturbedBlocks::for_each_pert(
   static const int comp_atom[]   = {2, 2, 2, 3, 3, 3, 0, 0, 0}; // 0=anuc, 2=inuc, 3=jnuc
   static const int comp_xyz[]    = {0, 1, 2, 0, 1, 2, 0, 1, 2};
 
-  const size_t Nsh_orb = cenv_->get_Nsh_orb();
+  const size_t Nsh_orb = cenv_->Nsh_orb();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
     const size_t Na = aux_shells_[ia].get_Nbf();
     const size_t a0 = aux_shells_[ia].get_first_ind();
@@ -269,7 +269,7 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
       cenv_(&cenv) {
   // The pivot shells follow the orbital shells in the environment when
   // they are not the same shells (a shared pivot basis)
-  piv_offset_ = (cenv_->get_Nsh_orb() == cenv_->get_Nsh()) ? 0 : cenv_->get_Nsh_orb();
+  piv_offset_ = (cenv_->Nsh_orb() == cenv_->Nsh()) ? 0 : cenv_->Nsh_orb();
 
   if(pivot_X_.n_cols != Naux_)
     throw std::logic_error("DirectCDBlocks: pivot_X cleaned-subspace dim does not match Naux");
@@ -387,7 +387,7 @@ arma::mat DirectDFBlocks::get_block(size_t ip) const {
   // they go straight into our slice. Matches the cached
   // compute_a_munu layout so the J/K kernels see identical blocks
   // either way.
-  const size_t Nsh_orb = cenv_->get_Nsh_orb();
+  const size_t Nsh_orb = cenv_->Nsh_orb();
   double * buf_ptr = buf.memptr();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
     const size_t Na = aux_shells_[ia].get_Nbf();

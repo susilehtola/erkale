@@ -104,7 +104,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   // the auxiliary basis has been Coulomb normalized, since the
   // environment measures the normalization of the shells.
   cenv=CintEnv(orbbas,auxbas);
-  const size_t Nsh_orb=cenv.get_Nsh_orb();
+  const size_t Nsh_orb=cenv.Nsh_orb();
 
   // First, compute the two-center integrals
   ab_.zeros(Naux_,Naux_);
@@ -924,7 +924,7 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
 
         // The two-center derivatives give six components: the three
         // cartesian components of each of the two centers.
-        deri->compute_2c(cenv.get_Nsh_orb()+ias, cenv.get_Nsh_orb()+jas);
+        deri->compute_2c(cenv.Nsh_orb()+ias, cenv.Nsh_orb()+jas);
         double ders[6] = {0,0,0,0,0,0};
         for(size_t iid=0; iid<6; iid++) {
           const std::vector<double> * erip = deri->getp((int) iid);
@@ -1423,7 +1423,7 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip, double *memptr) 
     // Compute (mu nu|a). The three-center integrals run the auxiliary
     // index fastest, which is Armadillo's column-major ordering for the
     // (Naux_ x Nmu*Nnu) block, with the column index nu*Nmu + mu.
-    eri->compute_3c(imus,inus,cenv.get_Nsh_orb()+ia);
+    eri->compute_3c(imus,inus,cenv.Nsh_orb()+ia);
     const std::vector<double> * erip(eri->getp());
 
     // Store integrals

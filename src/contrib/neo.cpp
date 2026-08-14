@@ -453,7 +453,7 @@ int main_guarded(int argc, char **argv) {
     // libcint environment: the target shells, followed by the source
     // shells of the other species
     CintEnv cenv(target_basis, source_basis);
-    const size_t Nsh_tgt = cenv.get_Nsh_orb();
+    const size_t Nsh_tgt = cenv.Nsh_orb();
 
     // Compute integrals
 #ifdef _OPENMP

@@ -546,7 +546,7 @@ int main_guarded(int argc, char **argv) {
   // libcint environment: the electronic shells, followed by the
   // protonic ones
   CintEnv cenv(basis, pbasis);
-  const size_t Nsh_e = cenv.get_Nsh_orb();
+  const size_t Nsh_e = cenv.Nsh_orb();
 
   // Form AO matrix of proton-electron integrals
   arma::mat V_ao(e_nbf*p_nbf,e_nbf*p_nbf,arma::fill::zeros);
