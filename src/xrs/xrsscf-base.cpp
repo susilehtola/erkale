@@ -34,21 +34,21 @@
 extern Settings settings;
 
 XRSSCF::XRSSCF(const BasisSet & basis, Checkpoint & chkpt, bool sp) : SCF(basis,chkpt) {
-  spin_=sp;
+  spin=sp;
 
   // Get number of alpha and beta electrons
-  get_Nel_alpha_beta(basis.Ztot()-settings.get_int("Charge"),settings.get_int("Multiplicity"),nocca_,noccb_);
+  get_Nel_alpha_beta(basis.Ztot()-settings.get_int("Charge"),settings.get_int("Multiplicity"),nocca,noccb);
 }
 
 XRSSCF::~XRSSCF() {
 }
 
 void XRSSCF::core(const arma::vec & c) {
-  coreorb_=c;
+  coreorb=c;
 }
 
 arma::vec XRSSCF::core() const {
-  return coreorb_;
+  return coreorb;
 }
 
 /// Get excited atom from atomlist

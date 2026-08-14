@@ -33,14 +33,14 @@ enum xrs_method {
 
 class XRSSCF : public SCF {
   /// Excite beta spin?
-  bool spin_;
+  bool spin;
   /// Number of alpha electrons
-  int nocca_;
+  int nocca;
   /// Number of beta electrons
-  int noccb_;
+  int noccb;
 
   /// Initial core hole orbital, used to identify the state by maximal overlap
-  arma::vec coreorb_;
+  arma::vec coreorb;
 
  public:
   /// Constructor
