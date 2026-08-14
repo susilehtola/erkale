@@ -373,7 +373,7 @@ class DensityFit {
 
   /// True iff this object was filled via fill_cholesky (i.e. the
   /// blocks hold CD-derived L vectors, not a genuine aux basis).
-  bool is_cholesky() const { return cholesky_mode; }
+  bool is_cholesky() const { return cholesky_mode_; }
 
   /// Algebraic two-step CD gradient of the Coulomb energy. Requires
   /// fill_cholesky to have populated cd_X / the pivot bookkeeping;
