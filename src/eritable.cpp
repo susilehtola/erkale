@@ -128,7 +128,7 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    J+=dig.get_J();
+    J+=dig.J();
   }
 
   return J;
@@ -162,7 +162,7 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    K+=dig.get_K();
+    K+=dig.K();
   }
 
   return K;
@@ -196,7 +196,7 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    K+=dig.get_K();
+    K+=dig.K();
   }
 
   return K;

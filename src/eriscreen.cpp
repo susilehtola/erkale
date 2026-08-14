@@ -398,9 +398,9 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
   calculate(p,D,tol);
 
   // Collect results
-  arma::mat J(((JDigestor *) p[0][0])->get_J());
+  arma::mat J(((JDigestor *) p[0][0])->J());
   for(int i=1;i<nth;i++)
-    J+=((JDigestor *) p[i][0])->get_J();
+    J+=((JDigestor *) p[i][0])->J();
 
   // Free memory
   for(size_t i=0;i<p.size();i++)
@@ -438,9 +438,9 @@ arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
   calculate(p,D,tol);
 
   // Collect results
-  arma::mat K(((KDigestor *) p[0][0])->get_K());
+  arma::mat K(((KDigestor *) p[0][0])->K());
   for(int i=1;i<nth;i++)
-    K+=((KDigestor *) p[i][0])->get_K();
+    K+=((KDigestor *) p[i][0])->K();
 
   // Free memory
   for(size_t i=0;i<p.size();i++)
@@ -478,9 +478,9 @@ arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
   calculate(p,D,tol);
 
   // Collect results
-  arma::cx_mat K(((cxKDigestor *) p[0][0])->get_K());
+  arma::cx_mat K(((cxKDigestor *) p[0][0])->K());
   for(int i=1;i<nth;i++)
-    K+=((cxKDigestor *) p[i][0])->get_K();
+    K+=((cxKDigestor *) p[i][0])->K();
 
   // Free memory
   for(size_t i=0;i<p.size();i++)
@@ -524,11 +524,11 @@ void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka
   calculate(p,D,tol);
 
   // Collect results
-  Ka=((KDigestor *) p[0][0])->get_K();
-  Kb=((KDigestor *) p[0][1])->get_K();
+  Ka=((KDigestor *) p[0][0])->K();
+  Kb=((KDigestor *) p[0][1])->K();
   for(int i=1;i<nth;i++) {
-    Ka+=((KDigestor *) p[i][0])->get_K();
-    Kb+=((KDigestor *) p[i][1])->get_K();
+    Ka+=((KDigestor *) p[i][0])->K();
+    Kb+=((KDigestor *) p[i][1])->K();
   }
 
   // Free memory
@@ -571,11 +571,11 @@ void ERIscreen::calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx
   calculate(p,D,tol);
 
   // Collect results
-  Ka=((cxKDigestor *) p[0][0])->get_K();
-  Kb=((cxKDigestor *) p[0][1])->get_K();
+  Ka=((cxKDigestor *) p[0][0])->K();
+  Kb=((cxKDigestor *) p[0][1])->K();
   for(int i=1;i<nth;i++) {
-    Ka+=((cxKDigestor *) p[i][0])->get_K();
-    Kb+=((cxKDigestor *) p[i][1])->get_K();
+    Ka+=((cxKDigestor *) p[i][0])->K();
+    Kb+=((cxKDigestor *) p[i][1])->K();
   }
 
   // Free memory
@@ -619,11 +619,11 @@ void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double
   calculate(p,D,tol);
 
   // Collect results
-  J=((JDigestor *) p[0][0])->get_J();
-  K=((KDigestor *) p[0][1])->get_K();
+  J=((JDigestor *) p[0][0])->J();
+  K=((KDigestor *) p[0][1])->K();
   for(int i=1;i<nth;i++) {
-    J+=((JDigestor *) p[i][0])->get_J();
-    K+=((KDigestor *) p[i][1])->get_K();
+    J+=((JDigestor *) p[i][0])->J();
+    K+=((KDigestor *) p[i][1])->K();
   }
 
   // Free memory
@@ -672,11 +672,11 @@ void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, 
   calculate(p,D,tol);
 
   // Collect results
-  J=((JDigestor *) p[0][0])->get_J();
-  K=((cxKDigestor *) p[0][1])->get_K();
+  J=((JDigestor *) p[0][0])->J();
+  K=((cxKDigestor *) p[0][1])->K();
   for(int i=1;i<nth;i++) {
-    J+=((JDigestor *) p[i][0])->get_J();
-    K+=((cxKDigestor *) p[i][1])->get_K();
+    J+=((JDigestor *) p[i][0])->J();
+    K+=((cxKDigestor *) p[i][1])->K();
   }
 
   // Free memory
@@ -734,13 +734,13 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
   calculate(p,D,tol);
 
   // Collect results
-  J=((JDigestor *) p[0][0])->get_J();
-  Ka=((KDigestor *) p[0][1])->get_K();
-  Kb=((KDigestor *) p[0][2])->get_K();
+  J=((JDigestor *) p[0][0])->J();
+  Ka=((KDigestor *) p[0][1])->K();
+  Kb=((KDigestor *) p[0][2])->K();
   for(int i=1;i<nth;i++) {
-    J+=((JDigestor *) p[i][0])->get_J();
-    Ka+=((KDigestor *) p[i][1])->get_K();
-    Kb+=((KDigestor *) p[i][2])->get_K();
+    J+=((JDigestor *) p[i][0])->J();
+    Ka+=((KDigestor *) p[i][1])->K();
+    Kb+=((KDigestor *) p[i][2])->K();
   }
 
   // Free memory
@@ -797,13 +797,13 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
   calculate(p,D,tol);
 
   // Collect results
-  J=((JDigestor *) p[0][0])->get_J();
-  Ka=((cxKDigestor *) p[0][1])->get_K();
-  Kb=((cxKDigestor *) p[0][2])->get_K();
+  J=((JDigestor *) p[0][0])->J();
+  Ka=((cxKDigestor *) p[0][1])->K();
+  Kb=((cxKDigestor *) p[0][2])->K();
   for(int i=1;i<nth;i++) {
-    J+=((JDigestor *) p[i][0])->get_J();
-    Ka+=((cxKDigestor *) p[i][1])->get_K();
-    Kb+=((cxKDigestor *) p[i][2])->get_K();
+    J+=((JDigestor *) p[i][0])->J();
+    Ka+=((cxKDigestor *) p[i][1])->K();
+    Kb+=((cxKDigestor *) p[i][2])->K();
   }
 
   // Free memory
@@ -876,14 +876,14 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
   if(doj) {
     for(size_t j=0;j<P.size();j++)
       for(int i=0;i<nth;i++)
-	JK[j]+=jfrac*((JDigestor *) p[i][j+joff])->get_J()*COMPLEX1;
+	JK[j]+=jfrac*((JDigestor *) p[i][j+joff])->J()*COMPLEX1;
     joff+=P.size();
   }
   // Exchange contribution
   if(dok) {
     for(size_t j=0;j<P.size();j++)
       for(int i=0;i<nth;i++)
-	JK[j]-=kfrac*((cxKDigestor *) p[i][j+joff])->get_K();
+	JK[j]-=kfrac*((cxKDigestor *) p[i][j+joff])->K();
     joff+=P.size();
   }
 
