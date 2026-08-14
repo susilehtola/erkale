@@ -45,11 +45,11 @@ class ForceDigestor;
 /// Screening of electron repulsion integrals
 class ERIscreen {
   /// Integral pairs sorted by value
-  std::vector<eripair_t> shpairs;
+  std::vector<eripair_t> shpairs_;
   /// Shell-pair screening matrices
-  arma::mat Q, M;
+  arma::mat Q_, M_;
   /// Number of basis functions
-  size_t Nbf;
+  size_t Nbf_;
 
   /// Pointer to the used basis set
   const BasisSet * basp;
@@ -57,18 +57,18 @@ class ERIscreen {
   CintEnv cenv;
 
   /// Index helper
-  std::vector<size_t> iidx;
+  std::vector<size_t> iidx_;
 
   /// Range separation parameter
-  double omega;
+  double omega_;
   /// Fraction of long-range exchange
-  double alpha;
+  double alpha_;
   /// Fraction of short-range exchange
-  double beta;
+  double beta_;
 
   /// Threshold for density-weighted Fock-contribution screening.
   /// Zero disables density screening (calculate() then uses only the
-  /// integral-magnitude tests). Set via set_screen_thresh().
+  /// integral-magnitude tests). Set via screen_thresh().
   double screen_thresh_;
 
   /// Per-thread ERIWorker / dERIWorker pool. Sized to
@@ -106,21 +106,21 @@ public:
   ~ERIscreen();
 
   /// Get amount of basis functions
-  size_t get_N() const;
+  size_t N() const;
 
   /// Set range separation
   void set_range_separation(double omega, double alpha, double beta);
   void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   /// Get range separation
-  void get_range_separation(double & omega, double & alpha, double & beta) const;
-  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
+  void range_separation(double & omega, double & alpha, double & beta) const;
+  RangeSeparation range_separation() const { RangeSeparation rs; range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /// Set the density-weighted (Fock-contribution) screening threshold.
   /// Zero disables density screening; calculate() then uses only the
   /// integral-magnitude tests.
-  void set_screen_thresh(double t) { screen_thresh_ = t; }
+  void screen_thresh(double t) { screen_thresh_ = t; }
   /// Get the density-weighted screening threshold.
-  double get_screen_thresh() const { return screen_thresh_; }
+  double screen_thresh() const { return screen_thresh_; }
 
   /// Form screening matrix, return amount of significant shell pairs
   size_t fill(const BasisSet * basis, double shtol, bool verbose=true);

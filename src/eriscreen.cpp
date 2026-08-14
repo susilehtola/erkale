@@ -55,27 +55,27 @@ size_t idx(size_t i, size_t j, size_t k, size_t l) {
 
 
 ERIscreen::ERIscreen() {
-  omega=0.0;
-  alpha=1.0;
-  beta=0.0;
+  omega_=0.0;
+  alpha_=1.0;
+  beta_=0.0;
   basp=NULL;
-  Nbf=0;
+  Nbf_=0;
   screen_thresh_=0.0;
 }
 
 ERIscreen::~ERIscreen() {
 }
 
-size_t ERIscreen::get_N() const {
-  return Nbf;
+size_t ERIscreen::N() const {
+  return Nbf_;
 }
 
 void ERIscreen::set_range_separation(double w, double a, double b) {
-  omega=w;
-  alpha=a;
-  beta=b;
-  // Workers in the pool were built against the previous omega /
-  // alpha / beta -- drop them so the next acquire_eri / acquire_deri
+  omega_=w;
+  alpha_=a;
+  beta_=b;
+  // Workers in the pool were built against the previous omega_ /
+  // alpha_ / beta_ -- drop them so the next acquire_eri / acquire_deri
   // rebuilds with the new parameters. Keep the pools sized to the
   // thread count: acquire_* indexes by thread number, so the slots
   // must exist even if no fill() intervenes before the next calc.
@@ -90,10 +90,10 @@ void ERIscreen::set_range_separation(double w, double a, double b) {
   deri_pool_.resize(nth);
 }
 
-void ERIscreen::get_range_separation(double & w, double & a, double & b) const {
-  w=omega;
-  a=alpha;
-  b=beta;
+void ERIscreen::range_separation(double & w, double & a, double & b) const {
+  w=omega_;
+  a=alpha_;
+  b=beta_;
 }
 
 size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
@@ -102,22 +102,22 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
     return 0;
 
   basp=basisv;
-  Nbf=basisv->get_Nbf();
+  Nbf_=basisv->get_Nbf();
 
   // libcint description of the basis: the tables and the integral
   // optimizers are built once here and shared by the worker pools
   cenv=CintEnv(*basp);
 
   // Form index helper
-  iidx=i_idx(Nbf);
+  iidx_=i_idx(Nbf_);
 
   // Shell-pair list
-  ScreeningData s = basp->compute_screening(shtol,omega,alpha,beta,verbose);
-  Q = std::move(s.Q);
-  M = std::move(s.M);
-  shpairs = std::move(s.shpairs);
+  ScreeningData s = basp->compute_screening(shtol,omega_,alpha_,beta_,verbose);
+  Q_ = std::move(s.Q_);
+  M_ = std::move(s.M_);
+  shpairs_ = std::move(s.shpairs_);
 
-  // Worker pools are tied to (basis, omega/alpha/beta). Basis just
+  // Worker pools are tied to (basis, omega_/alpha_/beta_). Basis just
   // changed, so reset; size to omp_get_max_threads() so threads can
   // index by omp_get_thread_num() without locking.
 #ifdef _OPENMP
@@ -130,18 +130,18 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   deri_pool_.clear();
   deri_pool_.resize(nth);
 
-  return shpairs.size();
+  return shpairs_.size();
 }
 
 ERIWorker * ERIscreen::acquire_eri(int ith) const {
   if(!eri_pool_[ith])
-    eri_pool_[ith] = make_eri_worker(cenv, omega, alpha, beta);
+    eri_pool_[ith] = make_eri_worker(cenv, omega_, alpha_, beta_);
   return eri_pool_[ith].get();
 }
 
 dERIWorker * ERIscreen::acquire_deri(int ith) const {
   if(!deri_pool_[ith])
-    deri_pool_[ith] = make_deri_worker(cenv, omega, alpha, beta);
+    deri_pool_[ith] = make_deri_worker(cenv, omega_, alpha_, beta_);
   return deri_pool_[ith].get();
 }
 
@@ -172,7 +172,7 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
   // Shells in basis set
   const std::vector<GaussianShell> & shells=basp->get_shells_ref();
   // Get number of shell pairs
-  const size_t Npairs=shpairs.size();
+  const size_t Npairs=shpairs_.size();
 
   // Global density bound. D(a,b) <= Dmax for every shell pair, so the
   // sorted-Q early-out can use QQ*Dmax: once that drops below tol,
@@ -204,14 +204,14 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++) {
 	// Shells on first pair
-	size_t is=shpairs[ip].is;
-	size_t js=shpairs[ip].js;
+	size_t is=shpairs_[ip].is;
+	size_t js=shpairs_[ip].js;
 	// and those on the second pair
-	size_t ks=shpairs[jp].is;
-	size_t ls=shpairs[jp].js;
+	size_t ks=shpairs_[jp].is;
+	size_t ls=shpairs_[jp].js;
 
         // Schwarz bound on |(ij|kl)|.
-        double QQ=Q(is,js)*Q(ks,ls);
+        double QQ=Q_(is,js)*Q_(ks,ls);
         // Integral threshold: break if every remaining quartet has
         // |(ij|kl)| < tol. The shellpair list is sorted by Q so all
         // later (smaller-QQ) pairs are below threshold as well.
@@ -227,8 +227,8 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
         // (i,k)-(j,l) and (i,l)-(j,k) groupings of the four shells.
         // Both bound the same integral so the tightest is their min;
         // skip when that drops below the threshold.
-        const double MM1=M(is,ks)*M(js,ls);
-        const double MM2=M(is,ls)*M(js,ks);
+        const double MM1=M_(is,ks)*M_(js,ls);
+        const double MM2=M_(is,ls)*M_(js,ks);
         const double MM=std::min(MM1,MM2);
         // Integral threshold (per-quartet).
         if(MM<tol)
@@ -259,7 +259,7 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 
 	// Digest the integrals
 	for(size_t i=0;i<digest[ith].size();i++)
-	  digest[ith][i]->digest(shpairs,ip,jp,*erip,0);
+	  digest[ith][i]->digest(shpairs_,ip,jp,*erip,0);
       }
     }
     // eri is owned by eri_pool_ -- do not delete.
@@ -270,7 +270,7 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
   // Shells
   const std::vector<GaussianShell> & shells=basp->get_shells_ref();
   // Get number of shell pairs
-  const size_t Npairs=shpairs.size();
+  const size_t Npairs=shpairs_.size();
 
   // Forces
   arma::vec F(3*basp->get_Nnuc());
@@ -302,11 +302,11 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
     for(size_t ip=0;ip<Npairs;ip++) {
       for(size_t jp=0;jp<=ip;jp++) {
 	// Shells on first pair
-	size_t is=shpairs[ip].is;
-	size_t js=shpairs[ip].js;
+	size_t is=shpairs_[ip].is;
+	size_t js=shpairs_[ip].js;
 	// and those on the second pair
-	size_t ks=shpairs[jp].is;
-	size_t ls=shpairs[jp].js;
+	size_t ks=shpairs_[jp].is;
+	size_t ls=shpairs_[jp].js;
 
 	// Shell centers
 	inuc=shells[is].get_center_ind();
@@ -319,7 +319,7 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	  continue;
 
         // Schwarz screening estimate
-        double QQ=Q(is,js)*Q(ks,ls);
+        double QQ=Q_(is,js)*Q_(ks,ls);
         if(QQ<tol) {
           // Skip due to small value of integral. Because the
           // integrals have been ordered wrt Q, all the next ones
@@ -329,8 +329,8 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 
         // Two product-basis Cauchy-Schwarz bounds on |(ij|kl)| via the
         // (i,k)-(j,l) and (i,l)-(j,k) groupings; take the tightest.
-        const double MM1=M(is,ks)*M(js,ls);
-        const double MM2=M(is,ls)*M(js,ks);
+        const double MM1=M_(is,ks)*M_(js,ls);
+        const double MM2=M_(is,ls)*M_(js,ks);
         if(std::min(MM1,MM2)<tol)
           continue;
 
@@ -342,7 +342,7 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 
 	// Digest the integrals
 	for(size_t i=0;i<digest[ith].size();i++)
-	  digest[ith][i]->digest(shpairs,ip,jp,*deri,f);
+	  digest[ith][i]->digest(shpairs_,ip,jp,*deri,f);
 
 	// Increment forces
 #ifdef _OPENMP
@@ -371,9 +371,9 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 }
 
 arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
   
@@ -411,9 +411,9 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
 }
 
 arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -451,9 +451,9 @@ arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
 }
 
 arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -491,14 +491,14 @@ arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
 }
 
 void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const {
-  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+  if(Pa.n_rows != Nbf_ || Pa.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+  if(Pb.n_rows != Nbf_ || Pb.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -538,14 +538,14 @@ void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka
 }
 
 void ERIscreen::calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const {
-  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+  if(Pa.n_rows != Nbf_ || Pa.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+  if(Pb.n_rows != Nbf_ || Pb.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -585,16 +585,16 @@ void ERIscreen::calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx
 }
 
 void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(J.n_rows != Nbf || J.n_cols != Nbf) {
-    J.zeros(Nbf,Nbf);
+  if(J.n_rows != Nbf_ || J.n_cols != Nbf_) {
+    J.zeros(Nbf_,Nbf_);
   }
-  if(K.n_rows != Nbf || K.n_cols != Nbf) {
-    K.zeros(Nbf,Nbf);
+  if(K.n_rows != Nbf_ || K.n_cols != Nbf_) {
+    K.zeros(Nbf_,Nbf_);
   }
 
 #ifdef _OPENMP
@@ -633,16 +633,16 @@ void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double
 }
 
 void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, double tol) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(J.n_rows != Nbf || J.n_cols != Nbf) {
-    J.zeros(Nbf,Nbf);
+  if(J.n_rows != Nbf_ || J.n_cols != Nbf_) {
+    J.zeros(Nbf_,Nbf_);
   }
-  if(K.n_rows != Nbf || K.n_cols != Nbf) {
-    K.zeros(Nbf,Nbf);
+  if(K.n_rows != Nbf_ || K.n_cols != Nbf_) {
+    K.zeros(Nbf_,Nbf_);
   }
 
 
@@ -686,24 +686,24 @@ void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, 
 }
 
 void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol) const {
-  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+  if(Pa.n_rows != Nbf_ || Pa.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+  if(Pb.n_rows != Nbf_ || Pb.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(J.n_rows != Nbf || J.n_cols != Nbf) {
-    J.zeros(Nbf,Nbf);
+  if(J.n_rows != Nbf_ || J.n_cols != Nbf_) {
+    J.zeros(Nbf_,Nbf_);
   }
-  if(Ka.n_rows != Nbf || Ka.n_cols != Nbf) {
-    Ka.zeros(Nbf,Nbf);
+  if(Ka.n_rows != Nbf_ || Ka.n_cols != Nbf_) {
+    Ka.zeros(Nbf_,Nbf_);
   }
-  if(Kb.n_rows != Nbf || Kb.n_cols != Nbf) {
-    Kb.zeros(Nbf,Nbf);
+  if(Kb.n_rows != Nbf_ || Kb.n_cols != Nbf_) {
+    Kb.zeros(Nbf_,Nbf_);
   }
 
 
@@ -750,24 +750,24 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
 }
 
 void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const {
-  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+  if(Pa.n_rows != Nbf_ || Pa.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+  if(Pb.n_rows != Nbf_ || Pb.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(J.n_rows != Nbf || J.n_cols != Nbf) {
-    J.zeros(Nbf,Nbf);
+  if(J.n_rows != Nbf_ || J.n_cols != Nbf_) {
+    J.zeros(Nbf_,Nbf_);
   }
-  if(Ka.n_rows != Nbf || Ka.n_cols != Nbf) {
-    Ka.zeros(Nbf,Nbf);
+  if(Ka.n_rows != Nbf_ || Ka.n_cols != Nbf_) {
+    Ka.zeros(Nbf_,Nbf_);
   }
-  if(Kb.n_rows != Nbf || Kb.n_cols != Nbf) {
-    Kb.zeros(Nbf,Nbf);
+  if(Kb.n_rows != Nbf_ || Kb.n_cols != Nbf_) {
+    Kb.zeros(Nbf_,Nbf_);
   }
 
 #ifdef _OPENMP
@@ -814,9 +814,9 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
 
 std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P, double jfrac, double kfrac, double tol) const {
   for(size_t i=0;i<P.size();i++) {
-    if(P[i].n_rows != Nbf || P[i].n_cols != Nbf) {
+    if(P[i].n_rows != Nbf_ || P[i].n_cols != Nbf_) {
       std::ostringstream oss;
-      oss << "Error in ERIscreen: Nbf = " << Nbf << ", P[" << i << "].n_rows = " << P[i].n_rows << ", P[" << i << "].n_cols = " << P[i].n_cols << "!\n";
+      oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P[" << i << "].n_rows = " << P[i].n_rows << ", P[" << i << "].n_cols = " << P[i].n_cols << "!\n";
       throw std::logic_error(oss.str());
     }
   }
@@ -896,9 +896,9 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
 }
 
 arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -930,9 +930,9 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
 }
 
 arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double kfrac) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -964,14 +964,14 @@ arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double kfrac) const
 }
 
 arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const {
-  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+  if(Pa.n_rows != Nbf_ || Pa.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+  if(Pb.n_rows != Nbf_ || Pb.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -1009,9 +1009,9 @@ arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double t
 }
 
 arma::vec ERIscreen::forceJK(const arma::mat & P, double tol, double kfrac) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -1044,14 +1044,14 @@ arma::vec ERIscreen::forceJK(const arma::mat & P, double tol, double kfrac) cons
 }
 
 arma::vec ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const {
-  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+  if(Pa.n_rows != Nbf_ || Pa.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
-  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+  if(Pb.n_rows != Nbf_ || Pb.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    oss << "Error in ERIscreen: Nbf = " << Nbf_ << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
