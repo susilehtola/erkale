@@ -1058,12 +1058,12 @@ int main_guarded(int argc, char **argv) {
     // Set initial state core orbital
     if(loadok==LOAD_FAIL) { // LOAD_FAIL
       if(spin)
-	solver.set_core(sol.Cb.col(icore));
+	solver.core(sol.Cb.col(icore));
       else
-	solver.set_core(sol.Ca.col(icore));
+	solver.core(sol.Ca.col(icore));
     } else
       // LOAD_DIFF
-      solver.set_core(core);
+      solver.core(core);
 
     // Write number of electrons to file
     chkpt.write("Nel",nocca+noccb);
@@ -1071,7 +1071,7 @@ int main_guarded(int argc, char **argv) {
     chkpt.write("Nel-b",noccb);
 
     // Store core orbital
-    chkpt.write("Ccore",solver.get_core());
+    chkpt.write("Ccore",solver.core());
 
     // Do we have the ground state energy?
     if(didgs)
