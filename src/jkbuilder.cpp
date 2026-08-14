@@ -83,12 +83,12 @@ namespace {
   arma::vec fourindex_force(ERIscreen & scr, ERIscreen & scr_rs, const BasisSet * basisp,
                             double intthr, bool verbose, const arma::mat & Ptot,
                             double kfull, double kshort, double omega, double tol) {
-    if(scr.get_N() != basisp->get_Nbf())
+    if(scr.N() != basisp->get_Nbf())
       scr.fill(basisp, intthr, verbose);
     arma::vec f = (kfull != 0.0) ? scr.forceJK(Ptot, tol, kfull) : scr.forceJ(Ptot, tol);
     if(omega != 0.0) {
       scr_rs.set_range_separation({omega, 0.0, 1.0});
-      if(scr_rs.get_N() != basisp->get_Nbf())
+      if(scr_rs.N() != basisp->get_Nbf())
         scr_rs.fill(basisp, intthr, verbose);
       f += scr_rs.forceK(Ptot, tol, kshort);
     }
@@ -100,12 +100,12 @@ namespace {
                             double intthr, bool verbose, const arma::mat & Ptot,
                             const arma::mat & Pa, const arma::mat & Pb,
                             double kfull, double kshort, double omega, double tol) {
-    if(scr.get_N() != basisp->get_Nbf())
+    if(scr.N() != basisp->get_Nbf())
       scr.fill(basisp, intthr, verbose);
     arma::vec f = (kfull != 0.0) ? scr.forceJK(Pa, Pb, tol, kfull) : scr.forceJ(Ptot, tol);
     if(omega != 0.0) {
       scr_rs.set_range_separation({omega, 0.0, 1.0});
-      if(scr_rs.get_N() != basisp->get_Nbf())
+      if(scr_rs.N() != basisp->get_Nbf())
         scr_rs.fill(basisp, intthr, verbose);
       f += scr_rs.forceK(Pa, Pb, tol, kshort);
     }
@@ -395,8 +395,8 @@ class JKBackend {
 
     void init(const BasisSet & basis, bool verb) override {
       verbose=verb; basisp=&basis;
-      scr.set_screen_thresh(cfg.screenthr);
-      scr_rs.set_screen_thresh(cfg.screenthr);
+      scr.screen_thresh(cfg.screenthr);
+      scr_rs.screen_thresh(cfg.screenthr);
       Timer t;
       size_t Npairs;
       if(verbose) { t.set(); printf("Forming ERI screening matrix ... "); fflush(stdout); }
@@ -413,7 +413,7 @@ class JKBackend {
       }
     }
     void init_rs(double omega) override {
-      const bool fill = !scr_rs.get_N() || scr_rs.get_range_separation().omega != omega;
+      const bool fill = !scr_rs.N() || scr_rs.range_separation().omega != omega;
       if(!fill) return;
       Timer t;
       if(verbose) { printf("Computing short-range repulsion integrals ... "); fflush(stdout); }
