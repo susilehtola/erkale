@@ -196,7 +196,7 @@ void Settings::add_scf_settings() {
   add_string("LinearOccupationFile", "File to read linear occupations from", "linoccs.dat");
   add_double("LinearB", "Magnetic field along bond axis", 0.0, true);
   add_double("LinearE", "Electric field along bond (z) axis", 0.0, true);
-  add_double("Confinement", "Harmonic confinement strength k (potential 1/2 k r^2), 0 = off", 0.0, true);
+  add_double("HarmonicConfinement", "Harmonic confinement strength k (potential 1/2 k r^2), 0 = off", 0.0, true);
 
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");
@@ -514,9 +514,8 @@ void Settings::print() const {
     kw.push_back(sset.name(i));
   std::stable_sort(kw.begin(),kw.end());
 
-  // and then print the list in alphabetic order. A name may live in more
-  // than one table (e.g. Confinement is both a string and a double), so
-  // every matching type is printed.
+  // and then print the list in alphabetic order. Each keyword lives in
+  // exactly one type table; the per-type probes below are defensive.
   for(size_t i=0;i<kw.size();i++) {
     size_t is=sset.is(kw[i]);
     size_t id=dset.is(kw[i]);

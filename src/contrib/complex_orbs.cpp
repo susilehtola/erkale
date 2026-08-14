@@ -110,7 +110,7 @@ int main_guarded(int argc, char **argv) {
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
   double linE = settings.get_double("LinearE");
-  double confinement = settings.get_double("Confinement");
+  double confinement = settings.get_double("HarmonicConfinement");
   bool unrestricted = !(settings.get_bool("Restricted"));
   std::string guess = settings.get_string("Guess");
   bool oda = settings.get_bool("ODA");
