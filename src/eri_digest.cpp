@@ -24,7 +24,7 @@ IntegralDigestor::~IntegralDigestor() {
 }
 
 JDigestor::JDigestor(const arma::mat & P_) : P(P_) {
-  J.zeros(P.n_rows,P.n_cols);
+  J_.zeros(P.n_rows,P.n_cols);
 }
 
 JDigestor::~JDigestor() {
@@ -82,9 +82,9 @@ void JDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
     for(size_t ii=0; ii<Ni; ii++)
       for(size_t jj=0; jj<Nj; jj++) {
         const double v = fac * scratch_rv(ii*Nj + jj);
-        J(i0+ii, j0+jj) += v;
+        J_(i0+ii, j0+jj) += v;
         if(is!=js)
-          J(j0+jj, i0+ii) += v;
+          J_(j0+jj, i0+ii) += v;
       }
   }
 
@@ -102,19 +102,19 @@ void JDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
     for(size_t kk=0; kk<Nk; kk++)
       for(size_t ll=0; ll<Nl; ll++) {
         const double v = fac * scratch_rv(kk*Nl + ll);
-        J(k0+kk, l0+ll) += v;
+        J_(k0+kk, l0+ll) += v;
         if(ks!=ls)
-          J(l0+ll, k0+kk) += v;
+          J_(l0+ll, k0+kk) += v;
       }
   }
 }
 
-arma::mat JDigestor::get_J() const {
-  return J;
+arma::mat JDigestor::J() const {
+  return J_;
 }
 
 KDigestor::KDigestor(const arma::mat & P_) : P(P_) {
-  K.zeros(P.n_rows,P.n_cols);
+  K_.zeros(P.n_rows,P.n_cols);
 }
 
 KDigestor::~KDigestor() {
@@ -187,10 +187,10 @@ void KDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
 	  for(size_t jj=0;jj<Nj;jj++)
 	    scratch_Kik(ii,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjl(jj,ll);
 
-    K.submat(i0,k0,i0+Ni-1,k0+Nk-1) += scratch_Kik;
+    K_.submat(i0,k0,i0+Ni-1,k0+Nk-1) += scratch_Kik;
     if(ip!=jp) {
       scratch_KT = scratch_Kik.t();
-      K.submat(k0,i0,k0+Nk-1,i0+Ni-1) += scratch_KT;
+      K_.submat(k0,i0,k0+Nk-1,i0+Ni-1) += scratch_KT;
     }
   }
 
@@ -207,10 +207,10 @@ void KDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
 	  for(size_t ii=0;ii<Ni;ii++)
 	    scratch_Kjk(jj,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pil(ii,ll);
 
-    K.submat(j0,k0,j0+Nj-1,k0+Nk-1) += scratch_Kjk;
+    K_.submat(j0,k0,j0+Nj-1,k0+Nk-1) += scratch_Kjk;
     if(ip!=jp) {
       scratch_KT = scratch_Kjk.t();
-      K.submat(k0,j0,k0+Nk-1,j0+Nj-1) += scratch_KT;
+      K_.submat(k0,j0,k0+Nk-1,j0+Nj-1) += scratch_KT;
     }
   }
 
@@ -227,10 +227,10 @@ void KDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
 	  for(size_t kk=0;kk<Nk;kk++)
 	    scratch_Kil(ii,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjk(jj,kk);
 
-    K.submat(i0,l0,i0+Ni-1,l0+Nl-1) += scratch_Kil;
+    K_.submat(i0,l0,i0+Ni-1,l0+Nl-1) += scratch_Kil;
     if(ip!=jp) {
       scratch_KT = scratch_Kil.t();
-      K.submat(l0,i0,l0+Nl-1,i0+Ni-1) += scratch_KT;
+      K_.submat(l0,i0,l0+Nl-1,i0+Ni-1) += scratch_KT;
     }
   }
 
@@ -247,16 +247,16 @@ void KDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
 	  for(size_t kk=0;kk<Nk;kk++)
 	    scratch_Kjl(jj,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pik(ii,kk);
 
-    K.submat(j0,l0,j0+Nj-1,l0+Nl-1) += scratch_Kjl;
+    K_.submat(j0,l0,j0+Nj-1,l0+Nl-1) += scratch_Kjl;
     if (ip!=jp) {
       scratch_KT = scratch_Kjl.t();
-      K.submat(l0,j0,l0+Nl-1,j0+Nj-1) += scratch_KT;
+      K_.submat(l0,j0,l0+Nl-1,j0+Nj-1) += scratch_KT;
     }
   }
 }
 
-arma::mat KDigestor::get_K() const {
-  return K;
+arma::mat KDigestor::K() const {
+  return K_;
 }
 
 cxKDigestor::cxKDigestor(const arma::cx_mat & P_) : P(P_) {
@@ -267,7 +267,7 @@ cxKDigestor::cxKDigestor(const arma::cx_mat & P_) : P(P_) {
   // the K(k,i)/K(k,j)/K(l,i)/K(l,j) blocks must be computed directly
   // rather than recovered from arma::trans of the corresponding K(i,*)
   // block.
-  K.zeros(P.n_rows,P.n_cols);
+  K_.zeros(P.n_rows,P.n_cols);
 }
 
 cxKDigestor::~cxKDigestor() {
@@ -335,10 +335,10 @@ void cxKDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size
 	  for(size_t jj=0;jj<Nj;jj++)
 	    scratch_Kik(ii,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjl(jj,ll);
 
-    K.submat(i0,k0,i0+Ni-1,k0+Nk-1) += scratch_Kik;
+    K_.submat(i0,k0,i0+Ni-1,k0+Nk-1) += scratch_Kik;
     if(ip!=jp) {
       scratch_KT = scratch_Kik.t();
-      K.submat(k0,i0,k0+Nk-1,i0+Ni-1) += scratch_KT;
+      K_.submat(k0,i0,k0+Nk-1,i0+Ni-1) += scratch_KT;
     }
   }
 
@@ -355,10 +355,10 @@ void cxKDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size
 	  for(size_t ii=0;ii<Ni;ii++)
 	    scratch_Kjk(jj,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pil(ii,ll);
 
-    K.submat(j0,k0,j0+Nj-1,k0+Nk-1) += scratch_Kjk;
+    K_.submat(j0,k0,j0+Nj-1,k0+Nk-1) += scratch_Kjk;
     if(ip!=jp) {
       scratch_KT = scratch_Kjk.t();
-      K.submat(k0,j0,k0+Nk-1,j0+Nj-1) += scratch_KT;
+      K_.submat(k0,j0,k0+Nk-1,j0+Nj-1) += scratch_KT;
     }
   }
 
@@ -375,10 +375,10 @@ void cxKDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size
 	  for(size_t kk=0;kk<Nk;kk++)
 	    scratch_Kil(ii,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjk(jj,kk);
 
-    K.submat(i0,l0,i0+Ni-1,l0+Nl-1) += scratch_Kil;
+    K_.submat(i0,l0,i0+Ni-1,l0+Nl-1) += scratch_Kil;
     if(ip!=jp) {
       scratch_KT = scratch_Kil.t();
-      K.submat(l0,i0,l0+Nl-1,i0+Ni-1) += scratch_KT;
+      K_.submat(l0,i0,l0+Nl-1,i0+Ni-1) += scratch_KT;
     }
   }
 
@@ -395,16 +395,16 @@ void cxKDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size
 	  for(size_t kk=0;kk<Nk;kk++)
 	    scratch_Kjl(jj,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pik(ii,kk);
 
-    K.submat(j0,l0,j0+Nj-1,l0+Nl-1) += scratch_Kjl;
+    K_.submat(j0,l0,j0+Nj-1,l0+Nl-1) += scratch_Kjl;
     if (ip!=jp) {
       scratch_KT = scratch_Kjl.t();
-      K.submat(l0,j0,l0+Nl-1,j0+Nj-1) += scratch_KT;
+      K_.submat(l0,j0,l0+Nl-1,j0+Nj-1) += scratch_KT;
     }
   }
 }
 
-arma::cx_mat cxKDigestor::get_K() const {
-  return K;
+arma::cx_mat cxKDigestor::K() const {
+  return K_;
 }
 
 ForceDigestor::ForceDigestor() {

@@ -39,7 +39,7 @@ class JDigestor: public IntegralDigestor {
   /// matrix first.
   const arma::mat & P;
   /// Coulomb matrix
-  arma::mat J;
+  arma::mat J_;
   /// Per-quartet scratch: row-major flat of the P submatrix
   /// (Pkl flat for the first contraction, Pij flat for the
   /// permutation) and the GEMV result vector. Grow-only via
@@ -55,7 +55,7 @@ public:
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
-  arma::mat get_J() const;
+  arma::mat J() const;
 };
 
 /// Exchange matrix digestor
@@ -63,7 +63,7 @@ class KDigestor: public IntegralDigestor {
   /// Density matrix (held by reference; see JDigestor).
   const arma::mat & P;
   /// Exchange matrix
-  arma::mat K;
+  arma::mat K_;
   /// Reusable scratch for the per-quartet K(i,k), K(j,k), K(i,l),
   /// K(j,l) accumulators. Grow-only: arma::set_size keeps the
   /// existing allocation when the requested logical shape fits.
@@ -85,7 +85,7 @@ public:
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
-  arma::mat get_K() const;
+  arma::mat K() const;
 };
 
 /// Complex exchange matrix digestor
@@ -93,7 +93,7 @@ class cxKDigestor: public IntegralDigestor {
   /// Density matrix (held by reference; see JDigestor).
   const arma::cx_mat & P;
   /// Exchange matrix
-  arma::cx_mat K;
+  arma::cx_mat K_;
   /// Reusable scratch (see KDigestor).
   arma::cx_mat scratch_Kik, scratch_Kjk, scratch_Kil, scratch_Kjl;
   /// Transposed K block (see KDigestor::scratch_KT).
@@ -108,7 +108,7 @@ public:
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
-  arma::cx_mat get_K() const;
+  arma::cx_mat K() const;
 };
 
 /// Force digestor
