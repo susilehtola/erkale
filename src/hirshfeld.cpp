@@ -22,12 +22,12 @@
 #include "lebedev.h"
 
 HirshfeldAtom::HirshfeldAtom() {
-  dr=0.0;
+  dr_=0.0;
 }
 
 HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double drv) {
   // Set spacing
-  dr=drv;
+  dr_=drv;
 
   if(basis.get_Nnuc()>1) {
     ERROR_INFO();
@@ -48,7 +48,7 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
   /// Fill out grid
   while(true) {
     // Compute radius
-    double r=rho.size()*dr;
+    double r=rho_.size()*dr_;
 
     // Compute spherical average
     double d=0.0;
@@ -65,7 +65,7 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
       d+=ang[iang].w*compute_density(P,basis,hlp-nuc);
     }
     // Add to stack
-    rho.push_back(d);
+    rho_.push_back(d);
     // Stop iteration?
     if(d==0.0) {
       break;
@@ -73,51 +73,51 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
   }
 }
 
-HirshfeldAtom::HirshfeldAtom(double drv, const std::vector<double> & rhov) : dr(drv), rho(rhov) {
+HirshfeldAtom::HirshfeldAtom(double drv, const std::vector<double> & rhov) : dr_(drv), rho_(rhov) {
 }
 
 HirshfeldAtom::~HirshfeldAtom() {
 }
 
-double HirshfeldAtom::get(double r) const {
-  if(dr==0.0)
+double HirshfeldAtom::density(double r) const {
+  if(dr_==0.0)
     return 0.0;
 
   // Linear interpolation.
-  double rdr=r/dr;
+  double rdr=r/dr_;
   // Index of entry is
   size_t i=(size_t) floor(rdr);
 
-  // Check limit. Test against rho.size() rather than rho.size()-1 so
-  // that an empty rho (size 0) doesn't wrap on the unsigned subtraction.
-  if(i+1>=rho.size())
+  // Check limit. Test against rho_.size() rather than rho_.size()-1 so
+  // that an empty rho_ (size 0) doesn't wrap on the unsigned subtraction.
+  if(i+1>=rho_.size())
     return 0.0;
 
   // Perform linear intepolation
-  return rho[i] + (rho[i+1]-rho[i])*(rdr-i);
+  return rho_[i] + (rho_[i+1]-rho_[i])*(rdr-i);
 }
 
-double HirshfeldAtom::get_spacing() const {
-  return dr;
+double HirshfeldAtom::spacing() const {
+  return dr_;
 }
 
-std::vector<double> HirshfeldAtom::get_rho() const {
-  return rho;
+std::vector<double> HirshfeldAtom::rho() const {
+  return rho_;
 }
 
-double HirshfeldAtom::get_range() const {
-  if(rho.size())
-    return (rho.size()-1)*dr;
+double HirshfeldAtom::range() const {
+  if(rho_.size())
+    return (rho_.size()-1)*dr_;
   else
     return 0.0;
 }
 
-double HirshfeldAtom::compute_moment(int k) const {
+double HirshfeldAtom::moment(int k) const {
   double m=0.0;
-  for(size_t i=0;i<rho.size();i++)
-    m+=std::pow(i*dr,k+2)*rho[i];
+  for(size_t i=0;i<rho_.size();i++)
+    m+=std::pow(i*dr_,k+2)*rho_[i];
 
-  return m*dr;
+  return m*dr_;
 }
 
 Hirshfeld::Hirshfeld() {
@@ -125,12 +125,12 @@ Hirshfeld::Hirshfeld() {
 
 void Hirshfeld::compute(const BasisSet & basis, std::string method) {
   // Store atomic centers.
-  cen.resize(basis.get_Nnuc());
-  for(size_t i=0;i<cen.size();i++)
-    cen[i]=basis.get_nucleus(i).r;
+  cen_.resize(basis.get_Nnuc());
+  for(size_t i=0;i<cen_.size();i++)
+    cen_[i]=basis.get_nucleus(i).r;
 
   // Reserve memory for atomic densities
-  atoms.resize(basis.get_Nnuc());
+  atoms_.resize(basis.get_Nnuc());
 
   // Get list of identical nuclei
   std::vector< std::vector<size_t> > idnuc=basis.find_identical_nuclei();
@@ -151,18 +151,18 @@ void Hirshfeld::compute(const BasisSet & basis, std::string method) {
     HirshfeldAtom at(atbas,atP);
     // and store it
     for(size_t j=0;j<idnuc[i].size();j++)
-      atoms[idnuc[i][j]]=at;
+      atoms_[idnuc[i][j]]=at;
   }
 }
 
 void Hirshfeld::load(const BasisSet & basis) {
   // Store atomic centers.
-  cen.resize(basis.get_Nnuc());
-  for(size_t i=0;i<cen.size();i++)
-    cen[i]=basis.get_nucleus(i).r;
+  cen_.resize(basis.get_Nnuc());
+  for(size_t i=0;i<cen_.size();i++)
+    cen_[i]=basis.get_nucleus(i).r;
 
   // Reserve memory for atomic densities
-  atoms.resize(basis.get_Nnuc());
+  atoms_.resize(basis.get_Nnuc());
 
   // Get list of nuclei
   std::vector<nucleus_t> nuc=basis.get_nuclei();
@@ -201,34 +201,34 @@ void Hirshfeld::load(const BasisSet & basis) {
       HirshfeldAtom at(bas,P);
       // and store it
       for(size_t j=0;j<Zv[Z].size();j++)
-	atoms[Zv[Z][j]]=at;
+	atoms_[Zv[Z][j]]=at;
     }
 }
 
 Hirshfeld::~Hirshfeld() {
 }
 
-double Hirshfeld::get_density(size_t inuc, const coords_t & r) const {
+double Hirshfeld::density(size_t inuc, const coords_t & r) const {
   // Compute distance and get density
-  coords_t rd=r-cen[inuc];
-  return atoms[inuc].get(norm(rd));
+  coords_t rd=r-cen_[inuc];
+  return atoms_[inuc].density(norm(rd));
 }
 
-double Hirshfeld::get_weight(size_t inuc, const coords_t & r) const {
-  if(atoms.size()!=cen.size()) {
+double Hirshfeld::weight(size_t inuc, const coords_t & r) const {
+  if(atoms_.size()!=cen_.size()) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "There are " << atoms.size() << " atoms but " << cen.size() << " centers!\n";
+    oss << "There are " << atoms_.size() << " atoms but " << cen_.size() << " centers!\n";
     throw std::runtime_error(oss.str());
   }
 
   // Compute atomic weights
-  arma::vec atw(atoms.size());
-  for(size_t iat=0;iat<atoms.size();iat++) {
+  arma::vec atw(atoms_.size());
+  for(size_t iat=0;iat<atoms_.size();iat++) {
     // Convert coordinates relative to nucleus
-    coords_t rd=r-cen[iat];
+    coords_t rd=r-cen_[iat];
     // Return the density
-    atw(iat)=atoms[iat].get(norm(rd));
+    atw(iat)=atoms_[iat].density(norm(rd));
   }
 
   // Compute total sum
@@ -242,17 +242,17 @@ double Hirshfeld::get_weight(size_t inuc, const coords_t & r) const {
     return atw(inuc)/sum;
 }
 
-double Hirshfeld::get_range(size_t inuc) const {
-  return atoms[inuc].get_range();
+double Hirshfeld::range(size_t inuc) const {
+  return atoms_[inuc].range();
 }
 
-double Hirshfeld::compute_moment(size_t inuc, int n) const {
-  return atoms[inuc].compute_moment(n);
+double Hirshfeld::moment(size_t inuc, int n) const {
+  return atoms_[inuc].moment(n);
 }
 
 void Hirshfeld::print_densities() const {
   // Print out atom densities
-  for(size_t i=0;i<atoms.size();i++) {
+  for(size_t i=0;i<atoms_.size();i++) {
     std::ostringstream fname;
     fname << "hirshfeld_" << i << ".dat";
     FILE *out=fopen(fname.str().c_str(),"w");
@@ -265,35 +265,35 @@ void Hirshfeld::print_densities() const {
     // Spacing to use
     double dr=0.001;
     // Amount of points
-    size_t N=1+ (size_t) round(atoms[i].get_range()/dr);
+    size_t N=1+ (size_t) round(atoms_[i].range()/dr);
     // Iterate ir=0..N-1; the previous `<=N` upper bound walked one
-    // point past the radial range, where atoms[i].get returns 0.
+    // point past the radial range, where atoms_[i].density returns 0.
     for(size_t ir=0;ir<N;ir++)
-      fprintf(out,"%e %e\n",ir*dr,atoms[i].get(ir*dr));
+      fprintf(out,"%e %e\n",ir*dr,atoms_[i].density(ir*dr));
     fclose(out);
   }
 }
 
-void Hirshfeld::set(const std::vector<coords_t> & cenv, double dr, const std::vector< std::vector<double> > & rho) {
+void Hirshfeld::set_atoms(const std::vector<coords_t> & cenv, double dr, const std::vector< std::vector<double> > & rho) {
   if(cenv.size()!=rho.size()) {
     ERROR_INFO();
     throw std::runtime_error("Size of centers does not size of densities!\n");
   }
 
   // Store centers
-  cen=cenv;
+  cen_=cenv;
 
   // Store atoms
-  atoms.resize(rho.size());
+  atoms_.resize(rho.size());
   for(size_t i=0;i<rho.size();i++) {
-    atoms[i]=HirshfeldAtom(dr,rho[i]);
+    atoms_[i]=HirshfeldAtom(dr,rho[i]);
   }
 }
 
-std::vector< std::vector<double> > Hirshfeld::get_rho() const {
-  std::vector< std::vector<double> > ret(atoms.size());
+std::vector< std::vector<double> > Hirshfeld::rho() const {
+  std::vector< std::vector<double> > ret(atoms_.size());
   for(size_t i=0;i<ret.size();i++)
-    ret[i]=atoms[i].get_rho();
+    ret[i]=atoms_[i].rho();
 
   return ret;
 }

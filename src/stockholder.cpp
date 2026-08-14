@@ -275,7 +275,7 @@ double StockholderAtom::average(const Hirshfeld & hirsh, size_t irad) const {
     // Increment total angular weight
     w+=weights[irad][ip];
     // and spherically averaged density
-    double c=weights[irad][ip]*rho[irad][ip]*hirsh.get_weight(atind,grid[irad][ip]);
+    double c=weights[irad][ip]*rho[irad][ip]*hirsh.weight(atind,grid[irad][ip]);
     d+=c;
   }
 
@@ -316,7 +316,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
   std::vector< std::vector<double> > newrho(cen.size(),w0);
 
   // Update weights
-  ISA.set(cen,dr,oldrho);
+  ISA.set_atoms(cen,dr,oldrho);
   (void) l0;
 
   // Current tolerance
@@ -363,7 +363,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
   */
 
   // and use these as starting weights for the self-consistent iteration
-  ISA.set(cen,dr,oldrho);
+  ISA.set_atoms(cen,dr,oldrho);
 
   while(true) {
     // Compute molecular density
@@ -420,7 +420,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
 	break;
 
       // Update weights
-      ISA.set(cen,dr,oldrho);
+      ISA.set_atoms(cen,dr,oldrho);
     }
 
     if(iiter==MAXITER)

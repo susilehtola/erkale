@@ -27,9 +27,9 @@ extern "C" {
 /// Hirshfeld atomic density
 class HirshfeldAtom {
   /// Grid spacing
-  double dr;
+  double dr_;
   /// Densities
-  std::vector<double> rho;
+  std::vector<double> rho_;
 
  public:
   /// Dummy constructor
@@ -42,26 +42,26 @@ class HirshfeldAtom {
   ~HirshfeldAtom();
 
   /// Evaluate density at r
-  double get(double r) const;
+  double density(double r) const;
 
-  /// Get grid spacing
-  double get_spacing() const;
-  /// Get densities
-  std::vector<double> get_rho() const;
+  /// Grid spacing
+  double spacing() const;
+  /// Densities
+  std::vector<double> rho() const;
 
-  /// Get the range of the atom
-  double get_range() const;
+  /// The range of the atom
+  double range() const;
   /// Calculate expectation values of radius (already includes r^2 factor)
-  double compute_moment(int n) const;
+  double moment(int n) const;
 };
 
 /// Hirshfeld atomic densities
 class Hirshfeld {
  protected:
   /// List of atoms
-  std::vector<HirshfeldAtom> atoms;
+  std::vector<HirshfeldAtom> atoms_;
   /// Centers
-  std::vector<coords_t> cen;
+  std::vector<coords_t> cen_;
 
  public:
   /// Dummy constructor
@@ -69,10 +69,10 @@ class Hirshfeld {
   /// Destructor
   ~Hirshfeld();
 
-  /// Set atoms
-  void set(const std::vector<coords_t> & cen, double dr, const std::vector< std::vector<double> > & rho);
-  /// Get atomic densities
-  std::vector< std::vector<double> > get_rho() const;
+  /// Set the atoms from precomputed centers, spacing and radial densities
+  void set_atoms(const std::vector<coords_t> & cen, double dr, const std::vector< std::vector<double> > & rho);
+  /// Atomic densities
+  std::vector< std::vector<double> > rho() const;
 
   /// Compute
   void compute(const BasisSet & basis, std::string method);
@@ -80,13 +80,13 @@ class Hirshfeld {
   void load(const BasisSet & basis);
 
   /// Evaluate density at r
-  double get_density(size_t inuc, const coords_t & r) const;
+  double density(size_t inuc, const coords_t & r) const;
   /// Evaluate weight at r
-  double get_weight(size_t inuc, const coords_t & r) const;
-  /// Get range of atom
-  double get_range(size_t inuc) const;
+  double weight(size_t inuc, const coords_t & r) const;
+  /// Range of atom
+  double range(size_t inuc) const;
   /// Calculate expectation values of radius (already includes r^2 factor)
-  double compute_moment(size_t inuc, int n) const;
+  double moment(size_t inuc, int n) const;
 
   /// Print densities
   void print_densities() const;

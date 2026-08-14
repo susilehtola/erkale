@@ -82,7 +82,7 @@ void HirshfeldI::compute(const BasisSet & basis, const arma::mat & P, std::strin
       // Construct atom
       HirshfeldAtom at(atbas,atP,dr);
       // get the density
-      std::vector<double> d=at.get_rho();
+      std::vector<double> d=at.rho();
       // and store it
       for(size_t j=0;j<idnuc[i].size();j++) {
 	atoms[idnuc[i][j]][dqmax-dq]=d;
@@ -167,7 +167,7 @@ void HirshfeldI::compute_load(const BasisSet & basis, const arma::mat & P, doubl
 	HirshfeldAtom at(bas,Pat);
 	// and store it
 	for(size_t j=0;j<Zv[Z].size();j++) {
-	  atoms[Zv[Z][j]][dqmax-dq]=at.get_rho();
+	  atoms[Zv[Z][j]][dqmax-dq]=at.rho();
 	  atQ[Zv[Z][j]][dqmax-dq]=nel;
 	}
 
@@ -313,7 +313,7 @@ Hirshfeld HirshfeldI::get(const arma::vec & Q) {
 
   // Returned object
   Hirshfeld hirsh;
-  hirsh.set(cen,dr,rho);
+  hirsh.set_atoms(cen,dr,rho);
 
   return hirsh;
 }
