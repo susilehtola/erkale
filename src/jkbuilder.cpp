@@ -577,18 +577,18 @@ class JKBackend {
         if(verbose) {
           printf("done (%s)\n",t.elapsed().c_str());
           printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-          printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+          printf("Auxiliary basis contains %i functions.\n",(int) dfit.Naux());
           fflush(stdout);
         }
         try_cache_save(dfit, cfg.cholmode, cfg.direct, cfg.cholfile, verbose);
       } else if(verbose) {
-        printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+        printf("Auxiliary basis contains %i functions.\n",(int) dfit.Naux());
         fflush(stdout);
       }
     }
 
     void init_rs(double omega) override {
-      const bool fill = !dfit_rs.get_Naux() || dfit_rs.get_range_separation().omega != omega;
+      const bool fill = !dfit_rs.Naux() || dfit_rs.range_separation().omega != omega;
       if(!fill) return;
       dfit_rs.set_range_separation({omega, 0.0, 1.0});
       const bool is_cd = dfit.is_cholesky();
@@ -611,7 +611,7 @@ class JKBackend {
           if(verbose) {
             printf("done (%s)\n",t.elapsed().c_str());
             printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
-            printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+            printf("Auxiliary basis contains %i functions.\n",(int) dfit.Naux());
             fflush(stdout);
           }
         }

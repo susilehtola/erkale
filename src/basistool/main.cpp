@@ -470,7 +470,7 @@ int main_guarded(int argc, char **argv) {
 #endif
 
       // Get the (a|b) integrals
-      arma::mat ab = dfit.get_ab();
+      arma::mat ab = dfit.ab();
 
       // Form contractions
       std::vector<arma::vec> exps(auxbasis.get_max_am()+1);
@@ -601,7 +601,7 @@ int main_guarded(int argc, char **argv) {
         dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
 
         // This matrix should be orthonormal, since the contracted functions are orthonormalized
-        arma::mat ab(dfit.get_ab());
+        arma::mat ab(dfit.ab());
         ab -= arma::eye<arma::mat>(ab.n_rows,ab.n_cols);
         double dnorm(arma::norm(ab,"fro"));
         printf("%s aux basis non-orthonormality %e\n",element.c_str(),dnorm);

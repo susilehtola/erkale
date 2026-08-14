@@ -37,67 +37,67 @@
 
 
 DensityFit::DensityFit() {
-  omega=0.0;
-  alpha=1.0;
-  beta=0.0;
-  cholesky_mode=false;
-  cd_pivot_sentinel=0;
+  omega_=0.0;
+  alpha_=1.0;
+  beta_=0.0;
+  cholesky_mode_=false;
+  cd_pivot_sentinel_=0;
 }
 
 DensityFit::~DensityFit() {
 }
 
 void DensityFit::set_range_separation(double w, double a, double b) {
-  omega=w;
-  alpha=a;
-  beta=b;
+  omega_=w;
+  alpha_=a;
+  beta_=b;
 }
 
-void DensityFit::get_range_separation(double & w, double & a, double & b) const {
-  w=omega;
-  a=alpha;
-  b=beta;
+void DensityFit::range_separation(double & w, double & a, double & b) const {
+  w=omega_;
+  a=alpha_;
+  b=beta_;
 }
 
 void DensityFit::init_orbital_state(const BasisSet & orbbas, bool dir) {
-  Nbf  = orbbas.get_Nbf();
-  Nnuc = orbbas.get_Nnuc();
-  direct = dir;
-  orbshells   = orbbas.get_shells();
-  maxorbam    = orbbas.get_max_am();
-  maxorbcontr = orbbas.get_max_Ncontr();
+  Nbf_  = orbbas.get_Nbf();
+  Nnuc_ = orbbas.get_Nnuc();
+  direct_ = dir;
+  orbshells_   = orbbas.get_shells();
+  maxorbam_    = orbbas.get_max_am();
+  maxorbcontr_ = orbbas.get_max_Ncontr();
 }
 
 void DensityFit::build_shellpair_descriptor(
     std::vector<std::pair<size_t, size_t>> & sp_pairs,
     std::vector<std::pair<size_t, size_t>> & sp_firsts,
     std::vector<std::pair<size_t, size_t>> & sp_sizes) const {
-  sp_pairs.resize(orbpairs.size());
-  sp_firsts.resize(orbpairs.size());
-  sp_sizes.resize(orbpairs.size());
-  for(size_t ip=0; ip<orbpairs.size(); ip++) {
-    const size_t imus = orbpairs[ip].is;
-    const size_t inus = orbpairs[ip].js;
+  sp_pairs.resize(orbpairs_.size());
+  sp_firsts.resize(orbpairs_.size());
+  sp_sizes.resize(orbpairs_.size());
+  for(size_t ip=0; ip<orbpairs_.size(); ip++) {
+    const size_t imus = orbpairs_[ip].is;
+    const size_t inus = orbpairs_[ip].js;
     sp_pairs[ip]  = std::make_pair(imus, inus);
-    sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(), orbshells[inus].get_first_ind());
-    sp_sizes[ip]  = std::make_pair(orbshells[imus].get_Nbf(), orbshells[inus].get_Nbf());
+    sp_firsts[ip] = std::make_pair(orbshells_[imus].get_first_ind(), orbshells_[inus].get_first_ind());
+    sp_sizes[ip]  = std::make_pair(orbshells_[imus].get_Nbf(), orbshells_[inus].get_Nbf());
   }
 }
 
 size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, double cholthr) {
-  cholesky_mode=false;
-  cd_pivot_index.reset();
-  cd_pivot_shellpairs_vec.clear();
-  pivot_shellpairs.clear();
+  cholesky_mode_=false;
+  cd_pivot_index_.reset();
+  cd_pivot_shellpairs_vec_.clear();
+  pivot_shellpairs_.clear();
 
   init_orbital_state(orbbas, dir);
-  Naux = auxbas.get_Nbf();
-  orbpairs = orbbas.compute_screening(erithr).shpairs;
-  auxshells = auxbas.get_shells();
-  maxauxam = auxbas.get_max_am();
-  maxauxcontr = auxbas.get_max_Ncontr();
-  maxam = std::max(maxorbam, maxauxam);
-  maxcontr = (int) std::max(maxorbcontr, maxauxcontr);
+  Naux_ = auxbas.get_Nbf();
+  orbpairs_ = orbbas.compute_screening(erithr).shpairs;
+  auxshells_ = auxbas.get_shells();
+  maxauxam_ = auxbas.get_max_am();
+  maxauxcontr_ = auxbas.get_max_Ncontr();
+  maxam_ = std::max(maxorbam_, maxauxam_);
+  maxcontr_ = (int) std::max(maxorbcontr_, maxauxcontr_);
 
   // libcint description of the orbital basis followed by the auxiliary
   // basis: auxiliary shell ia is shell Nsh_orb + ia. Built here, after
@@ -107,7 +107,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   const size_t Nsh_orb=cenv.get_Nsh_orb();
 
   // First, compute the two-center integrals
-  ab.zeros(Naux,Naux);
+  ab_.zeros(Naux_,Naux_);
 
   // Get list of unique auxiliary shell pairs
   std::vector<shellpair_t> auxpairs=auxbas.get_unique_shellpairs();
@@ -116,7 +116,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #pragma omp parallel
 #endif
   {
-    auto eri = make_eri_worker(cenv, omega, alpha, beta);
+    auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -132,34 +132,34 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
       erip=eri->getp();
 
       // Store integrals
-      size_t Ni=auxshells[is].get_Nbf();
-      size_t Nj=auxshells[js].get_Nbf();
+      size_t Ni=auxshells_[is].get_Nbf();
+      size_t Nj=auxshells_[js].get_Nbf();
       for(size_t ii=0;ii<Ni;ii++) {
-	size_t ai=auxshells[is].get_first_ind()+ii;
+	size_t ai=auxshells_[is].get_first_ind()+ii;
 	for(size_t jj=0;jj<Nj;jj++) {
-	  size_t aj=auxshells[js].get_first_ind()+jj;
+	  size_t aj=auxshells_[js].get_first_ind()+jj;
 
-	  ab(ai,aj)=(*erip)[ii*Nj+jj];
-	  ab(aj,ai)=(*erip)[ii*Nj+jj];
+	  ab_(ai,aj)=(*erip)[ii*Nj+jj];
+	  ab_(aj,ai)=(*erip)[ii*Nj+jj];
 	}
       }
     }
   }
 
-  ab_invh = PartialCholeskyOrth(ab, cholthr, linthr);
-  ab_inv = ab_invh * ab_invh.t();
+  ab_invh_ = PartialCholeskyOrth(ab_, cholthr, linthr);
+  ab_inv_ = ab_invh_ * ab_invh_.t();
 
   // Build the per-shellpair block descriptor; the same descriptor
   // feeds either the cached or direct BTensorBlocks subclass below.
   std::vector<std::pair<size_t, size_t>> sp_pairs, sp_firsts, sp_sizes;
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
 
-  if(!direct) {
+  if(!direct_) {
     // Compute and store the (alpha | mu nu) integrals in a flat
     // CachedBlocks backing store. Each block stores raw integrals;
-    // metric application happens in the J/K kernels via ab_invh /
-    // ab_inv as before.
-    auto cached = std::make_shared<CachedBlocks>(Nbf, Naux, sp_pairs, sp_firsts, sp_sizes);
+    // metric application happens in the J/K kernels via ab_invh_ /
+    // ab_inv_ as before.
+    auto cached = std::make_shared<CachedBlocks>(Nbf_, Naux_, sp_pairs, sp_firsts, sp_sizes);
     printf("(A|uv) integrals require %.3f GB\n", cached->storage_size()*8*1e-9);
     fflush(stdout);
 
@@ -167,28 +167,28 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #pragma omp parallel
 #endif
     {
-      auto eri = make_eri_worker(cenv, omega, alpha, beta);
+      auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
+      for(size_t ip=0;ip<orbpairs_.size();ip++) {
 	// Write straight into the CachedBlocks-owned slot for this ip.
 	arma::mat slot = cached->block_mut(ip);
 	(void) compute_a_munu(eri.get(), ip, slot.memptr());
       }
     }
-    blocks = cached;
+    blocks_ = cached;
   } else {
     // Direct mode: build a DirectDFBlocks that computes (alpha|mu nu)
-    // on demand. The J/K kernels see the same blocks->get_block(ip)
+    // on demand. The J/K kernels see the same blocks_->get_block(ip)
     // interface as the cached path.
-    blocks = std::make_shared<DirectDFBlocks>(
-        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
-        orbshells, auxshells, cenv, omega, alpha, beta);
+    blocks_ = std::make_shared<DirectDFBlocks>(
+        Nbf_, Naux_, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
+        orbshells_, auxshells_, cenv, omega_, alpha_, beta_);
   }
 
-  return orbpairs.size();
+  return orbpairs_.size();
 }
 
 // Two-step CD pivot selection (phases A-C: diagonal, pair
@@ -222,7 +222,7 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
   // libcint description of the orbital basis
   CintEnv lcenv(basis);
 
-  ScreeningData scr=basis.compute_screening(shell_screen_tol,omega,alpha,beta,verbose);
+  ScreeningData scr=basis.compute_screening(shell_screen_tol,omega_,alpha_,beta_,verbose);
   const arma::mat & Q = scr.Q;
   const arma::mat & M_screen = scr.M;
   const std::vector<eripair_t> & shpairs = scr.shpairs;
@@ -239,7 +239,7 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
 #pragma omp parallel
 #endif
   {
-    auto eri = make_eri_worker(lcenv, omega, alpha, beta);
+    auto eri = make_eri_worker(lcenv, omega_, alpha_, beta_);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -269,7 +269,7 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
 
   // Phase B: enumerate the significant orbital pairs into invmap
   // (compact product index -> (i,j)) and prodmap ((i,j) -> compact
-  // index). The flat index i*Nbf+j is recovered from invmap when the
+  // index). The flat index i*Nbf_+j is recovered from invmap when the
   // diagonal is gathered below, so no separate prodidx is kept.
   {
     prodmap.ones(Nbf_local,Nbf_local);
@@ -323,7 +323,7 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
   }
 
   // Restrict the diagonal to the significant products: the flat index
-  // of compact product k is invmap(0,k)*Nbf + invmap(1,k).
+  // of compact product k is invmap(0,k)*Nbf_ + invmap(1,k).
   d = d(arma::uvec(invmap.row(0).t()*Nbf_local + invmap.row(1).t()));
   // Phase C: pivoted selection of the Cholesky basis (paper step I).
   // Only the pivots are needed, so a product whose residual diagonal
@@ -405,7 +405,7 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
 #pragma omp parallel
 #endif
     {
-      auto eri = make_eri_worker(lcenv, omega, alpha, beta);
+      auto eri = make_eri_worker(lcenv, omega_, alpha_, beta_);
       const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -578,13 +578,13 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // Two-step CD = density fitting with an aux basis chosen by
   // pivoted Cholesky on orbital products. DF and CD share the
   // downstream J/K/forceJ kernels; only the aux selection differs.
-  cholesky_mode = true;
+  cholesky_mode_ = true;
   init_orbital_state(basis, dir);
-  auxshells.clear();
-  maxauxam    = 0;
-  maxauxcontr = 0;
-  maxam       = maxorbam;
-  maxcontr    = maxorbcontr;
+  auxshells_.clear();
+  maxauxam_    = 0;
+  maxauxcontr_ = 0;
+  maxam_       = maxorbam_;
+  maxcontr_    = maxorbcontr_;
 
   // libcint description of the basis. In two-step CD the auxiliary
   // functions are orbital products, so the orbital shells are all the
@@ -600,18 +600,18 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   arma::uvec pi;
   arma::umat invmap;
   const size_t Nselected = select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
-                                                  verbose, pi, invmap, pivot_shellpairs);
-  Naux = Nselected;
-  cd_pivot_shellpairs_vec.assign(pivot_shellpairs.begin(), pivot_shellpairs.end());
+                                                  verbose, pi, invmap, pivot_shellpairs_);
+  Naux_ = Nselected;
+  cd_pivot_shellpairs_vec_.assign(pivot_shellpairs_.begin(), pivot_shellpairs_.end());
 
   // (mu, nu) -> pivot rank lookup for forceJ_cholesky.
-  cd_pivot_sentinel = Nselected;
-  cd_pivot_index.set_size(Nbf, Nbf);
-  cd_pivot_index.fill(cd_pivot_sentinel);
+  cd_pivot_sentinel_ = Nselected;
+  cd_pivot_index_.set_size(Nbf_, Nbf_);
+  cd_pivot_index_.fill(cd_pivot_sentinel_);
   for(arma::uword p=0; p<Nselected; p++) {
     const arma::uword pii = pi(p);
-    cd_pivot_index(invmap(0,pii), invmap(1,pii)) = p;
-    cd_pivot_index(invmap(1,pii), invmap(0,pii)) = p;
+    cd_pivot_index_(invmap(0,pii), invmap(1,pii)) = p;
+    cd_pivot_index_(invmap(1,pii), invmap(0,pii)) = p;
   }
 
   // Phase D: build the two-center metric (piv | piv). This is the
@@ -625,22 +625,22 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
 #pragma omp parallel
 #endif
   {
-    auto eri = make_eri_worker(lcenv, omega, alpha, beta);
+    auto eri = make_eri_worker(lcenv, omega_, alpha_, beta_);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t ip=0; ip<cd_pivot_shellpairs_vec.size(); ip++) {
-      const size_t is = cd_pivot_shellpairs_vec[ip].first;
-      const size_t js = cd_pivot_shellpairs_vec[ip].second;
+    for(size_t ip=0; ip<cd_pivot_shellpairs_vec_.size(); ip++) {
+      const size_t is = cd_pivot_shellpairs_vec_[ip].first;
+      const size_t js = cd_pivot_shellpairs_vec_[ip].second;
       const size_t Ni = shells[is].get_Nbf();
       const size_t Nj = shells[js].get_Nbf();
       const size_t i0 = shells[is].get_first_ind();
       const size_t j0 = shells[js].get_first_ind();
       for(size_t jp=0; jp<=ip; jp++) {
-        const size_t ks = cd_pivot_shellpairs_vec[jp].first;
-        const size_t ls = cd_pivot_shellpairs_vec[jp].second;
+        const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
+        const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
         const size_t Nk = shells[ks].get_Nbf();
         const size_t Nl = shells[ls].get_Nbf();
         const size_t k0 = shells[ks].get_first_ind();
@@ -650,12 +650,12 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
         erip = eri->getp();
         for(size_t ii=0; ii<Ni; ii++)
           for(size_t jj=0; jj<Nj; jj++) {
-            const arma::uword pidx = cd_pivot_index(i0+ii, j0+jj);
-            if(pidx == cd_pivot_sentinel) continue;
+            const arma::uword pidx = cd_pivot_index_(i0+ii, j0+jj);
+            if(pidx == cd_pivot_sentinel_) continue;
             for(size_t kk=0; kk<Nk; kk++)
               for(size_t ll=0; ll<Nl; ll++) {
-                const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
-                if(qidx == cd_pivot_sentinel) continue;
+                const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
+                if(qidx == cd_pivot_sentinel_) continue;
                 const double val = (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
                 // Each (pidx, qidx) pair maps to a unique unordered
                 // pivot-shellpair pair, which the outer for(ip)
@@ -684,31 +684,31 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   //   M~ = D^-1 M D^-1   (D = diag(sqrt(M_pp))),   X~^T M~ X~ = I,
   // so X = D^-1 X~ satisfies X^T M X = I on the true (unnormalised) M.
   t.set();
-  ab = std::move(M_metric);
-  arma::vec dinv(ab.n_rows);
-  for(arma::uword p=0; p<ab.n_rows; p++) {
-    const double dpp = ab(p,p);
+  ab_ = std::move(M_metric);
+  arma::vec dinv(ab_.n_rows);
+  for(arma::uword p=0; p<ab_.n_rows; p++) {
+    const double dpp = ab_(p,p);
     // Pivots are selected from significant (mu nu|mu nu), so the
     // diagonal is strictly positive; guard defensively anyway.
     dinv(p) = (dpp > 0.0) ? 1.0/std::sqrt(dpp) : 0.0;
   }
-  arma::mat Mtilde(ab);
+  arma::mat Mtilde(ab_);
   Mtilde.each_col() %= dinv;     // M~_pq = M_pq / d_p ...
   Mtilde.each_row() %= dinv.t(); //                  ... / d_q
-  ab_invh = CanonicalOrth(Mtilde, fit_cholesky_thr);
-  ab_invh.each_col() %= dinv;    // X = D^-1 X~
+  ab_invh_ = CanonicalOrth(Mtilde, fit_cholesky_thr);
+  ab_invh_.each_col() %= dinv;    // X = D^-1 X~
   double t_chol_de = t.get();
 
   if(verbose) {
     printf("Two-step CD: pivot metric orthogonalisation reduced %i -> %i functions (%s).\n",
-           (int) Nselected, (int) ab_invh.n_cols, t.elapsed().c_str());
+           (int) Nselected, (int) ab_invh_.n_cols, t.elapsed().c_str());
     fflush(stdout);
   }
 
   // Build the (piv_p | mu nu) block storage. Per-shellpair block
   // shape and layout match the DF path so the J/K kernels are
   // insensitive to direct vs cached.
-  orbpairs = basis.compute_screening(shell_screen_tol).shpairs;
+  orbpairs_ = basis.compute_screening(shell_screen_tol).shpairs;
 
   std::vector<std::pair<size_t, size_t>> sp_pairs, sp_firsts, sp_sizes;
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
@@ -720,23 +720,23 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // it explicitly rounds badly; baking X into L sidesteps that.
   // forceJ_cholesky / forceK still need X to map the indep-space
   // expansion d back to a pivot-space coefficient (c = X d) and to
-  // build the per-orbital Z, so keep it in cd_X; the metric M itself
-  // is recomputed on the fly for derivatives, not stored. ab / ab_inv
-  // / ab_invh become identity over the cleaned subspace. Applies to
+  // build the per-orbital Z, so keep it in cd_X_; the metric M itself
+  // is recomputed on the fly for derivatives, not stored. ab_ / ab_inv_
+  // / ab_invh_ become identity over the cleaned subspace. Applies to
   // both cached and direct paths so they share the L-baked convention.
-  const size_t Naux_indep = ab_invh.n_cols;
-  Naux = Naux_indep;
-  cd_X = std::move(ab_invh);
-  // The metric is fully baked into the L blocks now, so the J/K
+  const size_t Naux_indep = ab_invh_.n_cols;
+  Naux_ = Naux_indep;
+  cd_X_ = std::move(ab_invh_);
+  // The metric is fully baked into the L blocks_ now, so the J/K
   // kernels need no (a|b) matrices in CD mode -- they branch on
-  // cholesky_mode and skip the multiply. Free ab / ab_inv / ab_invh
+  // cholesky_mode_ and skip the multiply. Free ab_ / ab_inv_ / ab_invh_
   // rather than carry Naux_indep^2 identity matrices around.
-  ab.reset();
-  ab_inv.reset();
-  ab_invh.reset();
+  ab_.reset();
+  ab_inv_.reset();
+  ab_invh_.reset();
 
-  // Both modes build the same L blocks: DirectCDBlocks recomputes
-  // (piv | mu nu) on the fly per block and bakes cd_X so the J/K
+  // Both modes build the same L blocks_: DirectCDBlocks recomputes
+  // (piv | mu nu) on the fly per block and bakes cd_X_ so the J/K
   // kernels see L = X^T (piv|mu nu) with identity metric. In direct mode
   // the builder *is* the block store (recomputed on each get_block); in
   // cached mode we materialise it once into a CachedBlocks and keep the
@@ -745,22 +745,22 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // cost of recomputing the (mu nu | piv) integrals once here (they are
   // no longer saved during pivoting).
   auto builder = std::make_shared<DirectCDBlocks>(
-      Nbf, Naux, sp_pairs, sp_firsts, sp_sizes,
-      orbshells, cd_pivot_shellpairs_vec, cd_pivot_index, cd_pivot_sentinel,
-      cd_X, cenv, omega, alpha, beta);
-  if(direct) {
-    blocks = builder;
+      Nbf_, Naux_, sp_pairs, sp_firsts, sp_sizes,
+      orbshells_, cd_pivot_shellpairs_vec_, cd_pivot_index_, cd_pivot_sentinel_,
+      cd_X_, cenv, omega_, alpha_, beta_);
+  if(direct_) {
+    blocks_ = builder;
   } else {
     auto cached = std::make_shared<CachedBlocks>(
-        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes));
+        Nbf_, Naux_, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes));
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+    for(size_t ip=0; ip<orbpairs_.size(); ip++) {
       arma::mat slot = cached->block_mut(ip);
       slot = builder->get_block(ip);
     }
-    blocks = cached;
+    blocks_ = cached;
   }
 
   if(verbose) {
@@ -771,7 +771,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
     fflush(stdout);
   }
 
-  return orbpairs.size();
+  return orbpairs_.size();
 }
 
 size_t DensityFit::fill_cholesky_shared(const BasisSet & orbbas,
@@ -802,60 +802,60 @@ size_t DensityFit::fill_cholesky_shared(const BasisSet & orbbas,
   // not derived from this orbital basis. See the header for why.
   Timer ttot;
 
-  cholesky_mode = true;
-  cd_foreign_pivots = true;
+  cholesky_mode_ = true;
+  cd_foreign_pivots_ = true;
   init_orbital_state(orbbas, dir);
-  auxshells.clear();
-  maxauxam    = 0;
-  maxauxcontr = 0;
-  maxam       = std::max(maxorbam, piv_max_am);
-  maxcontr    = std::max(maxorbcontr, (size_t) piv_max_contr);
+  auxshells_.clear();
+  maxauxam_    = 0;
+  maxauxcontr_ = 0;
+  maxam_       = std::max(maxorbam_, piv_max_am);
+  maxcontr_    = std::max(maxorbcontr_, (size_t) piv_max_contr);
 
-  Naux = X.n_cols;
-  cd_X = X;
-  cd_pivot_index = piv_index;
-  cd_pivot_sentinel = piv_sentinel;
-  cd_pivot_shellpairs_vec = piv_shellpairs;
-  pivot_shellpairs.clear();
-  pivot_shellpairs.insert(piv_shellpairs.begin(), piv_shellpairs.end());
+  Naux_ = X.n_cols;
+  cd_X_ = X;
+  cd_pivot_index_ = piv_index;
+  cd_pivot_sentinel_ = piv_sentinel;
+  cd_pivot_shellpairs_vec_ = piv_shellpairs;
+  pivot_shellpairs_.clear();
+  pivot_shellpairs_.insert(piv_shellpairs.begin(), piv_shellpairs.end());
 
-  // The metric is baked into the L blocks, exactly as in fill_cholesky, so
+  // The metric is baked into the L blocks_, exactly as in fill_cholesky, so
   // the J/K kernels see an identity metric in CD mode.
-  ab.reset();
-  ab_inv.reset();
-  ab_invh.reset();
+  ab_.reset();
+  ab_inv_.reset();
+  ab_invh_.reset();
 
-  orbpairs = orbbas.compute_screening(shell_screen_tol).shpairs;
+  orbpairs_ = orbbas.compute_screening(shell_screen_tol).shpairs;
 
   std::vector<std::pair<size_t, size_t>> sp_pairs, sp_firsts, sp_sizes;
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
 
   auto builder = std::make_shared<DirectCDBlocks>(
-      Nbf, Naux, sp_pairs, sp_firsts, sp_sizes,
-      orbshells, piv_shells, cd_pivot_shellpairs_vec, cd_pivot_index, cd_pivot_sentinel,
-      cd_X, cenv, omega, alpha, beta);
+      Nbf_, Naux_, sp_pairs, sp_firsts, sp_sizes,
+      orbshells_, piv_shells, cd_pivot_shellpairs_vec_, cd_pivot_index_, cd_pivot_sentinel_,
+      cd_X_, cenv, omega_, alpha_, beta_);
   if(dir) {
-    blocks = builder;
+    blocks_ = builder;
   } else {
     auto cached = std::make_shared<CachedBlocks>(
-        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes));
+        Nbf_, Naux_, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes));
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+    for(size_t ip=0; ip<orbpairs_.size(); ip++) {
       arma::mat slot = cached->block_mut(ip);
       slot = builder->get_block(ip);
     }
-    blocks = cached;
+    blocks_ = cached;
   }
 
   if(verbose) {
     printf("Shared-pivot CD: %i orbital shell pairs against %i shared vectors (%s).\n",
-           (int) orbpairs.size(), (int) Naux, ttot.elapsed().c_str());
+           (int) orbpairs_.size(), (int) Naux_, ttot.elapsed().c_str());
     fflush(stdout);
   }
 
-  return orbpairs.size();
+  return orbpairs_.size();
 }
 
 // Helper for the two CD force loops. Both compute a 4-shell dERIWorker
@@ -873,13 +873,13 @@ template<typename Body>
 void run_force_loop(size_t Nouter,
                     arma::vec & f,
                     const CintEnv & cenv,
-                    double omega, double alpha, double beta,
+                    double omega_, double alpha_, double beta_,
                     Body && body) {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    auto deri = make_deri_worker(cenv, omega, alpha, beta);
+    auto deri = make_deri_worker(cenv, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
     arma::vec fwrk(f); fwrk.zeros();
@@ -902,24 +902,24 @@ void run_force_loop(size_t Nouter,
 
 template<typename M_lookup>
 void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double sign) const {
-  if(!cholesky_mode) {
+  if(!cholesky_mode_) {
     // DF dispatch: aux shellpair pairs (ias, jas <= ias). The
     // two-center derivative gives six components, three per center.
     // The same-atom (anuc == bnuc) case gives a vanishing (a|b)/dR and
     // is skipped. run_force_loop owns the per-thread dERIWorker + fwrk
     // reduction; we iterate over the outer aux shell here and run the
     // inner jas <= ias loop in the body.
-    run_force_loop(auxshells.size(), f, cenv, omega, alpha, beta,
+    run_force_loop(auxshells_.size(), f, cenv, omega_, alpha_, beta_,
                    [&](size_t ias, dERIWorker * deri, arma::vec & fout) {
       for(size_t jas=0; jas<=ias; jas++) {
         // Off-diagonal aux-shellpair pair contributes both (ias, jas)
         // and (jas, ias) via integral symmetry; the (jas <= ias)
         // iteration visits the pair once, so double the factor there.
         double fac = (ias != jas) ? 1.0 : 0.5;
-        const size_t Na   = auxshells[ias].get_Nbf();
-        const size_t anuc = auxshells[ias].get_center_ind();
-        const size_t Nb   = auxshells[jas].get_Nbf();
-        const size_t bnuc = auxshells[jas].get_center_ind();
+        const size_t Na   = auxshells_[ias].get_Nbf();
+        const size_t anuc = auxshells_[ias].get_center_ind();
+        const size_t Nb   = auxshells_[jas].get_Nbf();
+        const size_t bnuc = auxshells_[jas].get_center_ind();
         if(anuc == bnuc) continue;
 
         // The two-center derivatives give six components: the three
@@ -929,9 +929,9 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
         for(size_t iid=0; iid<6; iid++) {
           const std::vector<double> * erip = deri->getp((int) iid);
           for(size_t iia=0; iia<Na; iia++) {
-            const size_t ia = auxshells[ias].get_first_ind() + iia;
+            const size_t ia = auxshells_[ias].get_first_ind() + iia;
             for(size_t iib=0; iib<Nb; iib++) {
-              const size_t ib = auxshells[jas].get_first_ind() + iib;
+              const size_t ib = auxshells_[jas].get_first_ind() + iib;
               ders[iid] += (*erip)[iia*Nb+iib] * M(ia, ib);
             }
           }
@@ -946,12 +946,12 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
   } else {
     // CD dispatch: pivot shellpair pairs (ip, jp <= ip). 4-shell
     // dERIWorker gives 12 derivative components mapped to 4 centers.
-    // M is looked up via cd_pivot_index(orb_idx_1, orb_idx_2).
-    const std::vector<GaussianShell> & shells = orbshells;
-    run_force_loop(cd_pivot_shellpairs_vec.size(), f, cenv, omega, alpha, beta,
+    // M is looked up via cd_pivot_index_(orb_idx_1, orb_idx_2).
+    const std::vector<GaussianShell> & shells = orbshells_;
+    run_force_loop(cd_pivot_shellpairs_vec_.size(), f, cenv, omega_, alpha_, beta_,
                    [&](size_t ip, dERIWorker * deri, arma::vec & fout) {
-      const size_t is = cd_pivot_shellpairs_vec[ip].first;
-      const size_t js = cd_pivot_shellpairs_vec[ip].second;
+      const size_t is = cd_pivot_shellpairs_vec_[ip].first;
+      const size_t js = cd_pivot_shellpairs_vec_[ip].second;
       const size_t Ni = shells[is].get_Nbf();
       const size_t Nj = shells[js].get_Nbf();
       const size_t i0 = shells[is].get_first_ind();
@@ -960,8 +960,8 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
       const size_t j_at = shells[js].get_center_ind();
 
       for(size_t jp=0; jp<=ip; jp++) {
-        const size_t ks = cd_pivot_shellpairs_vec[jp].first;
-        const size_t ls = cd_pivot_shellpairs_vec[jp].second;
+        const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
+        const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
         const size_t Nk = shells[ks].get_Nbf();
         const size_t Nl = shells[ls].get_Nbf();
         const size_t k0 = shells[ks].get_first_ind();
@@ -979,18 +979,18 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
           double accum = 0.0;
           for(size_t ii=0; ii<Ni; ii++)
             for(size_t jj=0; jj<Nj; jj++) {
-              // cd_pivot_index is symmetric, so within a diagonal
+              // cd_pivot_index_ is symmetric, so within a diagonal
               // shellpair both (ii, jj) and (jj, ii) map to the same
               // pivot; keep one orientation, or the pivot gets counted
               // twice against the once-per-pivot metric convention.
               if(is == js && jj < ii) continue;
-              const arma::uword pidx = cd_pivot_index(i0+ii, j0+jj);
-              if(pidx == cd_pivot_sentinel) continue;
+              const arma::uword pidx = cd_pivot_index_(i0+ii, j0+jj);
+              if(pidx == cd_pivot_sentinel_) continue;
               for(size_t kk=0; kk<Nk; kk++)
                 for(size_t ll=0; ll<Nl; ll++) {
                   if(ks == ls && ll < kk) continue;
-                  const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
-                  if(qidx == cd_pivot_sentinel) continue;
+                  const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
+                  if(qidx == cd_pivot_sentinel_) continue;
                   accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * M(pidx, qidx);
                 }
             }
@@ -1009,9 +1009,9 @@ void DensityFit::accumulate_3c_force_DF(arma::vec & f, double sign, BuildQ && bu
   // contributes sign * <sub_block, Q_ip.rows(a0, a0+Na_sh-1)>.
   std::vector<std::pair<size_t, size_t>> sp_pairs, sp_firsts, sp_sizes;
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
-  DirectDFPerturbedBlocks pblocks(Nbf, Naux, Nnuc,
+  DirectDFPerturbedBlocks pblocks(Nbf_, Naux_, Nnuc_,
                                   std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
-                                  orbshells, auxshells, cenv, omega, alpha, beta);
+                                  orbshells_, auxshells_, cenv, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -1021,8 +1021,8 @@ void DensityFit::accumulate_3c_force_DF(arma::vec & f, double sign, BuildQ && bu
     arma::vec fwrk(f); fwrk.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0; ip<orbpairs.size(); ip++) {
-      const arma::mat Q_ip = build_q(ip);  // (Naux x Nmu*Nnu)
+    for(size_t ip=0; ip<orbpairs_.size(); ip++) {
+      const arma::mat Q_ip = build_q(ip);  // (Naux_ x Nmu*Nnu)
       pblocks.for_each_pert(ip,
           [&](const Perturbation & pert, size_t a0, const arma::mat & sub_block) {
             const size_t Na_sh = sub_block.n_rows;
@@ -1047,17 +1047,17 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
   // Iterate (orbital_shellpair, pivot_shellpair) quartets. For each
   // quartet, 4-shell dERIWorker gives 12 derivative components; the
   // inner contraction with build_q(...)(qidx, ii*Nj+jj) is summed
-  // over (ii, jj, kk, ll) with cd_pivot_index deciding which (kk, ll)
+  // over (ii, jj, kk, ll) with cd_pivot_index_ deciding which (kk, ll)
   // entries land on selected pivots.
   //
   // build_q signature: (size_t ipair, size_t is, size_t js, size_t Ni,
   //                     size_t Nj, size_t i0, size_t j0) -> arma::mat
-  // returning a (Naux x Ni*Nj) matrix with column index = ii*Nj + jj.
+  // returning a (Naux_ x Ni*Nj) matrix with column index = ii*Nj + jj.
   const std::vector<eripair_t> orb_shps =
-    basis.compute_screening(/*tol*/0.0, omega, alpha, beta, false).shpairs;
+    basis.compute_screening(/*tol*/0.0, omega_, alpha_, beta_, false).shpairs;
   const std::vector<GaussianShell> & shells = basis.get_shells_ref();
 
-  run_force_loop(orb_shps.size(), f, cenv, omega, alpha, beta,
+  run_force_loop(orb_shps.size(), f, cenv, omega_, alpha_, beta_,
                  [&](size_t ipair, dERIWorker * deri, arma::vec & fout) {
     const size_t is = orb_shps[ipair].is;
     const size_t js = orb_shps[ipair].js;
@@ -1068,11 +1068,11 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
     const size_t i_at = shells[is].get_center_ind();
     const size_t j_at = shells[js].get_center_ind();
 
-    const arma::mat Q_ip = build_q(ipair, is, js, Ni, Nj, i0, j0);  // (Naux x Ni*Nj), col = ii*Nj+jj
+    const arma::mat Q_ip = build_q(ipair, is, js, Ni, Nj, i0, j0);  // (Naux_ x Ni*Nj), col = ii*Nj+jj
 
-    for(size_t jp=0; jp<cd_pivot_shellpairs_vec.size(); jp++) {
-      const size_t ks = cd_pivot_shellpairs_vec[jp].first;
-      const size_t ls = cd_pivot_shellpairs_vec[jp].second;
+    for(size_t jp=0; jp<cd_pivot_shellpairs_vec_.size(); jp++) {
+      const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
+      const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
       const size_t Nk = shells[ks].get_Nbf();
       const size_t Nl = shells[ls].get_Nbf();
       const size_t k0 = shells[ks].get_first_ind();
@@ -1092,15 +1092,15 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
             const size_t col = ii*Nj + jj;
             for(size_t kk=0; kk<Nk; kk++)
               for(size_t ll=0; ll<Nl; ll++) {
-                // cd_pivot_index is symmetric, so within a diagonal
+                // cd_pivot_index_ is symmetric, so within a diagonal
                 // pivot shellpair both (kk, ll) and (ll, kk) map to
                 // the same pivot; keep one orientation, or the pivot
                 // gets counted twice against the once-per-pivot
                 // 3-index convention. (The orbital (ii, jj) side is a
                 // genuine ordered-pair sum -- no restriction there.)
                 if(ks == ls && ll < kk) continue;
-                const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
-                if(qidx == cd_pivot_sentinel) continue;
+                const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
+                if(qidx == cd_pivot_sentinel_) continue;
                 accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * Q_ip(qidx, col);
               }
           }
@@ -1111,24 +1111,24 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
 }
 
 arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const {
-  if(!cholesky_mode)
+  if(!cholesky_mode_)
     throw std::runtime_error("DensityFit::forceJ_cholesky requires fill_cholesky to have been called.\n");
-  if(cd_foreign_pivots)
+  if(cd_foreign_pivots_)
     throw std::runtime_error("DensityFit::forceJ_cholesky: the pivot basis is not the orbital basis (shared-pivot CD); CD gradients are not implemented for it.\n");
-  if(P.n_rows != Nbf || P.n_cols != Nbf)
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_)
     throw std::runtime_error("DensityFit::forceJ_cholesky: density matrix dimension mismatch.\n");
 
-  // The blocks store L = X^T (piv|mu nu) (indep-space orthonormal
+  // The blocks_ store L = X^T (piv|mu nu) (indep-space orthonormal
   // vectors), so compute_expansion returns d = L^T Pv (with doubling),
   // which is the indep-space expansion. The force algebra is in
   // pivot space: c_raw = X * d gives the pivot-space coefficient
   // that goes against M, dM/dR and the 3-center derivatives, the
   // same c that the force kernels used before the L-baked storage.
   const arma::vec d = compute_expansion(P);
-  const arma::vec c = cd_X * d;
-  const size_t Naux_pivot = cd_X.n_rows;  // == Nselected
+  const arma::vec c = cd_X_ * d;
+  const size_t Naux_pivot = cd_X_.n_rows;  // == Nselected
 
-  arma::vec f(3 * Nnuc, arma::fill::zeros);
+  arma::vec f(3 * Nnuc_, arma::fill::zeros);
 
   // Part 1: f += (1/2) c^T (dM/dR) c. accumulate_2c_metric_force
   // handles the CD pivot-shellpair-pair scaffolding.
@@ -1157,9 +1157,9 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
 }
 
 arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, const std::vector<double> & occo, double kfrac) const {
-  if(Corig.n_rows != Nbf)
+  if(Corig.n_rows != Nbf_)
     throw std::runtime_error("DensityFit::forceK: orbital matrix doesn't match basis set.\n");
-  if(cd_foreign_pivots)
+  if(cd_foreign_pivots_)
     throw std::runtime_error("DensityFit::forceK: the pivot basis is not the orbital basis (shared-pivot CD); gradients are not implemented for it.\n");
 
   // Filter to occupied orbitals (drop columns with zero occupation).
@@ -1171,74 +1171,74 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
   const arma::mat P = C * arma::diagmat(occs) * C.t();
 
   // Per-orbital half-transform aui[io](a, mu) = sum_nu (a|mu nu) C(nu, io).
-  // In DF mode Z[io] = ab_inv * aui[io] (M^{-1} aui in aux space),
-  // shape (Naux_DF x Nbf). In CD mode the blocks store L (indep-space
+  // In DF mode Z[io] = ab_inv_ * aui[io] (M^{-1} aui in aux space),
+  // shape (Naux_DF x Nbf_). In CD mode the blocks_ store L (indep-space
   // orthonormal), aui = L^T C is already in indep space, and the
   // dM/dR / 3-center derivative kernels iterate pivot space, so
-  // Z = cd_X * aui projects up to (Nselected x Nbf).
-  const size_t Naux_force = cholesky_mode ? cd_X.n_rows : Naux;
-  arma::cube Z(Naux_force, Nbf, Nmo, arma::fill::zeros);
+  // Z = cd_X_ * aui projects up to (Nselected x Nbf_).
+  const size_t Naux_force = cholesky_mode_ ? cd_X_.n_rows : Naux_;
+  arma::cube Z(Naux_force, Nbf_, Nmo, arma::fill::zeros);
 
   size_t Nmax = 0;
-  for(size_t s=0; s<orbshells.size(); s++)
-    Nmax = std::max(Nmax, orbshells[s].get_Nbf());
+  for(size_t s=0; s<orbshells_.size(); s++)
+    Nmax = std::max(Nmax, orbshells_[s].get_Nbf());
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     arma::mat aui;
-    arma::mat ui_scratch(Naux*Nmax, 1);
-    arma::mat vi_scratch(Naux*Nmax, 1);
-    arma::mat anumu_scratch(Naux, Nmax*Nmax);
+    arma::mat ui_scratch(Naux_*Nmax, 1);
+    arma::mat vi_scratch(Naux_*Nmax, 1);
+    arma::mat anumu_scratch(Naux_, Nmax*Nmax);
 
 #ifdef _OPENMP
 #pragma omp for
 #endif
     for(size_t io=0; io<Nmo; io++) {
-      aui.zeros(Naux, Nbf);
-      for(size_t ip=0; ip<orbpairs.size(); ip++) {
-        const size_t imus = orbpairs[ip].is;
-        const size_t inus = orbpairs[ip].js;
-        const size_t mu0  = orbshells[imus].get_first_ind();
-        const size_t nu0  = orbshells[inus].get_first_ind();
-        const size_t Nmu  = orbshells[imus].get_Nbf();
-        const size_t Nnu  = orbshells[inus].get_Nbf();
-        arma::mat amunu = blocks->get_block(ip);
+      aui.zeros(Naux_, Nbf_);
+      for(size_t ip=0; ip<orbpairs_.size(); ip++) {
+        const size_t imus = orbpairs_[ip].is;
+        const size_t inus = orbpairs_[ip].js;
+        const size_t mu0  = orbshells_[imus].get_first_ind();
+        const size_t nu0  = orbshells_[inus].get_first_ind();
+        const size_t Nmu  = orbshells_[imus].get_Nbf();
+        const size_t Nnu  = orbshells_[inus].get_Nbf();
+        arma::mat amunu = blocks_->get_block(ip);
 
         {
-          arma::mat ui(ui_scratch.memptr(), Naux*Nmu, 1, false, true);
-          ui = arma::reshape(amunu, Naux*Nmu, Nnu) * C.submat(nu0, io, nu0+Nnu-1, io);
-          ui.reshape(Naux, Nmu);
+          arma::mat ui(ui_scratch.memptr(), Naux_*Nmu, 1, false, true);
+          ui = arma::reshape(amunu, Naux_*Nmu, Nnu) * C.submat(nu0, io, nu0+Nnu-1, io);
+          ui.reshape(Naux_, Nmu);
           aui.cols(mu0, mu0+Nmu-1) += ui;
         }
         if(imus != inus) {
-          arma::mat anumu(anumu_scratch.memptr(), Naux, Nmu*Nnu, false, true);
+          arma::mat anumu(anumu_scratch.memptr(), Naux_, Nmu*Nnu, false, true);
           for(size_t mu=0; mu<Nmu; mu++)
             for(size_t nu=0; nu<Nnu; nu++)
               anumu.col(mu*Nnu+nu) = amunu.col(nu*Nmu+mu);
-          arma::mat vi(vi_scratch.memptr(), Naux*Nnu, 1, false, true);
-          vi = arma::reshape(anumu, Naux*Nnu, Nmu) * C.submat(mu0, io, mu0+Nmu-1, io);
-          vi.reshape(Naux, Nnu);
+          arma::mat vi(vi_scratch.memptr(), Naux_*Nnu, 1, false, true);
+          vi = arma::reshape(anumu, Naux_*Nnu, Nmu) * C.submat(mu0, io, mu0+Nmu-1, io);
+          vi.reshape(Naux_, Nnu);
           aui.cols(nu0, nu0+Nnu-1) += vi;
         }
       }
-      // DF: aui is in aux space (Naux DF aux fns); Z = M^{-1} aui.
-      // CD: blocks store L, aui = X^T aui_raw is indep-space; the
+      // DF: aui is in aux space (Naux_ DF aux fns); Z = M^{-1} aui.
+      // CD: blocks_ store L, aui = X^T aui_raw is indep-space; the
       //     dM/dR / 3-center derivative kernels iterate pivot space,
       //     so Z = X * aui = X X^T aui_raw = M^{-1} aui_raw lives
       //     in pivot space.
-      if(cholesky_mode)
-        Z.slice(io) = cd_X * aui;
+      if(cholesky_mode_)
+        Z.slice(io) = cd_X_ * aui;
       else
-        Z.slice(io) = ab_inv * aui;
+        Z.slice(io) = ab_inv_ * aui;
     }
   }
   const size_t Naux_pivot = Naux_force;
 
-  // V[io] = P Z[io]^T (Nbf x Nselected). Used for both G and the
+  // V[io] = P Z[io]^T (Nbf_ x Nselected). Used for both G and the
   // 3-center contraction.
-  arma::cube V(Nbf, Naux_pivot, Nmo);
+  arma::cube V(Nbf_, Naux_pivot, Nmo);
   for(size_t io=0; io<Nmo; io++)
     V.slice(io) = P * Z.slice(io).t();
 
@@ -1250,7 +1250,7 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
   // Geometric force accumulator. kfrac applied at return.
   // dE_K/dR = - 3c_term + (1/2) 2c_term, so f_K = -dE_K/dR
   //         = + 3c_term - (1/2) 2c_term, scaled by kfrac.
-  arma::vec f_geom(3*Nnuc, arma::fill::zeros);
+  arma::vec f_geom(3*Nnuc_, arma::fill::zeros);
 
   // ========================================================================
   // 2-center derivative: f_geom -= (1/2) sum_ab (d_R M_ab) G(a, b)
@@ -1266,23 +1266,23 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
   // Per orbital shellpair (s1, s2), build a Q_combined matrix that
   // pre-mixes occupied orbitals into a single contraction tensor.
   // The (s1 != s2) branch absorbs the (mu <-> nu) swap term that
-  // orbpairs doesn't double-count. accumulate_3c_force_{DF,CD}
+  // orbpairs_ doesn't double-count. accumulate_3c_force_{DF,CD}
   // handles the integral dispatch.
   auto build_Qcomb_DF = [&](size_t ip) -> arma::mat {
-    const size_t imus = orbpairs[ip].is;
-    const size_t inus = orbpairs[ip].js;
-    const size_t mu0  = orbshells[imus].get_first_ind();
-    const size_t nu0  = orbshells[inus].get_first_ind();
-    const size_t Nmu  = orbshells[imus].get_Nbf();
-    const size_t Nnu  = orbshells[inus].get_Nbf();
+    const size_t imus = orbpairs_[ip].is;
+    const size_t inus = orbpairs_[ip].js;
+    const size_t mu0  = orbshells_[imus].get_first_ind();
+    const size_t nu0  = orbshells_[inus].get_first_ind();
+    const size_t Nmu  = orbshells_[imus].get_Nbf();
+    const size_t Nnu  = orbshells_[inus].get_Nbf();
     const bool   off_diag = (imus != inus);
 
     // Q(a, inu*Nmu + imu) = sum_io n_io [
     //   C(nu0+inu, io) * V_io(mu0+imu, a)
     //   + (off_diag ? C(mu0+imu, io) * V_io(nu0+inu, a) : 0)
     // ]
-    // V.slice(io) lives in the force aux dimension (DF aux for !cholesky_mode,
-    // pivot space Nselected for cholesky_mode), which matches Naux_force.
+    // V.slice(io) lives in the force aux dimension (DF aux for !cholesky_mode_,
+    // pivot space Nselected for cholesky_mode_), which matches Naux_force.
     arma::mat Qcomb(Naux_force, Nmu*Nnu, arma::fill::zeros);
     for(size_t io=0; io<Nmo; io++) {
       const double n_io = occs(io);
@@ -1297,7 +1297,7 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
     return Qcomb;
   };
 
-  if(!cholesky_mode) {
+  if(!cholesky_mode_) {
     accumulate_3c_force_DF(f_geom, +1.0, build_Qcomb_DF);
   } else {
     // CD column layout uses ii*Nj+jj rather than DF's inu*Nmu+imu;
@@ -1332,7 +1332,7 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
 }
 
 double DensityFit::fitting_error() const {
-  arma::mat error_matrix(maxorbam+1, maxorbam+1, arma::fill::zeros);
+  arma::mat error_matrix(maxorbam_+1, maxorbam_+1, arma::fill::zeros);
 
   // Loop over pairs
 #ifdef _OPENMP
@@ -1341,24 +1341,24 @@ double DensityFit::fitting_error() const {
   {
     arma::mat wrk_error(error_matrix);
 
-    auto eri = make_eri_worker(cenv, omega, alpha, beta);
+    auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
+    for(size_t ip=0;ip<orbpairs_.size();ip++) {
       // Shells in question are
-      size_t imus=orbpairs[ip].is;
-      size_t inus=orbpairs[ip].js;
+      size_t imus=orbpairs_[ip].is;
+      size_t inus=orbpairs_[ip].js;
       // Amount of functions
-      size_t Nmu=orbshells[imus].get_Nbf();
-      size_t Nnu=orbshells[inus].get_Nbf();
+      size_t Nmu=orbshells_[imus].get_Nbf();
+      size_t Nnu=orbshells_[inus].get_Nbf();
 
       // Compute the (A|uv) integrals
       arma::mat auv(compute_a_munu(eri.get(), ip));
 
       // This gives the density fitted (uv|uv) integrals as
-      arma::mat dfit_uvuv(arma::trans(auv) * ab_inv * auv);
+      arma::mat dfit_uvuv(arma::trans(auv) * ab_inv_ * auv);
 
       // The correct integrals are, however
       eri->compute(inus,imus,inus,imus);
@@ -1370,13 +1370,13 @@ double DensityFit::fitting_error() const {
           size_t imunu = nu*Nmu+mu;
           size_t ieri = imunu*(Nmu*Nnu) + imunu;
           double delta= (*erip)[ieri] - dfit_uvuv(imunu, imunu);
-          //printf("(%c%c|%c%c): (%i %i|%i %i) = %e (fit) vs %e (exact), error %e\n", shell_types[orbshells[inus].get_am()], shell_types[orbshells[imus].get_am()], shell_types[orbshells[inus].get_am()], shell_types[orbshells[imus].get_am()], (int) (nu0+nu),(int) (mu0+mu),(int) (nu0+nu),(int) (mu0+mu),dfit_uvuv(imunu, imunu),(*erip)[ieri],delta);
+          //printf("(%c%c|%c%c): (%i %i|%i %i) = %e (fit) vs %e (exact), error %e\n", shell_types[orbshells_[inus].get_am()], shell_types[orbshells_[imus].get_am()], shell_types[orbshells_[inus].get_am()], shell_types[orbshells_[imus].get_am()], (int) (nu0+nu),(int) (mu0+mu),(int) (nu0+nu),(int) (mu0+mu),dfit_uvuv(imunu, imunu),(*erip)[ieri],delta);
           shell_error += delta;
         }
 
-      wrk_error(orbshells[imus].get_am(), orbshells[inus].get_am()) += shell_error;
+      wrk_error(orbshells_[imus].get_am(), orbshells_[inus].get_am()) += shell_error;
       if(imus != inus)
-        wrk_error(orbshells[inus].get_am(), orbshells[imus].get_am()) += shell_error;
+        wrk_error(orbshells_[inus].get_am(), orbshells_[imus].get_am()) += shell_error;
     }
 
 #ifdef _OPENMP
@@ -1386,7 +1386,7 @@ double DensityFit::fitting_error() const {
   }
 
   printf("\n");
-  for(int iam=0;iam<=maxorbam;iam++)
+  for(int iam=0;iam<=maxorbam_;iam++)
     for(int jam=0;jam<=iam;jam++)
       printf("Total (%c%c|%c%c) error %e\n",shell_types[jam],shell_types[iam],shell_types[jam],shell_types[iam],error_matrix(jam,iam));
 
@@ -1398,31 +1398,31 @@ double DensityFit::fitting_error() const {
 
 arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip, double *memptr) const {
   // Shells in question are
-  size_t imus=orbpairs[ip].is;
-  size_t inus=orbpairs[ip].js;
+  size_t imus=orbpairs_[ip].is;
+  size_t inus=orbpairs_[ip].js;
   // Amount of functions
-  size_t Nmu=orbshells[imus].get_Nbf();
-  size_t Nnu=orbshells[inus].get_Nbf();
+  size_t Nmu=orbshells_[imus].get_Nbf();
+  size_t Nnu=orbshells_[inus].get_Nbf();
 
   // Allocate storage. If the caller supplied a backing buffer
   // (memptr), wrap it as an advisory mat (no copy / no resize); else
   // own the allocation.
   arma::mat amunu;
   if(memptr != nullptr)
-    amunu=arma::mat(memptr, Naux, Nmu*Nnu, false, true);
+    amunu=arma::mat(memptr, Naux_, Nmu*Nnu, false, true);
   else
-    amunu.zeros(Naux,Nmu*Nnu);
+    amunu.zeros(Naux_,Nmu*Nnu);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ia=0;ia<auxshells.size();ia++) {
+  for(size_t ia=0;ia<auxshells_.size();ia++) {
     // Number of functions on shell
-    size_t Na=auxshells[ia].get_Nbf();
-    size_t a0=auxshells[ia].get_first_ind();
+    size_t Na=auxshells_[ia].get_Nbf();
+    size_t a0=auxshells_[ia].get_first_ind();
 
     // Compute (mu nu|a). The three-center integrals run the auxiliary
     // index fastest, which is Armadillo's column-major ordering for the
-    // (Naux x Nmu*Nnu) block, with the column index nu*Nmu + mu.
+    // (Naux_ x Nmu*Nnu) block, with the column index nu*Nmu + mu.
     eri->compute_3c(imus,inus,cenv.get_Nsh_orb()+ia);
     const std::vector<double> * erip(eri->getp());
 
@@ -1437,9 +1437,9 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip, double *memptr) 
 }
 
 void DensityFit::check_density_dims(const arma::mat & P) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in DensityFit: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 }
@@ -1448,14 +1448,14 @@ void DensityFit::project_density_to_aux(const arma::mat & P, size_t ip, const ar
   check_density_dims(P);
 
   // Shells in question are
-  size_t imus=orbpairs[ip].is;
-  size_t inus=orbpairs[ip].js;
+  size_t imus=orbpairs_[ip].is;
+  size_t inus=orbpairs_[ip].js;
   // First function on shell
-  size_t mubeg=orbshells[imus].get_first_ind();
-  size_t nubeg=orbshells[inus].get_first_ind();
+  size_t mubeg=orbshells_[imus].get_first_ind();
+  size_t nubeg=orbshells_[inus].get_first_ind();
   // Amount of functions
-  size_t muend=orbshells[imus].get_last_ind();
-  size_t nuend=orbshells[inus].get_last_ind();
+  size_t muend=orbshells_[imus].get_last_ind();
+  size_t nuend=orbshells_[inus].get_last_ind();
 
   // Density submatrix
   arma::vec Psub;
@@ -1471,14 +1471,14 @@ void DensityFit::project_density_to_aux(const arma::mat & P, size_t ip, const ar
 
 void DensityFit::contract_aux_to_J(const arma::vec & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const {
   // Shells in question are
-  size_t imus=orbpairs[ip].is;
-  size_t inus=orbpairs[ip].js;
+  size_t imus=orbpairs_[ip].is;
+  size_t inus=orbpairs_[ip].js;
   // First function on shell
-  size_t mu0=orbshells[imus].get_first_ind();
-  size_t nu0=orbshells[inus].get_first_ind();
+  size_t mu0=orbshells_[imus].get_first_ind();
+  size_t nu0=orbshells_[inus].get_first_ind();
   // Amount of functions
-  size_t Nmu=orbshells[imus].get_Nbf();
-  size_t Nnu=orbshells[inus].get_Nbf();
+  size_t Nmu=orbshells_[imus].get_Nbf();
+  size_t Nnu=orbshells_[inus].get_Nbf();
 
   // vec(uv) = c_a (a,uv)
   arma::mat Jsub(arma::trans(gamma)*amunu);
@@ -1493,47 +1493,47 @@ template<typename T>
 void DensityFit::halftransform_orbital(const arma::Mat<T> & C, size_t io, arma::Mat<T> & aui,
                                        arma::Mat<T> & ui_scratch, arma::Mat<T> & vi_scratch,
                                        arma::mat & anumu_scratch) const {
-  aui.zeros(Naux,Nbf);
-  for(size_t ip=0;ip<orbpairs.size();ip++) {
-    const size_t imus = orbpairs[ip].is;
-    const size_t inus = orbpairs[ip].js;
-    const size_t mu0  = orbshells[imus].get_first_ind();
-    const size_t nu0  = orbshells[inus].get_first_ind();
-    const size_t Nmu  = orbshells[imus].get_Nbf();
-    const size_t Nnu  = orbshells[inus].get_Nbf();
-    // (Naux x Nmu*Nnu) block, always real (integrals).
-    arma::mat amunu = blocks->get_block(ip);
+  aui.zeros(Naux_,Nbf_);
+  for(size_t ip=0;ip<orbpairs_.size();ip++) {
+    const size_t imus = orbpairs_[ip].is;
+    const size_t inus = orbpairs_[ip].js;
+    const size_t mu0  = orbshells_[imus].get_first_ind();
+    const size_t nu0  = orbshells_[inus].get_first_ind();
+    const size_t Nmu  = orbshells_[imus].get_Nbf();
+    const size_t Nnu  = orbshells_[inus].get_Nbf();
+    // (Naux_ x Nmu*Nnu) block, always real (integrals).
+    arma::mat amunu = blocks_->get_block(ip);
 
-    // Half-transform (a | u; i): reshape amunu to (Naux*Nmu, Nnu)
+    // Half-transform (a | u; i): reshape amunu to (Naux_*Nmu, Nnu)
     // and contract over nu with C(nu, io). Advisory view into
     // ui_scratch avoids per-quartet heap alloc.
     {
-      arma::Mat<T> ui(ui_scratch.memptr(), Naux*Nmu, 1, false, true);
-      ui = arma::reshape(amunu, Naux*Nmu, Nnu) * C.submat(nu0,io,nu0+Nnu-1,io);
-      ui.reshape(Naux, Nmu);
+      arma::Mat<T> ui(ui_scratch.memptr(), Naux_*Nmu, 1, false, true);
+      ui = arma::reshape(amunu, Naux_*Nmu, Nnu) * C.submat(nu0,io,nu0+Nnu-1,io);
+      ui.reshape(Naux_, Nmu);
       aui.cols(mu0, mu0+Nmu-1) += ui;
     }
 
     if(imus != inus) {
       // Off-diagonal shellpair: swap mu/nu axes to compute (a | v; i).
-      arma::mat anumu(anumu_scratch.memptr(), Naux, Nmu*Nnu, false, true);
+      arma::mat anumu(anumu_scratch.memptr(), Naux_, Nmu*Nnu, false, true);
       for(size_t mu=0;mu<Nmu;mu++)
         for(size_t nu=0;nu<Nnu;nu++)
           anumu.col(mu*Nnu+nu) = amunu.col(nu*Nmu+mu);
 
-      arma::Mat<T> vi(vi_scratch.memptr(), Naux*Nnu, 1, false, true);
-      vi = arma::reshape(anumu, Naux*Nnu, Nmu) * C.submat(mu0,io,mu0+Nmu-1,io);
-      vi.reshape(Naux, Nnu);
+      arma::Mat<T> vi(vi_scratch.memptr(), Naux_*Nnu, 1, false, true);
+      vi = arma::reshape(anumu, Naux_*Nnu, Nmu) * C.submat(mu0,io,mu0+Nmu-1,io);
+      vi.reshape(Naux_, Nnu);
       aui.cols(nu0, nu0+Nnu-1) += vi;
     }
   }
-  // K_uv = (a|ui) (a|b)^-1 (b|vi); ab_invh is the canonical-orth
+  // K_uv = (a|ui) (a|b)^-1 (b|vi); ab_invh_ is the canonical-orth
   // half-inverse X with X^T (a|b) X = I, so (a|b)^{-1} ≈ X X^T
-  // and the half-transform is X^T aui. In CD mode the blocks are
+  // and the half-transform is X^T aui. In CD mode the blocks_ are
   // already L = X^T (piv|mu nu), so aui = sum_munu L C is the
-  // half-transform directly -- no X^T multiply (ab_invh is empty).
-  if(!cholesky_mode)
-    aui = ab_invh.t() * aui;
+  // half-transform directly -- no X^T multiply (ab_invh_ is empty).
+  if(!cholesky_mode_)
+    aui = ab_invh_.t() * aui;
 }
 
 template void DensityFit::halftransform_orbital<double>(const arma::mat &, size_t, arma::mat &, arma::mat &, arma::mat &, arma::mat &) const;
@@ -1541,9 +1541,9 @@ template void DensityFit::halftransform_orbital<std::complex<double>>(const arma
 
 template<typename T>
 void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & K) const {
-  if(C.n_rows != Nbf) {
+  if(C.n_rows != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    oss << "Error in DensityFit: Nbf = " << Nbf_ << ", C.n_rows = " << C.n_rows << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -1556,17 +1556,17 @@ void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::ve
   // arma::trans is the plain transpose and the same expression
   // works.
   size_t Nmax=0;
-  for(size_t is=0;is<orbshells.size();is++)
-    Nmax=std::max(Nmax, orbshells[is].get_Nbf());
+  for(size_t is=0;is<orbshells_.size();is++)
+    Nmax=std::max(Nmax, orbshells_[is].get_Nbf());
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     arma::Mat<T> aui;
-    arma::Mat<T> ui_scratch(Naux*Nmax, 1);
-    arma::Mat<T> vi_scratch(Naux*Nmax, 1);
-    arma::mat    anumu_scratch(Naux, Nmax*Nmax);  // real -- amunu is always real
+    arma::Mat<T> ui_scratch(Naux_*Nmax, 1);
+    arma::Mat<T> vi_scratch(Naux_*Nmax, 1);
+    arma::mat    anumu_scratch(Naux_, Nmax*Nmax);  // real -- amunu is always real
 
 #ifdef _OPENMP
 #pragma omp for
@@ -1587,38 +1587,38 @@ template void DensityFit::accumulate_K_from_blocks<std::complex<double>>(const a
 
 template<typename T>
 void DensityFit::accumulate_KC_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & KC) const {
-  if(C.n_rows != Nbf) {
+  if(C.n_rows != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    oss << "Error in DensityFit: Nbf = " << Nbf_ << ", C.n_rows = " << C.n_rows << "!\n";
     throw std::logic_error(oss.str());
   }
 
   // occ-RI-K: assemble only the occupied columns
   //   KC(mu,k) = sum_i n_i sum_a B^a_{mu,i} B^a_{k,i} = (K C)_{mu,k},
   // with B^a_{k,i} = sum_mu C(mu,k) B^a_{mu,i} = (aui * C)(a,k). The
-  // contraction is Nbf x Nocc per orbital instead of Nbf x Nbf, which
+  // contraction is Nbf_ x Nocc per orbital instead of Nbf_ x Nbf_, which
   // is the whole point of occ-RI-K. Parallelise over orbitals into a
   // per-thread accumulator and reduce once at the end.
   size_t Nmax=0;
-  for(size_t is=0;is<orbshells.size();is++)
-    Nmax=std::max(Nmax, orbshells[is].get_Nbf());
+  for(size_t is=0;is<orbshells_.size();is++)
+    Nmax=std::max(Nmax, orbshells_[is].get_Nbf());
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     arma::Mat<T> aui;
-    arma::Mat<T> ui_scratch(Naux*Nmax, 1);
-    arma::Mat<T> vi_scratch(Naux*Nmax, 1);
-    arma::mat    anumu_scratch(Naux, Nmax*Nmax);
-    arma::Mat<T> KC_local(Nbf, C.n_cols, arma::fill::zeros);
+    arma::Mat<T> ui_scratch(Naux_*Nmax, 1);
+    arma::Mat<T> vi_scratch(Naux_*Nmax, 1);
+    arma::mat    anumu_scratch(Naux_, Nmax*Nmax);
+    arma::Mat<T> KC_local(Nbf_, C.n_cols, arma::fill::zeros);
 
 #ifdef _OPENMP
 #pragma omp for
 #endif
     for(size_t io=0;io<C.n_cols;io++) {
       halftransform_orbital(C, io, aui, ui_scratch, vi_scratch, anumu_scratch);
-      // trans(aui) is (Nbf x Naux); aui*C is (Naux x Nocc). For complex
+      // trans(aui) is (Nbf_ x Naux_); aui*C is (Naux_ x Nocc). For complex
       // orbitals trans() is the conjugate transpose, matching the
       // conjugation of conventional K (sum_a conj(B_mu) B_k).
       KC_local += occs[io] * arma::trans(aui) * (aui * C);
@@ -1646,10 +1646,10 @@ namespace {
 
 template<typename T>
 arma::Mat<T> DensityFit::calcK_occ_impl(const arma::Mat<T> & Corig, const std::vector<double> & occo, const arma::mat & S) const {
-  if(S.n_rows != Nbf || S.n_cols != Nbf) {
+  if(S.n_rows != Nbf_ || S.n_cols != Nbf_) {
     std::ostringstream oss;
     oss << "Error in DensityFit::calcK_occ: overlap is " << S.n_rows << "x" << S.n_cols
-        << ", expected " << Nbf << "x" << Nbf << "!\n";
+        << ", expected " << Nbf_ << "x" << Nbf_ << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -1657,19 +1657,19 @@ arma::Mat<T> DensityFit::calcK_occ_impl(const arma::Mat<T> & Corig, const std::v
   arma::vec occs;
   filter_occupied(Corig, occo, C, occs);
 
-  // Occupied columns KC = K C_o (Nbf x Nocc).
-  arma::Mat<T> KC(Nbf, C.n_cols, arma::fill::zeros);
+  // Occupied columns KC = K C_o (Nbf_ x Nocc).
+  arma::Mat<T> KC(Nbf_, C.n_cols, arma::fill::zeros);
   accumulate_KC_from_blocks(C, occs, KC);
 
   // Reconstruct the full AO exchange matrix reproducing the exact (RI)
-  // occupied-occupied and occupied-virtual blocks:
+  // occupied-occupied and occupied-virtual blocks_:
   //   K = KC (SC)^H + (SC) KC^H - (SC) M (SC)^H,
   // with SC = S C_o and M = C_o^H K C_o = C_o^H KC. Using C_o^H S C_o = I,
   // K C_o = KC and C_o^H K C_o = M exactly, so the occupied projection is
   // exact and K is Hermitian; only the virtual-virtual block is
   // approximate. M is symmetrised to keep K exactly Hermitian under RI
   // noise.
-  arma::Mat<T> SC = occk_S_times_C(S, C);   // Nbf x Nocc
+  arma::Mat<T> SC = occk_S_times_C(S, C);   // Nbf_ x Nocc
   arma::Mat<T> M  = C.t() * KC;             // Nocc x Nocc
   M = 0.5 * (M + M.t());
   arma::Mat<T> K = KC * SC.t() + SC * KC.t() - SC * (M * SC.t());
@@ -1711,49 +1711,49 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
 arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   check_density_dims(P);
 
-  arma::vec gamma(Naux);
+  arma::vec gamma(Naux_);
   gamma.zeros();
 
-  // Compute gamma; blocks->get_block(ip) routes to cached storage or
+  // Compute gamma; blocks_->get_block(ip) routes to cached storage or
   // recomputes on the fly depending on the BTensorBlocks subclass.
 #ifdef _OPENMP
 #pragma omp parallel
   {
-    arma::vec gv(Naux);
+    arma::vec gv(Naux_);
     gv.zeros();
 #pragma omp for schedule(dynamic)
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      project_density_to_aux(P,ip,blocks->get_block(ip),gv);
+    for(size_t ip=0;ip<orbpairs_.size();ip++)
+      project_density_to_aux(P,ip,blocks_->get_block(ip),gv);
 #pragma omp critical
     gamma+=gv;
   }
 #else
-  for(size_t ip=0;ip<orbpairs.size();ip++)
-    project_density_to_aux(P,ip,blocks->get_block(ip),gamma);
+  for(size_t ip=0;ip<orbpairs_.size();ip++)
+    project_density_to_aux(P,ip,blocks_->get_block(ip),gamma);
 #endif
 
-  // CD mode: the L blocks already carry the metric (L = X^T (piv|mu nu)),
+  // CD mode: the L blocks_ already carry the metric (L = X^T (piv|mu nu)),
   // so the projection gamma_j = sum_munu L_{j,munu} P_munu is the
   // indep-space expansion directly -- no (a|b)^-1 multiply.
-  if(cholesky_mode)
+  if(cholesky_mode_)
     return gamma;
-  return ab_inv*gamma;
+  return ab_inv_*gamma;
 }
 
 std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat> & P) const {
   for(size_t i=0;i<P.size();i++) {
-    if(P[i].n_rows != Nbf || P[i].n_cols != Nbf) {
+    if(P[i].n_rows != Nbf_ || P[i].n_cols != Nbf_) {
       std::ostringstream oss;
-      oss << "Error in DensityFit: Nbf = " << Nbf << ", P[" << i << "].n_rows = " << P[i].n_rows << ", P[" << i << "].n_cols = " << P[i].n_cols << "!\n";
+      oss << "Error in DensityFit: Nbf = " << Nbf_ << ", P[" << i << "].n_rows = " << P[i].n_rows << ", P[" << i << "].n_cols = " << P[i].n_cols << "!\n";
       throw std::logic_error(oss.str());
     }
   }
 
   std::vector<arma::vec> gamma(P.size());
   for(size_t i=0;i<P.size();i++)
-    gamma[i].zeros(Naux);
+    gamma[i].zeros(Naux_);
 
-  // Compute gamma; blocks->get_block(ip) routes to cached storage or
+  // Compute gamma; blocks_->get_block(ip) routes to cached storage or
   // recomputes on the fly depending on the BTensorBlocks subclass.
   for(size_t iden=0;iden<P.size();iden++) {
 #ifdef _OPENMP
@@ -1761,15 +1761,15 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 #endif
     {
 #ifdef _OPENMP
-      arma::vec gv(Naux);
+      arma::vec gv(Naux_);
       gv.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
+      for(size_t ip=0;ip<orbpairs_.size();ip++) {
 #ifdef _OPENMP
-	project_density_to_aux(P[iden],ip,blocks->get_block(ip),gv);
+	project_density_to_aux(P[iden],ip,blocks_->get_block(ip),gv);
 #else
-	project_density_to_aux(P[iden],ip,blocks->get_block(ip),gamma[iden]);
+	project_density_to_aux(P[iden],ip,blocks_->get_block(ip),gamma[iden]);
 #endif
       }
 #ifdef _OPENMP
@@ -1779,11 +1779,11 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
     }
   }
 
-  // CD mode: L blocks carry the metric, gamma is already the
+  // CD mode: L blocks_ carry the metric, gamma is already the
   // indep-space expansion (see single-density overload).
-  if(!cholesky_mode)
+  if(!cholesky_mode_)
     for(size_t ig=0;ig<P.size();ig++)
-      gamma[ig]=ab_inv*gamma[ig];
+      gamma[ig]=ab_inv_*gamma[ig];
 
   return gamma;
 }
@@ -1797,20 +1797,20 @@ arma::mat DensityFit::calcJ(const arma::mat & P) const {
 }
 
 arma::mat DensityFit::calcJ_vector(const arma::vec & c) const {
-  if(c.n_elem != Naux) {
+  if(c.n_elem != Naux_) {
     std::ostringstream oss;
-    oss << "Error in DensityFit: Naux = " << Naux << ", c.n_elem = " << c.n_elem << "!\n";
+    oss << "Error in DensityFit: Naux = " << Naux_ << ", c.n_elem = " << c.n_elem << "!\n";
     throw std::logic_error(oss.str());
   }
 
-  arma::mat J(Nbf,Nbf);
+  arma::mat J(Nbf_,Nbf_);
   J.zeros();
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<orbpairs.size();ip++)
-    contract_aux_to_J(c,ip,blocks->get_block(ip),J);
+  for(size_t ip=0;ip<orbpairs_.size();ip++)
+    contract_aux_to_J(c,ip,blocks_->get_block(ip),J);
 
   return J;
 }
@@ -1821,15 +1821,15 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
 
   std::vector<arma::mat> J(P.size());
   for(size_t iden=0;iden<P.size();iden++)
-    J[iden].zeros(Nbf,Nbf);
+    J[iden].zeros(Nbf_,Nbf_);
 
   // One integral sweep over orbital shellpairs covers all densities;
-  // blocks->get_block(ip) is uniform across cached/direct backends.
+  // blocks_->get_block(ip) is uniform across cached/direct backends.
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<orbpairs.size();ip++) {
-    arma::mat amunu = blocks->get_block(ip);
+  for(size_t ip=0;ip<orbpairs_.size();ip++) {
+    arma::mat amunu = blocks_->get_block(ip);
     for(size_t iden=0;iden<P.size();iden++)
       contract_aux_to_J(c[iden],ip,amunu,J[iden]);
   }
@@ -1842,7 +1842,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) const {
   arma::vec c=compute_expansion(P);
 
   // The force
-  arma::vec f(3*Nnuc, arma::fill::zeros);
+  arma::vec f(3*Nnuc_, arma::fill::zeros);
 
   // First part: f += (1/2) c^T (dM/dR) c. accumulate_2c_metric_force
   // handles the aux-shellpair-pair scaffolding (same helper as
@@ -1854,18 +1854,18 @@ arma::vec DensityFit::forceJ(const arma::mat & P) const {
   // Second part: f -= gamma_a' c_a (three-center derivative term).
   // accumulate_3c_force_DF runs the orbpair iteration and
   // DirectDFPerturbedBlocks streaming; the build_q callable
-  // materialises the (Naux x Nmu*Nnu) per-shellpair Q matrix as
+  // materialises the (Naux_ x Nmu*Nnu) per-shellpair Q matrix as
   // the rank-1 outer product fac * c x Psub^T. The for_each_pert
   // contraction then collapses to fac * (sub_block * Psub) . c on
   // each pert, equivalent to the original kernel.
   accumulate_3c_force_DF(f, -1.0,
       [&](size_t ip) {
-        const size_t imus = orbpairs[ip].is;
-        const size_t inus = orbpairs[ip].js;
-        const size_t mu0  = orbshells[imus].get_first_ind();
-        const size_t nu0  = orbshells[inus].get_first_ind();
-        const size_t Nmu  = orbshells[imus].get_Nbf();
-        const size_t Nnu  = orbshells[inus].get_Nbf();
+        const size_t imus = orbpairs_[ip].is;
+        const size_t inus = orbpairs_[ip].js;
+        const size_t mu0  = orbshells_[imus].get_first_ind();
+        const size_t nu0  = orbshells_[inus].get_first_ind();
+        const size_t Nmu  = orbshells_[imus].get_Nbf();
+        const size_t Nnu  = orbshells_[inus].get_Nbf();
         const double fac  = (imus == inus) ? 1.0 : 2.0;
 
         // P submatrix vectorised with mu fastest, matching the
@@ -1901,9 +1901,9 @@ void DensityFit::filter_occupied(const arma::Mat<T> & Corig, const std::vector<d
 
 template<typename T>
 arma::Mat<T> DensityFit::calcK_impl(const arma::Mat<T> & Corig, const std::vector<double> & occo) const {
-  if(Corig.n_rows != Nbf) {
+  if(Corig.n_rows != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
+    oss << "Error in DensityFit: Nbf = " << Nbf_ << ", Corig.n_rows = " << Corig.n_rows << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -1911,8 +1911,8 @@ arma::Mat<T> DensityFit::calcK_impl(const arma::Mat<T> & Corig, const std::vecto
   arma::vec occs;
   filter_occupied(Corig, occo, C, occs);
 
-  arma::Mat<T> K(Nbf, Nbf, arma::fill::zeros);
-  // accumulate_K_from_blocks consumes blocks->get_block(ip) uniformly
+  arma::Mat<T> K(Nbf_, Nbf_, arma::fill::zeros);
+  // accumulate_K_from_blocks consumes blocks_->get_block(ip) uniformly
   // across cached/direct backends; peak memory is one (Naux x Nbf)
   // aui per thread.
   accumulate_K_from_blocks(C, occs, K);
@@ -1935,48 +1935,48 @@ arma::cx_mat DensityFit::calcK_occ(const arma::cx_mat & Corig, const std::vector
   return calcK_occ_impl(Corig, occo, S);
 }
 
-size_t DensityFit::get_Naux() const {
-  return Naux;
+size_t DensityFit::Naux() const {
+  return Naux_;
 }
 
-size_t DensityFit::get_Naux_indep() const {
-  // DF: ab_invh's column count is the aux-space rank after the lindep
+size_t DensityFit::Naux_indep() const {
+  // DF: ab_invh_'s column count is the aux-space rank after the lindep
   // cleanup. CD: the cleanup already happened in fill_cholesky and
-  // Naux was set to the cleaned-subspace size (ab_invh is empty), so
-  // Naux is the independent count.
-  return cholesky_mode ? Naux : ab_invh.n_cols;
+  // Naux_ was set to the cleaned-subspace size (ab_invh_ is empty), so
+  // Naux_ is the independent count.
+  return cholesky_mode_ ? Naux_ : ab_invh_.n_cols;
 }
 
-const arma::mat & DensityFit::get_ab() const {
-  return ab;
+const arma::mat & DensityFit::ab() const {
+  return ab_;
 }
 
 void DensityFit::three_center_integrals(arma::mat & ints) const {
-  // blocks->get_block(ip) works in either cached or direct mode;
-  // no need to forbid direct here. In CD mode auxshells is empty
-  // but the block still has (Naux x Nmu*Nnu) entries, so iterate
+  // blocks_->get_block(ip) works in either cached or direct mode;
+  // no need to forbid direct here. In CD mode auxshells_ is empty
+  // but the block still has (Naux_ x Nmu*Nnu) entries, so iterate
   // over flat aux indices rather than per-shell — the same loop
-  // shape works for both DF (Naux = aux basis size) and CD
-  // (Naux = number of orthonormal L vectors).
-  ints.zeros(Nbf*Nbf,Naux);
-  for(size_t ip=0;ip<orbpairs.size();ip++) {
-    const size_t imus=orbpairs[ip].is;
-    const size_t inus=orbpairs[ip].js;
-    const size_t Nmu=orbshells[imus].get_Nbf();
-    const size_t Nnu=orbshells[inus].get_Nbf();
-    const size_t mu0=orbshells[imus].get_first_ind();
-    const size_t nu0=orbshells[inus].get_first_ind();
+  // shape works for both DF (Naux_ = aux basis size) and CD
+  // (Naux_ = number of orthonormal L vectors).
+  ints.zeros(Nbf_*Nbf_,Naux_);
+  for(size_t ip=0;ip<orbpairs_.size();ip++) {
+    const size_t imus=orbpairs_[ip].is;
+    const size_t inus=orbpairs_[ip].js;
+    const size_t Nmu=orbshells_[imus].get_Nbf();
+    const size_t Nnu=orbshells_[inus].get_Nbf();
+    const size_t mu0=orbshells_[imus].get_first_ind();
+    const size_t nu0=orbshells_[inus].get_first_ind();
 
-    arma::mat amunu = blocks->get_block(ip);  // (Naux x Nmu*Nnu)
+    arma::mat amunu = blocks_->get_block(ip);  // (Naux_ x Nmu*Nnu)
 
     for(size_t imu=0;imu<Nmu;imu++) {
       const size_t mu=imu+mu0;
       for(size_t inu=0;inu<Nnu;inu++) {
         const size_t nu=inu+nu0;
-        for(size_t a=0;a<Naux;a++) {
+        for(size_t a=0;a<Naux_;a++) {
           const double el = amunu(a, inu*Nmu + imu);
-          ints(mu*Nbf+nu, a) = el;
-          ints(nu*Nbf+mu, a) = el;
+          ints(mu*Nbf_+nu, a) = el;
+          ints(nu*Nbf_+mu, a) = el;
         }
       }
     }
@@ -1986,26 +1986,26 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
 void DensityFit::B_matrix(arma::mat & B) const {
   // three_center_integrals + the metric multiply work in either
   // cached or direct mode; the latter recomputes the shellpair
-  // blocks on demand inside the iteration. In DF mode
-  // ab_invh is the metric half-inverse; in CD mode the blocks are
-  // already L = X^T (piv|mu nu) (metric baked in, ab_invh empty), so the
+  // blocks_ on demand inside the iteration. In DF mode
+  // ab_invh_ is the metric half-inverse; in CD mode the blocks_ are
+  // already L = X^T (piv|mu nu) (metric baked in, ab_invh_ empty), so the
   // three-center integrals are the final B with no extra multiply.
   three_center_integrals(B);
-  if(!cholesky_mode)
-    B*=ab_invh;
+  if(!cholesky_mode_)
+    B*=ab_invh_;
 }
 
 arma::mat DensityFit::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose) const {
-  if(Cl.n_rows != Nbf || Cr.n_rows != Nbf) {
+  if(Cl.n_rows != Nbf_ || Cr.n_rows != Nbf_) {
     std::ostringstream oss;
-    oss << "DensityFit::B_transform: orbital matrices don't match basis set! Nbf = " << Nbf << ", Cl.n_rows = " << Cl.n_rows << ", Cr.n_rows = " << Cr.n_rows << "!\n";
+    oss << "DensityFit::B_transform: orbital matrices don't match basis set! Nbf = " << Nbf_ << ", Cl.n_rows = " << Cl.n_rows << ", Cr.n_rows = " << Cr.n_rows << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   Timer t;
 
-  // Build the dense B matrix once (Nbf*Nbf x Naux). Each column is
-  // a (Nbf, Nbf) block transformed by two GEMMs.
+  // Build the dense B matrix once (Nbf_*Nbf_ x Naux_). Each column is
+  // a (Nbf_, Nbf_) block transformed by two GEMMs.
   arma::mat Bdense;
   B_matrix(Bdense);
 
@@ -2017,13 +2017,13 @@ arma::mat DensityFit::B_transform(const arma::mat & Cl, const arma::mat & Cr, bo
 
   const size_t Nl = Cl.n_cols;
   const size_t Nr = Cr.n_cols;
-  arma::mat Br(Naux, Nl*Nr);
+  arma::mat Br(Naux_, Nl*Nr);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-  for(size_t P=0; P<Naux; P++) {
-    const arma::mat block_P(Bdense.colptr(P), Nbf, Nbf, false, true);
+  for(size_t P=0; P<Naux_; P++) {
+    const arma::mat block_P(Bdense.colptr(P), Nbf_, Nbf_, false, true);
     const arma::mat Tmo(Cl.t() * block_P.t() * Cr);
     Br.row(P) = arma::trans(arma::vectorise(Tmo));
   }
@@ -2041,16 +2041,16 @@ arma::mat DensityFit::B_transform(const arma::mat & Cl, const arma::mat & Cr, bo
 // HDF5 save / load. Used by SCF (and moints) to skip the fill on a
 // repeated run when the orbital + auxiliary basis match a previously
 // cached state. Plain DF and range-separated DF coexist in the same
-// file by keying every entry with a (omega, alpha, beta)-derived
+// file by keying every entry with a (omega_, alpha_, beta_)-derived
 // prefix. CD entries use the same convention; DF and CD never share a
-// key (the cholesky_mode flag is the first thing checked on load).
+// key (the cholesky_mode_ flag is the first thing checked on load).
 // ===========================================================================
 namespace {
-std::string df_cache_prefix(double omega, double alpha, double beta) {
-  if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
+std::string df_cache_prefix(double omega_, double alpha_, double beta_) {
+  if(omega_ == 0.0 && alpha_ == 1.0 && beta_ == 0.0)
     return "";
   std::ostringstream oss;
-  oss << "rs_o" << omega << "_a" << alpha << "_b" << beta << "_";
+  oss << "rs_o" << omega_ << "_a" << alpha_ << "_b" << beta_ << "_";
   return oss.str();
 }
 
@@ -2065,48 +2065,48 @@ arma::umat hsize_to_umat(const std::vector<hsize_t> & v, size_t nrows, size_t nc
 }
 
 void DensityFit::save(const std::string & fname) const {
-  if(direct)
+  if(direct_)
     throw std::runtime_error("DensityFit::save: nothing to cache in direct mode.\n");
-  if(Nbf == 0 || Naux == 0)
+  if(Nbf_ == 0 || Naux_ == 0)
     throw std::runtime_error("DensityFit::save: object is uninitialised.\n");
-  auto * cached = dynamic_cast<CachedBlocks *>(blocks.get());
+  auto * cached = dynamic_cast<CachedBlocks *>(blocks_.get());
   if(!cached)
-    throw std::runtime_error("DensityFit::save: blocks backing store is not a CachedBlocks.\n");
+    throw std::runtime_error("DensityFit::save: blocks_ backing store is not a CachedBlocks.\n");
 
   // Open the file: truncate if it doesn't exist, append otherwise.
   const bool trunc = !file_exists(fname);
   Checkpoint chkpt(fname, true, trunc);
-  const std::string P = df_cache_prefix(omega, alpha, beta);
+  const std::string P = df_cache_prefix(omega_, alpha_, beta_);
 
-  chkpt.write(P+"cholesky_mode", (int) (cholesky_mode ? 1 : 0));
-  chkpt.write(P+"Nbf",  (hsize_t) Nbf);
-  chkpt.write(P+"Naux", (hsize_t) Naux);
-  chkpt.write(P+"Nnuc", (hsize_t) Nnuc);
-  chkpt.write(P+"omega", omega);
-  chkpt.write(P+"alpha", alpha);
-  chkpt.write(P+"beta",  beta);
-  chkpt.write(P+"maxam",        maxam);
-  chkpt.write(P+"maxcontr",     maxcontr);
-  chkpt.write(P+"maxorbam",     maxorbam);
-  chkpt.write(P+"maxorbcontr",  (hsize_t) maxorbcontr);
-  chkpt.write(P+"maxauxam",     maxauxam);
-  chkpt.write(P+"maxauxcontr",  (hsize_t) maxauxcontr);
+  chkpt.write(P+"cholesky_mode_", (int) (cholesky_mode_ ? 1 : 0));
+  chkpt.write(P+"Nbf_",  (hsize_t) Nbf_);
+  chkpt.write(P+"Naux_", (hsize_t) Naux_);
+  chkpt.write(P+"Nnuc_", (hsize_t) Nnuc_);
+  chkpt.write(P+"omega_", omega_);
+  chkpt.write(P+"alpha_", alpha_);
+  chkpt.write(P+"beta_",  beta_);
+  chkpt.write(P+"maxam_",        maxam_);
+  chkpt.write(P+"maxcontr_",     maxcontr_);
+  chkpt.write(P+"maxorbam_",     maxorbam_);
+  chkpt.write(P+"maxorbcontr_",  (hsize_t) maxorbcontr_);
+  chkpt.write(P+"maxauxam_",     maxauxam_);
+  chkpt.write(P+"maxauxcontr_",  (hsize_t) maxauxcontr_);
 
   // DF keeps the (a|b) metric and its (half-)inverse; CD bakes the
-  // metric into the L blocks and keeps only X for the force kernels.
-  if(cholesky_mode) {
-    chkpt.write(P+"cd_X", cd_X);
+  // metric into the L blocks_ and keeps only X for the force kernels.
+  if(cholesky_mode_) {
+    chkpt.write(P+"cd_X_", cd_X_);
   } else {
-    chkpt.write(P+"ab",      ab);
-    chkpt.write(P+"ab_inv",  ab_inv);
-    chkpt.write(P+"ab_invh", ab_invh);
+    chkpt.write(P+"ab_",      ab_);
+    chkpt.write(P+"ab_inv_",  ab_inv_);
+    chkpt.write(P+"ab_invh_", ab_invh_);
   }
 
   // orbpair (is, js) -- the rest is recomputed from the basis on load.
-  std::vector<hsize_t> orb_is(orbpairs.size()), orb_js(orbpairs.size());
-  for(size_t i=0; i<orbpairs.size(); i++) {
-    orb_is[i] = orbpairs[i].is;
-    orb_js[i] = orbpairs[i].js;
+  std::vector<hsize_t> orb_is(orbpairs_.size()), orb_js(orbpairs_.size());
+  for(size_t i=0; i<orbpairs_.size(); i++) {
+    orb_is[i] = orbpairs_[i].is;
+    orb_js[i] = orbpairs_[i].js;
   }
   chkpt.write(P+"orb_is", orb_is);
   chkpt.write(P+"orb_js", orb_js);
@@ -2114,14 +2114,14 @@ void DensityFit::save(const std::string & fname) const {
   // CachedBlocks flat backing storage.
   chkpt.write(P+"storage", cached->storage());
 
-  if(cholesky_mode) {
-    chkpt.write(P+"cd_pivot_index", umat_to_hsize(cd_pivot_index));
-    chkpt.write(P+"cd_pivot_sentinel", (hsize_t) cd_pivot_sentinel);
-    std::vector<hsize_t> piv_is(cd_pivot_shellpairs_vec.size());
-    std::vector<hsize_t> piv_js(cd_pivot_shellpairs_vec.size());
-    for(size_t i=0; i<cd_pivot_shellpairs_vec.size(); i++) {
-      piv_is[i] = cd_pivot_shellpairs_vec[i].first;
-      piv_js[i] = cd_pivot_shellpairs_vec[i].second;
+  if(cholesky_mode_) {
+    chkpt.write(P+"cd_pivot_index_", umat_to_hsize(cd_pivot_index_));
+    chkpt.write(P+"cd_pivot_sentinel_", (hsize_t) cd_pivot_sentinel_);
+    std::vector<hsize_t> piv_is(cd_pivot_shellpairs_vec_.size());
+    std::vector<hsize_t> piv_js(cd_pivot_shellpairs_vec_.size());
+    for(size_t i=0; i<cd_pivot_shellpairs_vec_.size(); i++) {
+      piv_is[i] = cd_pivot_shellpairs_vec_[i].first;
+      piv_js[i] = cd_pivot_shellpairs_vec_[i].second;
     }
     chkpt.write(P+"pivot_sp_is", piv_is);
     chkpt.write(P+"pivot_sp_js", piv_js);
@@ -2131,19 +2131,19 @@ void DensityFit::save(const std::string & fname) const {
 bool DensityFit::load(const BasisSet & basis, const BasisSet * auxbas, const std::string & fname) {
   if(!file_exists(fname)) return false;
   Checkpoint chkpt(fname, false);
-  const std::string P = df_cache_prefix(omega, alpha, beta);
-  if(!chkpt.exist(P+"Nbf")) return false;
+  const std::string P = df_cache_prefix(omega_, alpha_, beta_);
+  if(!chkpt.exist(P+"Nbf_")) return false;
 
   // Read header and validate match against the caller-supplied basis.
   hsize_t Nbf_in, Naux_in, Nnuc_in;
-  chkpt.read(P+"Nbf",  Nbf_in);
-  chkpt.read(P+"Naux", Naux_in);
-  chkpt.read(P+"Nnuc", Nnuc_in);
+  chkpt.read(P+"Nbf_",  Nbf_in);
+  chkpt.read(P+"Naux_", Naux_in);
+  chkpt.read(P+"Nnuc_", Nnuc_in);
   if(Nbf_in != basis.get_Nbf() || Nnuc_in != basis.get_Nnuc())
     return false;
 
   int chol_mode_in;
-  chkpt.read(P+"cholesky_mode", chol_mode_in);
+  chkpt.read(P+"cholesky_mode_", chol_mode_in);
   const bool want_cd = (auxbas == nullptr);
   if(want_cd != (chol_mode_in != 0))
     return false;
@@ -2151,88 +2151,88 @@ bool DensityFit::load(const BasisSet & basis, const BasisSet * auxbas, const std
     return false;
 
   // Commit to populating *this -- past this point we mutate state.
-  cholesky_mode = (chol_mode_in != 0);
-  Nbf  = Nbf_in;
-  Naux = Naux_in;
-  Nnuc = Nnuc_in;
-  direct = false;
-  chkpt.read(P+"omega", omega);
-  chkpt.read(P+"alpha", alpha);
-  chkpt.read(P+"beta",  beta);
-  chkpt.read(P+"maxam",       maxam);
-  chkpt.read(P+"maxcontr",    maxcontr);
-  chkpt.read(P+"maxorbam",    maxorbam);
+  cholesky_mode_ = (chol_mode_in != 0);
+  Nbf_  = Nbf_in;
+  Naux_ = Naux_in;
+  Nnuc_ = Nnuc_in;
+  direct_ = false;
+  chkpt.read(P+"omega_", omega_);
+  chkpt.read(P+"alpha_", alpha_);
+  chkpt.read(P+"beta_",  beta_);
+  chkpt.read(P+"maxam_",       maxam_);
+  chkpt.read(P+"maxcontr_",    maxcontr_);
+  chkpt.read(P+"maxorbam_",    maxorbam_);
   hsize_t maxorbcontr_in, maxauxcontr_in;
-  chkpt.read(P+"maxorbcontr", maxorbcontr_in);
-  chkpt.read(P+"maxauxam",    maxauxam);
-  chkpt.read(P+"maxauxcontr", maxauxcontr_in);
-  maxorbcontr = maxorbcontr_in;
-  maxauxcontr = maxauxcontr_in;
+  chkpt.read(P+"maxorbcontr_", maxorbcontr_in);
+  chkpt.read(P+"maxauxam_",    maxauxam_);
+  chkpt.read(P+"maxauxcontr_", maxauxcontr_in);
+  maxorbcontr_ = maxorbcontr_in;
+  maxauxcontr_ = maxauxcontr_in;
 
-  if(cholesky_mode) {
-    chkpt.read(P+"cd_X", cd_X);
-    ab.reset(); ab_inv.reset(); ab_invh.reset();
+  if(cholesky_mode_) {
+    chkpt.read(P+"cd_X_", cd_X_);
+    ab_.reset(); ab_inv_.reset(); ab_invh_.reset();
   } else {
-    chkpt.read(P+"ab",      ab);
-    chkpt.read(P+"ab_inv",  ab_inv);
-    chkpt.read(P+"ab_invh", ab_invh);
-    cd_X.reset();
+    chkpt.read(P+"ab_",      ab_);
+    chkpt.read(P+"ab_inv_",  ab_inv_);
+    chkpt.read(P+"ab_invh_", ab_invh_);
+    cd_X_.reset();
   }
 
-  orbshells = basis.get_shells();
-  auxshells = auxbas ? auxbas->get_shells() : std::vector<GaussianShell>();
+  orbshells_ = basis.get_shells();
+  auxshells_ = auxbas ? auxbas->get_shells() : std::vector<GaussianShell>();
   // Rebuild the libcint environment: it is not part of the checkpoint
   cenv = auxbas ? CintEnv(basis,*auxbas) : CintEnv(basis);
 
   std::vector<hsize_t> orb_is, orb_js;
   chkpt.read(P+"orb_is", orb_is);
   chkpt.read(P+"orb_js", orb_js);
-  orbpairs.assign(orb_is.size(), eripair_t{});
+  orbpairs_.assign(orb_is.size(), eripair_t{});
   for(size_t i=0; i<orb_is.size(); i++) {
-    orbpairs[i].is = orb_is[i];
-    orbpairs[i].js = orb_js[i];
-    orbpairs[i].i0 = orbshells[orb_is[i]].get_first_ind();
-    orbpairs[i].j0 = orbshells[orb_js[i]].get_first_ind();
-    orbpairs[i].Ni = orbshells[orb_is[i]].get_Nbf();
-    orbpairs[i].Nj = orbshells[orb_js[i]].get_Nbf();
-    orbpairs[i].eri = 0.0;  // screening field, unused after fill
+    orbpairs_[i].is = orb_is[i];
+    orbpairs_[i].js = orb_js[i];
+    orbpairs_[i].i0 = orbshells_[orb_is[i]].get_first_ind();
+    orbpairs_[i].j0 = orbshells_[orb_js[i]].get_first_ind();
+    orbpairs_[i].Ni = orbshells_[orb_is[i]].get_Nbf();
+    orbpairs_[i].Nj = orbshells_[orb_js[i]].get_Nbf();
+    orbpairs_[i].eri = 0.0;  // screening field, unused after fill
   }
 
   // Rebuild the CachedBlocks descriptor and slot the saved storage_
-  // back in. build_shellpair_descriptor needs orbpairs and orbshells
+  // back in. build_shellpair_descriptor needs orbpairs_ and orbshells_
   // populated -- both set above.
   std::vector<std::pair<size_t, size_t>> sp_pairs, sp_firsts, sp_sizes;
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
-  auto cached = std::make_shared<CachedBlocks>(Nbf, Naux, sp_pairs, sp_firsts, sp_sizes);
+  auto cached = std::make_shared<CachedBlocks>(Nbf_, Naux_, sp_pairs, sp_firsts, sp_sizes);
   std::vector<double> storage;
   chkpt.read(P+"storage", storage);
   if(storage.size() != cached->storage_size()) {
-    // Shouldn't happen if Nbf and orbpairs matched, but bail out
+    // Shouldn't happen if Nbf_ and orbpairs_ matched, but bail out
     // rather than corrupt *this.
     return false;
   }
   cached->storage() = std::move(storage);
-  blocks = cached;
+  blocks_ = cached;
 
-  if(cholesky_mode) {
+  if(cholesky_mode_) {
     hsize_t piv_sentinel_in;
     std::vector<hsize_t> piv_index, piv_is, piv_js;
-    chkpt.read(P+"cd_pivot_index",    piv_index);
-    chkpt.read(P+"cd_pivot_sentinel", piv_sentinel_in);
+    chkpt.read(P+"cd_pivot_index_",    piv_index);
+    chkpt.read(P+"cd_pivot_sentinel_", piv_sentinel_in);
     chkpt.read(P+"pivot_sp_is",       piv_is);
     chkpt.read(P+"pivot_sp_js",       piv_js);
-    cd_pivot_index     = hsize_to_umat(piv_index, Nbf, Nbf);
-    cd_pivot_sentinel  = piv_sentinel_in;
-    cd_pivot_shellpairs_vec.resize(piv_is.size());
-    pivot_shellpairs.clear();
+    cd_pivot_index_     = hsize_to_umat(piv_index, Nbf_, Nbf_);
+    cd_pivot_sentinel_  = piv_sentinel_in;
+    cd_pivot_shellpairs_vec_.resize(piv_is.size());
+    pivot_shellpairs_.clear();
     for(size_t i=0; i<piv_is.size(); i++) {
-      cd_pivot_shellpairs_vec[i] = std::make_pair((size_t) piv_is[i], (size_t) piv_js[i]);
-      pivot_shellpairs.insert(cd_pivot_shellpairs_vec[i]);
+      cd_pivot_shellpairs_vec_[i] = std::make_pair((size_t) piv_is[i], (size_t) piv_js[i]);
+      pivot_shellpairs_.insert(cd_pivot_shellpairs_vec_[i]);
     }
   } else {
-    cd_pivot_index.reset();
-    cd_pivot_shellpairs_vec.clear();
-    pivot_shellpairs.clear();
+    cd_pivot_index_.reset();
+    cd_pivot_shellpairs_vec_.clear();
+    pivot_shellpairs_.clear();
   }
 
   return true;
