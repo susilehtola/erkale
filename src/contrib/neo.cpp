@@ -333,8 +333,8 @@ int main_guarded(int argc, char **argv) {
       // density fitting also used for e-p terms
       Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
 
-    printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
-    if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
+    printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.Naux(),(int) (dfit.Naux()-dfit.Naux_indep()));
+    if(Sp.n_elem>0 and dfit.Naux() != pfit.Naux())
       throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
 
   } else {

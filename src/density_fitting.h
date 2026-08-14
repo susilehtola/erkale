@@ -69,37 +69,37 @@
 /// not free -- cheap relative to the block tensor, but not nothing.
 class DensityFit {
   /// Amount of orbital basis functions
-  size_t Nbf;
+  size_t Nbf_;
   /// Amount of auxiliary basis functions
-  size_t Naux;
+  size_t Naux_;
   /// Direct calculation? (Compute three-center integrals on-the-fly)
-  bool direct;
+  bool direct_;
 
   /// Range separation constants
-  double omega, alpha, beta;
+  double omega_, alpha_, beta_;
 
   /// Amount of nuclei
-  size_t Nnuc;
+  size_t Nnuc_;
   /// Maximum angular momentum
-  int maxam;
+  int maxam_;
   /// Maximum contractions
-  int maxcontr;
+  int maxcontr_;
 
   /// Orbital shells
-  std::vector<GaussianShell> orbshells;
-  int maxorbam;
-  size_t maxorbcontr;
+  std::vector<GaussianShell> orbshells_;
+  int maxorbam_;
+  size_t maxorbcontr_;
   /// Density fitting shells
-  std::vector<GaussianShell> auxshells;
-  int maxauxam;
-  size_t maxauxcontr;
+  std::vector<GaussianShell> auxshells_;
+  int maxauxam_;
+  size_t maxauxcontr_;
   /// libcint description of the orbital basis, followed by the
   /// auxiliary basis (in two-step CD there is no separate auxiliary
   /// basis, and the environment holds the orbital shells alone)
   CintEnv cenv;
 
   /// List of unique orbital shell pairs
-  std::vector<eripair_t> orbpairs;
+  std::vector<eripair_t> orbpairs_;
   /// Three-index (alpha | mu nu) block source, indexed per orbital
   /// shellpair. In non-direct mode this is a CachedBlocks with the
   /// integrals precomputed and stored; in direct mode this is a
@@ -107,20 +107,20 @@ class DensityFit {
   /// Either way, the J/K kernels consume blocks via the same
   /// blocks->get_block(ip) interface. shared_ptr so DensityFit
   /// copies (e.g. Edmiston) share the storage / state.
-  std::shared_ptr<BTensorBlocks> blocks;
+  std::shared_ptr<BTensorBlocks> blocks_;
 
   /// \f$ ( \alpha | \beta) \f$
-  arma::mat ab;
+  arma::mat ab_;
   /// \f$ ( \alpha | \beta)^-1 \f$
-  arma::mat ab_inv;
+  arma::mat ab_inv_;
   /// \f$ ( \alpha | \beta)^-1/2 \f$
-  arma::mat ab_invh;
+  arma::mat ab_invh_;
 
   /// True when this object was filled via fill_cholesky. CD and DF
   /// share the same J/K machinery; the only thing this flag affects
   /// is which gradient path is available (forceJ for DF aux shells,
   /// forceJ_cholesky for pivot-orbital-pair "aux").
-  bool cholesky_mode;
+  bool cholesky_mode_;
 
   /// CD-only half-inverse X = D^-1 X~ of the pivot metric M=(piv|piv).
   /// Stored alongside the L-baked blocks so the force kernels
@@ -130,29 +130,29 @@ class DensityFit {
   /// DirectCDBlocks can bake X into its on-the-fly blocks. The metric
   /// M itself is not retained: the force kernels recompute its
   /// nuclear derivatives on the fly via dERIWorker. Empty in DF mode.
-  arma::mat cd_X;
+  arma::mat cd_X_;
 
   /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank in 0..Naux-1, or
   /// cd_pivot_sentinel for non-pivot pairs. Built in fill_cholesky
   /// and consumed by forceJ_cholesky for the dM/dR + d(mu nu | piv)/dR
   /// contractions.
-  arma::umat cd_pivot_index;
+  arma::umat cd_pivot_index_;
   /// Sentinel value used in cd_pivot_index (== Naux).
-  arma::uword cd_pivot_sentinel;
+  arma::uword cd_pivot_sentinel_;
   /// Pivot shellpairs in lexicographic order; enumerated to drive
   /// the dM/dR sweep in forceJ_cholesky without re-sorting per call.
-  std::vector<std::pair<size_t, size_t>> cd_pivot_shellpairs_vec;
+  std::vector<std::pair<size_t, size_t>> cd_pivot_shellpairs_vec_;
 
   /// Pivot shellpairs (set form) populated by fill_cholesky via
   /// select_two_step_pivots; copied into cd_pivot_shellpairs_vec to
   /// drive the metric build and the force sweeps.
-  std::set<std::pair<size_t, size_t>> pivot_shellpairs;
+  std::set<std::pair<size_t, size_t>> pivot_shellpairs_;
 
   /// True when the pivot products were built from a basis other than the
   /// orbital basis (fill_cholesky_shared). cd_pivot_index is then indexed
   /// over the pivot basis, not the orbital basis, so the CD gradient
   /// kernels -- which assume the two coincide -- must refuse to run.
-  bool cd_foreign_pivots = false;
+  bool cd_foreign_pivots_ = false;
 
   /// Form screening matrix
   void form_screening();
@@ -287,8 +287,8 @@ class DensityFit {
   void set_range_separation(double w, double a, double b);
   void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   /// Get range separation constants
-  void get_range_separation(double & w, double & a, double & b) const;
-  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
+  void range_separation(double & w, double & a, double & b) const;
+  RangeSeparation range_separation() const { RangeSeparation rs; range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /**
    * Compute the density-fitting integrals against the auxiliary basis
@@ -444,11 +444,11 @@ class DensityFit {
   arma::cx_mat calcK_occ(const arma::cx_mat & C, const std::vector<double> & occs, const arma::mat & S) const;
 
   /// Get the number of auxiliary functions
-  size_t get_Naux() const;
+  size_t Naux() const;
   /// Get the number of linearly independent auxiliary functions
-  size_t get_Naux_indep() const;
+  size_t Naux_indep() const;
   /// Get the (a|b) metric
-  const arma::mat & get_ab() const;
+  const arma::mat & ab() const;
 
   /// Get 3-center integrals (must have HF enabled)
   void three_center_integrals(arma::mat & B) const;
