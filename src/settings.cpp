@@ -19,13 +19,116 @@
 #include "settings.h"
 #include "stringutil.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <type_traits>
 #include <cfloat>
 
-Settings::Settings() {
+template<typename T>
+SettingTable<T>::SettingTable(const std::string & label) : typelabel(label) {
+}
+
+template<typename T>
+size_t SettingTable<T>::find_ci(const std::string & name) const {
+  for(size_t i=0;i<entries.size();i++)
+    if(stricmp(name,entries[i].name)==0)
+      return i+1;
+  return 0;
+}
+
+template<typename T>
+size_t SettingTable<T>::find_cs(const std::string & name) const {
+  for(size_t i=0;i<entries.size();i++)
+    if(name==entries[i].name)
+      return i+1;
+  return 0;
+}
+
+template<typename T>
+void SettingTable<T>::add(const std::string & name, const std::string & comment, const T & val, bool negative) {
+  // Check that setting does not already exist
+  if(find_ci(name)) {
+    std::ostringstream oss;
+    oss << "Error: the " << typelabel << " setting " << name << " already exists!";
+    throw std::runtime_error(oss.str());
+  }
+  entries.push_back({name,comment,val,negative});
+}
+
+template<typename T>
+void SettingTable<T>::set(const std::string & name, const T & val) {
+  size_t idx=find_ci(name);
+  if(!idx) {
+    std::ostringstream oss;
+    oss << "\nThe " << typelabel << " setting "<<name<<" was not found!\n";
+    throw std::runtime_error(oss.str());
+  }
+  Entry & e=entries[idx-1];
+  // Only the numeric types carry a sign constraint.
+  if constexpr (std::is_same_v<T,double> || std::is_same_v<T,int>) {
+    if(val<T(0) && !e.negative) {
+      std::ostringstream oss;
+      oss << "Error: setting " << name << " must have non-negative value.\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
+  e.val=val;
+}
+
+template<typename T>
+T SettingTable<T>::get(const std::string & name) const {
+  // Historical behaviour: get matches case-sensitively.
+  size_t idx=find_cs(name);
+  if(!idx) {
+    std::ostringstream oss;
+    oss << "\nThe " << typelabel << " setting "<<name<<" was not found!\n";
+    throw std::runtime_error(oss.str());
+  }
+  return entries[idx-1].val;
+}
+
+template<typename T>
+size_t SettingTable<T>::is(const std::string & name) const {
+  return find_ci(name);
+}
+
+template<typename T>
+size_t SettingTable<T>::size() const {
+  return entries.size();
+}
+
+template<typename T>
+const std::string & SettingTable<T>::name(size_t i) const {
+  return entries[i].name;
+}
+
+template<typename T>
+void SettingTable<T>::print_entry(size_t i) const {
+  const Entry & e=entries[i];
+  if constexpr (std::is_same_v<T,std::string>) {
+    printf("%5s%-15s\t%20s\t%s\n","",e.name.c_str(),e.val.c_str(),e.comment.c_str());
+  } else if constexpr (std::is_same_v<T,double>) {
+    printf("%5s%-15s\t%20.3e\t%s\n","",e.name.c_str(),e.val,e.comment.c_str());
+  } else if constexpr (std::is_same_v<T,int>) {
+    printf("%5s%-15s\t%20i\t%s\n","",e.name.c_str(),e.val,e.comment.c_str());
+  } else if constexpr (std::is_same_v<T,bool>) {
+    static const char * bvals[]={"false","true"};
+    printf("%5s%-15s\t%20s\t%s\n","",e.name.c_str(),bvals[e.val],e.comment.c_str());
+  }
+  fflush(stdout);
+}
+
+// The four value types actually used by Settings.
+template class SettingTable<double>;
+template class SettingTable<bool>;
+template class SettingTable<int>;
+template class SettingTable<std::string>;
+
+Settings::Settings()
+  : dset("double type"), bset("boolean"), iset("integer"), sset("string") {
   // Set default Settings
 }
 
@@ -208,171 +311,55 @@ void Settings::add_scf_settings() {
   add_int("PZseed", "Seed number for randomized matrices?", 0);
 }
 
-void Settings::add_double(std::string name, std::string comment, double val, bool negative) {
-  // Check that setting does not exist
-  if(is_double(name)) {
-    std::ostringstream oss;
-    oss << "Error in add_double: setting " << name << " already exists!";
-    throw std::runtime_error(oss.str());
-  }
-
-  dset.push_back(gend(name,comment,val,negative));
+void Settings::add_double(const std::string & name, const std::string & comment, double val, bool negative) {
+  dset.add(name,comment,val,negative);
 }
 
-void Settings::add_bool(std::string name, std::string comment, bool val) {
-  // Check that setting does not exist
-  if(is_bool(name)) {
-    std::ostringstream oss;
-    oss << "Error in add_bool: setting " << name << " already exists!";
-    throw std::runtime_error(oss.str());
-  }
-
-  bset.push_back(genb(name,comment,val));
+void Settings::add_bool(const std::string & name, const std::string & comment, bool val) {
+  bset.add(name,comment,val);
 }
 
-void Settings::add_int(std::string name, std::string comment, int val, bool negative) {
-  // Check that setting does not exist
-  if(is_int(name)) {
-    std::ostringstream oss;
-    oss << "Error in add_int: setting " << name << " already exists!";
-    throw std::runtime_error(oss.str());
-  }
-
-  iset.push_back(geni(name,comment,val,negative));
+void Settings::add_int(const std::string & name, const std::string & comment, int val, bool negative) {
+  iset.add(name,comment,val,negative);
 }
 
-void Settings::add_string(std::string name, std::string comment, std::string val) {
-  // Check that setting does not exist
-  if(is_string(name)) {
-    std::ostringstream oss;
-    oss << "Error in add_string: setting " << name << " already exists!";
-    throw std::runtime_error(oss.str());
-  }
-  sset.push_back(gens(name,comment,val));
+void Settings::add_string(const std::string & name, const std::string & comment, const std::string & val) {
+  sset.add(name,comment,val);
 }
 
-void Settings::set_double(std::string name, double val) {
-  // Find setting in table
-  for(size_t i=0;i<dset.size();i++)
-    if(stricmp(name,dset[i].name)==0) {
-      if(val<0.0 && !dset[i].negative) {
-	std::ostringstream oss;
-	oss << "Error: setting " << name << " must have non-negative value.\n";
-	throw std::runtime_error(oss.str());
-      }
-      dset[i].val=val;
-      return;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe double type setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
+void Settings::set_double(const std::string & name, double val) {
+  dset.set(name,val);
 }
 
-void Settings::set_bool(std::string name, bool val) {
-  // Find setting in table
-  for(size_t i=0;i<bset.size();i++)
-    if(stricmp(name,bset[i].name)==0) {
-      bset[i].val=val;
-      return;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe boolean setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
+void Settings::set_bool(const std::string & name, bool val) {
+  bset.set(name,val);
 }
 
-void Settings::set_int(std::string name, int val) {
-  // Find setting in table
-  for(size_t i=0;i<iset.size();i++)
-    if(stricmp(name,iset[i].name)==0) {
-      if(val<0 && !iset[i].negative) {
-	std::ostringstream oss;
-	oss << "Error: setting " << name << " must have non-negative value.\n";
-	throw std::runtime_error(oss.str());
-      }
-      iset[i].val=val;
-      return;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe integer setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
+void Settings::set_int(const std::string & name, int val) {
+  iset.set(name,val);
 }
 
-
-void Settings::set_string(std::string name, std::string val) {
-  // Find setting in table
-  for(size_t i=0;i<sset.size();i++)
-    if(stricmp(name,sset[i].name)==0) {
-      sset[i].val=val;
-      return;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe string setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
+void Settings::set_string(const std::string & name, const std::string & val) {
+  sset.set(name,val);
 }
 
-
-
-double Settings::get_double(std::string name) const {
-  // Find setting in table
-  for(size_t i=0;i<dset.size();i++)
-    if(name==dset[i].name) {
-      return dset[i].val;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe double type setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
-
-  return 0.0;
+double Settings::get_double(const std::string & name) const {
+  return dset.get(name);
 }
 
-bool Settings::get_bool(std::string name) const {
-  // Find setting in table
-  for(size_t i=0;i<bset.size();i++)
-    if(name==bset[i].name) {
-      return bset[i].val;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe boolean setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
-
-  return 0;
+bool Settings::get_bool(const std::string & name) const {
+  return bset.get(name);
 }
 
-int Settings::get_int(std::string name) const {
-  // Find setting in table
-  for(size_t i=0;i<iset.size();i++)
-    if(name==iset[i].name) {
-      return iset[i].val;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe integer setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
-
-  return 0;
+int Settings::get_int(const std::string & name) const {
+  return iset.get(name);
 }
 
-std::string Settings::get_string(std::string name) const {
-  // Find setting in table
-  for(size_t i=0;i<sset.size();i++)
-    if(name==sset[i].name) {
-      return sset[i].val;
-    }
-
-  std::ostringstream oss;
-  oss << "\nThe string setting "<<name<<" was not found!\n";
-  throw std::runtime_error(oss.str());
-
-  return "";
+std::string Settings::get_string(const std::string & name) const {
+  return sset.get(name);
 }
 
-arma::vec Settings::get_vec(std::string name) const {
+arma::vec Settings::get_vec(const std::string & name) const {
   std::vector<std::string> v(splitline(get_string(name)));
 
   arma::vec x(v.size());
@@ -382,7 +369,7 @@ arma::vec Settings::get_vec(std::string name) const {
   return x;
 }
 
-arma::ivec Settings::get_ivec(std::string name) const {
+arma::ivec Settings::get_ivec(const std::string & name) const {
   std::vector<std::string> v(splitline(get_string(name)));
 
   arma::ivec x(v.size());
@@ -392,40 +379,24 @@ arma::ivec Settings::get_ivec(std::string name) const {
   return x;
 }
 
-arma::uvec Settings::get_uvec(std::string name) const {
+arma::uvec Settings::get_uvec(const std::string & name) const {
   return arma::conv_to<arma::uvec>::from(get_ivec(name));
 }
 
-size_t Settings::is_double(std::string name) const {
-  for(size_t i=0;i<dset.size();i++)
-    if(stricmp(name,dset[i].name)==0)
-      return i+1;
-
-  return 0;
+size_t Settings::is_double(const std::string & name) const {
+  return dset.is(name);
 }
 
-size_t Settings::is_int(std::string name) const {
-  for(size_t i=0;i<iset.size();i++)
-    if(stricmp(name,iset[i].name)==0)
-      return i+1;
-
-  return 0;
+size_t Settings::is_int(const std::string & name) const {
+  return iset.is(name);
 }
 
-size_t Settings::is_bool(std::string name) const {
-  for(size_t i=0;i<bset.size();i++)
-    if(stricmp(name,bset[i].name)==0)
-      return i+1;
-
-  return 0;
+size_t Settings::is_bool(const std::string & name) const {
+  return bset.is(name);
 }
 
-size_t Settings::is_string(std::string name) const {
-  for(size_t i=0;i<sset.size();i++)
-    if(stricmp(name,sset[i].name)==0)
-      return i+1;
-
-  return 0;
+size_t Settings::is_string(const std::string & name) const {
+  return sset.is(name);
 }
 
 
@@ -529,74 +500,34 @@ void Settings::parse(std::string filename, bool scf) {
 
 void Settings::print() const {
   printf("\nCurrent Settings used by ERKALE:\n");
+  fflush(stdout);
 
-  const std::string bvals[]={"false","true"};
-
-  // First, sort the keywords alphabetically.
+  // First, collect the keywords and sort them alphabetically.
   std::vector<std::string> kw;
   for(size_t i=0;i<bset.size();i++)
-    kw.push_back(bset[i].name);
+    kw.push_back(bset.name(i));
   for(size_t i=0;i<iset.size();i++)
-    kw.push_back(iset[i].name);
+    kw.push_back(iset.name(i));
   for(size_t i=0;i<dset.size();i++)
-    kw.push_back(dset[i].name);
+    kw.push_back(dset.name(i));
   for(size_t i=0;i<sset.size();i++)
-    kw.push_back(sset[i].name);
+    kw.push_back(sset.name(i));
   std::stable_sort(kw.begin(),kw.end());
 
-  // and then print the list in alphabetic order.
+  // and then print the list in alphabetic order. A name may live in more
+  // than one table (e.g. Confinement is both a string and a double), so
+  // every matching type is printed.
   for(size_t i=0;i<kw.size();i++) {
-    size_t is=is_string(kw[i]);
-    size_t id=is_double(kw[i]);
-    size_t ii=is_int(kw[i]);
-    size_t ib=is_bool(kw[i]);
+    size_t is=sset.is(kw[i]);
+    size_t id=dset.is(kw[i]);
+    size_t ii=iset.is(kw[i]);
+    size_t ib=bset.is(kw[i]);
 
-    if(is>0)
-      // Is string!
-      printf("%5s%-15s\t%20s\t%s\n","",sset[is-1].name.c_str(),sset[is-1].val.c_str(),sset[is-1].comment.c_str());
-    if(id>0)
-      // Is double!
-      printf("%5s%-15s\t%20.3e\t%s\n","",dset[id-1].name.c_str(),dset[id-1].val,dset[id-1].comment.c_str());
-    if(ii>0)
-      // Is integer!
-      printf("%5s%-15s\t%20i\t%s\n","",iset[ii-1].name.c_str(),iset[ii-1].val,iset[ii-1].comment.c_str());
-    if(ib>0)
-      // Is boolean!
-      printf("%5s%-15s\t%20s\t%s\n","",bset[ib-1].name.c_str(),bvals[bset[ib-1].val].c_str(),bset[ib-1].comment.c_str());
+    if(is>0) sset.print_entry(is-1);
+    if(id>0) dset.print_entry(id-1);
+    if(ii>0) iset.print_entry(ii-1);
+    if(ib>0) bset.print_entry(ib-1);
   }
   printf("\n");
-}
-
-doubleset_t gend(std::string name, std::string comment, double val, bool negative) {
-  doubleset_t ret;
-  ret.name=name;
-  ret.comment=comment;
-  ret.val=val;
-  ret.negative=negative;
-  return ret;
-}
-
-boolset_t genb(std::string name, std::string comment, bool val) {
-  boolset_t ret;
-  ret.name=name;
-  ret.comment=comment;
-  ret.val=val;
-  return ret;
-}
-
-intset_t geni(std::string name, std::string comment, int val, bool negative) {
-  intset_t ret;
-  ret.name=name;
-  ret.comment=comment;
-  ret.val=val;
-  ret.negative=negative;
-  return ret;
-}
-
-stringset_t gens(std::string name, std::string comment, std::string val) {
-  stringset_t ret;
-  ret.name=name;
-  ret.comment=comment;
-  ret.val=val;
-  return ret;
+  fflush(stdout);
 }
