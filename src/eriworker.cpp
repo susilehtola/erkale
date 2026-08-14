@@ -128,7 +128,7 @@ IntegralWorker::IntegralWorker(const CintEnv & cenv, double omega, double alpha,
   envp=&cenv;
   // The kernels take the data array as a non-const pointer, and the
   // range separation constant lives in it, so each worker holds a copy
-  env=cenv.get_env();
+  env=cenv.env();
   rs_omega=omega;
   rs_alpha=alpha;
   rs_beta=beta;
@@ -147,14 +147,14 @@ IntegralWorker::~IntegralWorker() {
 void * IntegralWorker::get_opt(cint_kernel_t kernel, double omega) {
   // The environment's optimizers are built for the full-range kernels
   if(omega==0.0)
-    return envp->get_opt(kernel);
+    return envp->opt(kernel);
 
   // The attenuated kernels need an optimizer of their own, built with
   // the range separation constant in place. The environment data array
   // already carries it when this is called.
   if(!sr_opts[kernel]) {
     CINTOpt * o=nullptr;
-    optimizer_function(kernel)(&o, envp->get_atm(), envp->get_natm(), envp->get_bas(), envp->get_nbas(), env.data());
+    optimizer_function(kernel)(&o, envp->atm(), envp->natm(), envp->bas(), envp->nbas(), env.data());
     sr_opts[kernel]=(void *) o;
   }
   return sr_opts[kernel];
@@ -177,10 +177,10 @@ void IntegralWorker::evaluate(cint_kernel_t kernel, int nsh, const int * shls_in
   auto evaluate_omega=[&](double omega, std::vector<double> & buf) {
     env[PTR_RANGE_OMEGA]=omega;
     CINTOpt * opt=(CINTOpt *) get_opt(kernel,omega);
-    const size_t csize=intor(NULL,NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_bas(),envp->get_nbas(),env.data(),NULL,NULL);
+    const size_t csize=intor(NULL,NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),NULL,NULL);
     if(csize>cache.size())
       cache.resize(csize);
-    if(!intor(buf.data(),NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_bas(),envp->get_nbas(),env.data(),opt,cache.data()))
+    if(!intor(buf.data(),NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),opt,cache.data()))
       std::fill(buf.begin(),buf.end(),0.0);
   };
 
@@ -210,7 +210,7 @@ void IntegralWorker::normalize(const size_t * shls, int nsh, int ncomp, std::vec
   size_t Nbf[4], stride[4];
   size_t N=1;
   for(int i=nsh-1;i>=0;i--) {
-    Nbf[i]=envp->get_Nbf(shls[i]);
+    Nbf[i]=envp->Nbf(shls[i]);
     stride[i]=N;
     N*=Nbf[i];
   }
@@ -218,7 +218,7 @@ void IntegralWorker::normalize(const size_t * shls, int nsh, int ncomp, std::vec
   for(size_t idx=0;idx<N;idx++) {
     double norm=1.0;
     for(int i=0;i<nsh;i++)
-      norm*=envp->get_fnorm(shls[i])[(idx/stride[i])%Nbf[i]];
+      norm*=envp->fnorm(shls[i])[(idx/stride[i])%Nbf[i]];
     for(int ic=0;ic<ncomp;ic++)
       out[ic*N+idx]*=norm;
   }
@@ -254,7 +254,7 @@ void ERIWorker::compute(size_t is, size_t js, size_t ks, size_t ls) {
   // (lk|ji), which by the permutational symmetry of the integrals is the
   // same integral, gives the result directly in ERKALE's layout.
   const int shls[4]={(int) ls, (int) ks, (int) js, (int) is};
-  const size_t N=envp->get_Nbf(is)*envp->get_Nbf(js)*envp->get_Nbf(ks)*envp->get_Nbf(ls);
+  const size_t N=envp->Nbf(is)*envp->Nbf(js)*envp->Nbf(ks)*envp->Nbf(ls);
 
   evaluate(CINT_ERI,4,shls,1,N,ints);
 
@@ -264,7 +264,7 @@ void ERIWorker::compute(size_t is, size_t js, size_t ks, size_t ls) {
 
 void ERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
   const int shls[3]={(int) is, (int) js, (int) ks};
-  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js), Nk=envp->get_Nbf(ks);
+  const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js), Nk=envp->Nbf(ks);
 
   evaluate(CINT_3C2E,3,shls,1,Ni*Nj*Nk,tmp);
   remap_3c(tmp,1,Ni,Nj,Nk,ints);
@@ -275,7 +275,7 @@ void ERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
 
 void ERIWorker::compute_2c(size_t is, size_t js) {
   const int shls[2]={(int) js, (int) is};
-  const size_t N=envp->get_Nbf(is)*envp->get_Nbf(js);
+  const size_t N=envp->Nbf(is)*envp->Nbf(js);
 
   evaluate(CINT_2C2E,2,shls,1,N,ints);
 
@@ -284,10 +284,10 @@ void ERIWorker::compute_2c(size_t is, size_t js) {
 }
 
 void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
-  const GaussianShell & shi=envp->get_shell(is);
-  const GaussianShell & shj=envp->get_shell(js);
-  const GaussianShell & shk=envp->get_shell(ks);
-  const GaussianShell & shl=envp->get_shell(ls);
+  const GaussianShell & shi=envp->shell(is);
+  const GaussianShell & shj=envp->shell(js);
+  const GaussianShell & shk=envp->shell(ks);
+  const GaussianShell & shl=envp->shell(ls);
   const GaussianShell * shs[4]={&shi, &shj, &shk, &shl};
 
   const std::vector<shellf_t> & ci=shi.get_cart_ref();
@@ -305,7 +305,7 @@ void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
   size_t Ncart[4], Nbf[4], Nlm[4];
   for(int q=0;q<4;q++) {
     Ncart[q]=shs[q]->get_Ncart();
-    Nbf[q]=envp->get_Nbf(q==0 ? is : (q==1 ? js : (q==2 ? ks : ls)));
+    Nbf[q]=envp->Nbf(q==0 ? is : (q==1 ? js : (q==2 ? ks : ls)));
     Nlm[q]=Nbf[q]/nctr[q];
   }
 
@@ -411,7 +411,7 @@ dERIWorker::~dERIWorker() {
 }
 
 void dERIWorker::compute(size_t is, size_t js, size_t ks, size_t ls) {
-  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js), Nk=envp->get_Nbf(ks), Nl=envp->get_Nbf(ls);
+  const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js), Nk=envp->Nbf(ks), Nl=envp->Nbf(ls);
   N=Ni*Nj*Nk*Nl;
   nsh=4;
   dR.assign(12*N,0.0);
@@ -454,7 +454,7 @@ void dERIWorker::compute(size_t is, size_t js, size_t ks, size_t ls) {
 }
 
 void dERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
-  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js), Nk=envp->get_Nbf(ks);
+  const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js), Nk=envp->Nbf(ks);
   N=Ni*Nj*Nk;
   nsh=3;
   dR.assign(9*N,0.0);
@@ -481,7 +481,7 @@ void dERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
 }
 
 void dERIWorker::compute_2c(size_t is, size_t js) {
-  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js);
+  const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js);
   N=Ni*Nj;
   nsh=2;
   dR.assign(6*N,0.0);
@@ -548,17 +548,17 @@ void Int1eWorker::compute(cint_1e_kernel_t kernel, size_t is, size_t js,
     for(int i=0;i<3;i++)
       env[PTR_COMMON_ORIG+i]=common_orig[i];
 
-  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js);
+  const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js);
   const size_t N=Ni*Nj;
 
   // The one-electron integrals are cheap, so they are evaluated without
   // an optimizer
   int shls[2]={(int) is, (int) js};
   tmp.resize(ncomp*N);
-  const size_t csize=intor(NULL,NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_bas(),envp->get_nbas(),env.data(),NULL,NULL);
+  const size_t csize=intor(NULL,NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),NULL,NULL);
   if(csize>cache.size())
     cache.resize(csize);
-  if(!intor(tmp.data(),NULL,shls,envp->get_atm(),envp->get_natm(),envp->get_bas(),envp->get_nbas(),env.data(),NULL,cache.data()))
+  if(!intor(tmp.data(),NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),NULL,cache.data()))
     std::fill(tmp.begin(),tmp.end(),0.0);
 
   // libcint runs the first shell fastest; ERKALE runs the last index
@@ -581,7 +581,7 @@ const std::vector<double> * Int1eWorker::getp() const {
 }
 
 arma::mat Int1eWorker::get_mat(int ic, size_t is, size_t js) const {
-  const size_t Ni=envp->get_Nbf(is), Nj=envp->get_Nbf(js);
+  const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js);
   arma::mat M(Ni,Nj);
   const double * ip=ints.data()+ic*Ni*Nj;
   for(size_t i=0;i<Ni;i++)

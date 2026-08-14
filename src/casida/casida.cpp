@@ -531,7 +531,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   // Dummy shell, helper for computing ERIs
   // libcint environment: orbital shells followed by the auxiliary ones
   CintEnv cenv(basis,dfitbas);
-  const size_t Nsh_orb=cenv.get_Nsh_orb();
+  const size_t Nsh_orb=cenv.Nsh_orb();
 
   // First, compute the two-center integrals
   arma::mat ab(Naux,Naux);

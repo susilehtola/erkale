@@ -82,7 +82,7 @@ int cint_1e_ncomp(cint_1e_kernel_t kernel);
  *
  * Shells are numbered as in the source basis set; in the two-basis
  * constructor the auxiliary shells follow the orbital shells, so
- * auxiliary shell i is shell get_Nsh_orb() + i.
+ * auxiliary shell i is shell Nsh_orb() + i.
  *
  * The contraction coefficients are stored in libcint's convention
  * (normalized primitives), so the integrals come out over normalized
@@ -96,11 +96,11 @@ int cint_1e_ncomp(cint_1e_kernel_t kernel);
  */
 class CintEnv {
   /// libcint atom table
-  std::vector<int> cint_atm;
+  std::vector<int> cint_atm_;
   /// libcint shell table
-  std::vector<int> cint_bas;
+  std::vector<int> cint_bas_;
   /// libcint data array: coordinates, exponents, contraction coefficients
-  std::vector<double> cint_env;
+  std::vector<double> cint_env_;
 
   /// Integral optimizers, one per kernel. They cache the primitive pair
   /// data and are read-only during integral evaluation, so copies of an
@@ -111,22 +111,22 @@ class CintEnv {
     std::vector<void *> opts;
     ~OptSet();
   };
-  std::shared_ptr<OptSet> opts;
+  std::shared_ptr<OptSet> opts_;
 
   /// Number of shells in the orbital basis
-  size_t Nsh_orb;
+  size_t Nsh_orb_;
   /// Number of functions in each shell
-  std::vector<size_t> shell_Nbf;
+  std::vector<size_t> shell_Nbf_;
   /// Index of the first function of each shell
-  std::vector<size_t> shell_first;
+  std::vector<size_t> shell_first_;
   /// Maximum number of functions in a shell
-  size_t max_Nbf;
+  size_t max_Nbf_;
 
   /// The shells themselves
-  std::vector<GaussianShell> shells;
+  std::vector<GaussianShell> shells_;
 
   /// Are the integrals evaluated in the spherical harmonics basis?
-  bool lm;
+  bool lm_;
   /// Normalization of each function of each shell, relative to
   /// libcint's convention: ERKALE scales its basis functions with the
   /// per-function relnorm factors, which the Coulomb normalization used
@@ -134,9 +134,9 @@ class CintEnv {
   /// normalizes the shell internally. The factors are measured against
   /// ERKALE's own overlap integrals when the environment is built, so
   /// the environment must be built from a finalized basis set.
-  std::vector<std::vector<double>> fnorm;
+  std::vector<std::vector<double>> fnorm_;
   /// Are all the normalization factors unity?
-  bool unit_norm;
+  bool unit_norm_;
 
   /// Fill the tables from a list of shells
   void build(const std::vector<GaussianShell> & shells, size_t Nsh_orbital, bool build_opts);
@@ -152,44 +152,44 @@ class CintEnv {
   explicit CintEnv(const std::vector<GaussianShell> & shells, bool build_opts=true);
   /// Construct for an explicit list of shells, of which the first
   /// Nsh_orbital are the orbital shells and the rest auxiliary: the
-  /// auxiliary shells are then addressed as get_Nsh_orb() + i
+  /// auxiliary shells are then addressed as Nsh_orb() + i
   CintEnv(const std::vector<GaussianShell> & shells, size_t Nsh_orbital, bool build_opts=true);
 
   /// Is the environment initialized?
   bool is_filled() const;
 
   /// Number of shells
-  size_t get_Nsh() const;
+  size_t Nsh() const;
   /// The ish'th shell
-  const GaussianShell & get_shell(size_t ish) const;
+  const GaussianShell & shell(size_t ish) const;
   /// Number of shells in the orbital basis (the rest are auxiliary)
-  size_t get_Nsh_orb() const;
+  size_t Nsh_orb() const;
   /// Number of functions in shell ish
-  size_t get_Nbf(size_t ish) const;
+  size_t Nbf(size_t ish) const;
   /// Index of the first function of shell ish
-  size_t get_first_ind(size_t ish) const;
+  size_t first_ind(size_t ish) const;
   /// Maximum number of functions in a shell
-  size_t get_max_Nbf() const;
+  size_t max_Nbf() const;
   /// Are the integrals in the spherical harmonics basis?
   bool lm_in_use() const;
 
   /// Normalization factors of the functions of shell ish, relative to
   /// libcint's convention
-  const std::vector<double> & get_fnorm(size_t ish) const;
+  const std::vector<double> & fnorm(size_t ish) const;
   /// Are all the normalization factors unity, i.e. can the scaling be skipped?
   bool has_unit_norm() const;
 
   /// libcint tables. The tables are logically const during integral
   /// evaluation, but libcint's interface takes non-const pointers.
-  int * get_atm() const;
-  int get_natm() const;
-  int * get_bas() const;
-  int get_nbas() const;
+  int * atm() const;
+  int natm() const;
+  int * bas() const;
+  int nbas() const;
   /// The data array, to be copied by the worker that evaluates integrals
-  const std::vector<double> & get_env() const;
+  const std::vector<double> & env() const;
 
   /// Integral optimizer for the given kernel (a libcint CINTOpt *)
-  void * get_opt(cint_kernel_t kernel) const;
+  void * opt(cint_kernel_t kernel) const;
 
 };
 

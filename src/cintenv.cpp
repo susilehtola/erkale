@@ -65,7 +65,7 @@ int cint_1e_ncomp(cint_1e_kernel_t kernel) {
   }
 }
 
-CintEnv::CintEnv() : Nsh_orb(0), max_Nbf(0), lm(true) {
+CintEnv::CintEnv() : Nsh_orb_(0), max_Nbf_(0), lm_(true) {
 }
 
 CintEnv::CintEnv(const BasisSet & basis, bool build_opts) {
@@ -99,10 +99,10 @@ CintEnv::OptSet::~OptSet() {
 }
 
 void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, bool build_opts) {
-  Nsh_orb=Nsh_orbital;
-  shells=sh;
+  Nsh_orb_=Nsh_orbital;
+  shells_=sh;
 
-  if(!shells.size())
+  if(!shells_.size())
     throw std::logic_error("CintEnv: no shells to build an environment for!\n");
 
   // ERKALE's optlm keeps the s and p shells cartesian even when the rest
@@ -111,10 +111,10 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   // spherical kernels. Only shells with l >= 2 decide the mode, and they
   // all have to agree.
   bool have_lm=false, have_cart=false;
-  for(size_t is=0;is<shells.size();is++) {
-    if(shells[is].get_am()<2)
+  for(size_t is=0;is<shells_.size();is++) {
+    if(shells_[is].get_am()<2)
       continue;
-    if(shells[is].lm_in_use())
+    if(shells_[is].lm_in_use())
       have_lm=true;
     else
       have_cart=true;
@@ -123,13 +123,13 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     throw std::runtime_error("CintEnv: the basis mixes spherical and cartesian shells of l >= 2, which libcint cannot evaluate in a single call.\n");
   // A basis of only s and p shells is the same either way; use the
   // spherical kernels, as they are what the rest of ERKALE defaults to.
-  lm=!have_cart;
+  lm_=!have_cart;
 
   // Collect the distinct centers
   std::vector<coords_t> centers;
-  std::vector<size_t> shell_center(shells.size());
-  for(size_t is=0;is<shells.size();is++) {
-    const coords_t cen=shells[is].get_center();
+  std::vector<size_t> shell_center(shells_.size());
+  for(size_t is=0;is<shells_.size();is++) {
+    const coords_t cen=shells_[is].get_center();
     size_t icen;
     for(icen=0;icen<centers.size();icen++)
       if(centers[icen]==cen)
@@ -140,61 +140,61 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   }
 
   // Fill the tables
-  cint_atm.assign(ATM_SLOTS*centers.size(), 0);
-  cint_bas.assign(BAS_SLOTS*shells.size(), 0);
-  cint_env.assign(PTR_ENV_START, 0.0);
+  cint_atm_.assign(ATM_SLOTS*centers.size(), 0);
+  cint_bas_.assign(BAS_SLOTS*shells_.size(), 0);
+  cint_env_.assign(PTR_ENV_START, 0.0);
 
   for(size_t icen=0;icen<centers.size();icen++) {
-    cint_atm[icen*ATM_SLOTS+CHARGE_OF]=0;
-    cint_atm[icen*ATM_SLOTS+NUC_MOD_OF]=POINT_NUC;
-    cint_atm[icen*ATM_SLOTS+PTR_COORD]=(int) cint_env.size();
-    cint_env.push_back(centers[icen].x);
-    cint_env.push_back(centers[icen].y);
-    cint_env.push_back(centers[icen].z);
+    cint_atm_[icen*ATM_SLOTS+CHARGE_OF]=0;
+    cint_atm_[icen*ATM_SLOTS+NUC_MOD_OF]=POINT_NUC;
+    cint_atm_[icen*ATM_SLOTS+PTR_COORD]=(int) cint_env_.size();
+    cint_env_.push_back(centers[icen].x);
+    cint_env_.push_back(centers[icen].y);
+    cint_env_.push_back(centers[icen].z);
   }
 
-  shell_Nbf.resize(shells.size());
-  shell_first.resize(shells.size());
-  fnorm.resize(shells.size());
-  max_Nbf=0;
+  shell_Nbf_.resize(shells_.size());
+  shell_first_.resize(shells_.size());
+  fnorm_.resize(shells_.size());
+  max_Nbf_=0;
 
   size_t ibf=0;
-  for(size_t is=0;is<shells.size();is++) {
-    const GaussianShell & sh=shells[is];
+  for(size_t is=0;is<shells_.size();is++) {
+    const GaussianShell & sh=shells_[is];
     const int l=sh.get_am();
     const size_t nprim=sh.get_Ncontr();
     const size_t nctr=sh.get_Nctr();
 
-    cint_bas[is*BAS_SLOTS+ATOM_OF]=(int) shell_center[is];
-    cint_bas[is*BAS_SLOTS+ANG_OF]=l;
-    cint_bas[is*BAS_SLOTS+NPRIM_OF]=(int) nprim;
-    cint_bas[is*BAS_SLOTS+NCTR_OF]=(int) nctr;
-    cint_bas[is*BAS_SLOTS+KAPPA_OF]=0;
+    cint_bas_[is*BAS_SLOTS+ATOM_OF]=(int) shell_center[is];
+    cint_bas_[is*BAS_SLOTS+ANG_OF]=l;
+    cint_bas_[is*BAS_SLOTS+NPRIM_OF]=(int) nprim;
+    cint_bas_[is*BAS_SLOTS+NCTR_OF]=(int) nctr;
+    cint_bas_[is*BAS_SLOTS+KAPPA_OF]=0;
 
     // Shared primitive exponents
-    cint_bas[is*BAS_SLOTS+PTR_EXP]=(int) cint_env.size();
+    cint_bas_[is*BAS_SLOTS+PTR_EXP]=(int) cint_env_.size();
     {
       const std::vector<contr_t> c0=sh.get_contr_normalized(0);
       for(size_t ip=0;ip<nprim;ip++)
-        cint_env.push_back(c0[ip].z);
+        cint_env_.push_back(c0[ip].z);
     }
 
     // The coefficient columns, one contraction after the other, each
     // over normalized primitives (libcint contracts normalized primitives)
-    cint_bas[is*BAS_SLOTS+PTR_COEFF]=(int) cint_env.size();
+    cint_bas_[is*BAS_SLOTS+PTR_COEFF]=(int) cint_env_.size();
     for(size_t ic=0;ic<nctr;ic++) {
       const std::vector<contr_t> cc=sh.get_contr_normalized(ic);
       for(size_t ip=0;ip<nprim;ip++)
-        cint_env.push_back(cc[ip].c*CINTgto_norm(l,cc[ip].z));
+        cint_env_.push_back(cc[ip].c*CINTgto_norm(l,cc[ip].z));
     }
 
     // Number of functions: nctr angular blocks. Spherical mode
     // evaluates every shell in the spherical basis (s and p coincide
     // with the cartesian ones).
-    shell_Nbf[is]= nctr * (lm ? (size_t) (2*l+1) : (size_t) ((l+1)*(l+2)/2));
-    shell_first[is]=ibf;
-    ibf+=shell_Nbf[is];
-    max_Nbf=std::max(max_Nbf,shell_Nbf[is]);
+    shell_Nbf_[is]= nctr * (lm_ ? (size_t) (2*l+1) : (size_t) ((l+1)*(l+2)/2));
+    shell_first_[is]=ibf;
+    ibf+=shell_Nbf_[is];
+    max_Nbf_=std::max(max_Nbf_,shell_Nbf_[is]);
   }
 
   // Measure the normalization of the basis functions against ERKALE's:
@@ -204,19 +204,19 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   // were built. ERKALE's norms are evaluated in closed form here rather
   // than with the overlap integrals of BasisSet, which are themselves
   // evaluated through an environment.
-  CINTIntegralFunction * ovlp = lm ? int1e_ovlp_sph : int1e_ovlp_cart;
-  unit_norm=true;
+  CINTIntegralFunction * ovlp = lm_ ? int1e_ovlp_sph : int1e_ovlp_cart;
+  unit_norm_=true;
   std::vector<double> buf;
-  for(size_t is=0;is<shells.size();is++) {
-    const size_t Nbf=shell_Nbf[is];
-    fnorm[is].assign(Nbf,1.0);
+  for(size_t is=0;is<shells_.size();is++) {
+    const size_t Nbf=shell_Nbf_[is];
+    fnorm_[is].assign(Nbf,1.0);
 
     int shls[2]={(int) is, (int) is};
     buf.resize(Nbf*Nbf);
-    if(!ovlp(buf.data(),NULL,shls,cint_atm.data(),(int) centers.size(),cint_bas.data(),(int) shells.size(),cint_env.data(),NULL,NULL))
+    if(!ovlp(buf.data(),NULL,shls,cint_atm_.data(),(int) centers.size(),cint_bas_.data(),(int) shells_.size(),cint_env_.data(),NULL,NULL))
       throw std::runtime_error("CintEnv: failed to evaluate the self-overlap of a shell.\n");
 
-    const arma::vec Serk=shells[is].function_norms();
+    const arma::vec Serk=shells_[is].function_norms();
     if(Serk.n_elem != Nbf)
       throw std::logic_error("CintEnv: the shell has an unexpected number of functions.\n");
 
@@ -224,9 +224,9 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
       const double scint=buf[i*Nbf+i];
       if(scint<=0.0)
         throw std::runtime_error("CintEnv: a basis function has a non-positive norm.\n");
-      fnorm[is][i]=sqrt(Serk(i)/scint);
-      if(std::abs(fnorm[is][i]-1.0)>1e-12)
-        unit_norm=false;
+      fnorm_[is][i]=sqrt(Serk(i)/scint);
+      if(std::abs(fnorm_[is][i]-1.0)>1e-12)
+        unit_norm_=false;
     }
   }
 
@@ -235,13 +235,13 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   if(!build_opts)
     return;
 
-  opts=std::make_shared<OptSet>();
-  opts->opts.assign(CINT_NKERNEL, nullptr);
-  int * atmp=cint_atm.data();
-  int * basp=cint_bas.data();
-  double * envp=cint_env.data();
+  opts_=std::make_shared<OptSet>();
+  opts_->opts.assign(CINT_NKERNEL, nullptr);
+  int * atmp=cint_atm_.data();
+  int * basp=cint_bas_.data();
+  double * envp=cint_env_.data();
   const int natm=(int) centers.size();
-  const int nbas=(int) shells.size();
+  const int nbas=(int) shells_.size();
 
   CINTOptimizerFunction * const optfun[CINT_NKERNEL]={
     int2e_optimizer, int2e_ip1_optimizer, int2e_ip2_optimizer,
@@ -250,72 +250,72 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   for(int ik=0;ik<CINT_NKERNEL;ik++) {
     CINTOpt * o=nullptr;
     optfun[ik](&o, atmp, natm, basp, nbas, envp);
-    opts->opts[ik]=(void *) o;
+    opts_->opts[ik]=(void *) o;
   }
 }
 
 bool CintEnv::is_filled() const {
-  return cint_bas.size()!=0;
+  return cint_bas_.size()!=0;
 }
 
-size_t CintEnv::get_Nsh() const {
-  return shell_Nbf.size();
+size_t CintEnv::Nsh() const {
+  return shell_Nbf_.size();
 }
 
-const GaussianShell & CintEnv::get_shell(size_t ish) const {
-  return shells[ish];
+const GaussianShell & CintEnv::shell(size_t ish) const {
+  return shells_[ish];
 }
 
-size_t CintEnv::get_Nsh_orb() const {
-  return Nsh_orb;
+size_t CintEnv::Nsh_orb() const {
+  return Nsh_orb_;
 }
 
-size_t CintEnv::get_Nbf(size_t ish) const {
-  return shell_Nbf[ish];
+size_t CintEnv::Nbf(size_t ish) const {
+  return shell_Nbf_[ish];
 }
 
-size_t CintEnv::get_first_ind(size_t ish) const {
-  return shell_first[ish];
+size_t CintEnv::first_ind(size_t ish) const {
+  return shell_first_[ish];
 }
 
-size_t CintEnv::get_max_Nbf() const {
-  return max_Nbf;
+size_t CintEnv::max_Nbf() const {
+  return max_Nbf_;
 }
 
 bool CintEnv::lm_in_use() const {
-  return lm;
+  return lm_;
 }
 
-const std::vector<double> & CintEnv::get_fnorm(size_t ish) const {
-  return fnorm[ish];
+const std::vector<double> & CintEnv::fnorm(size_t ish) const {
+  return fnorm_[ish];
 }
 
 bool CintEnv::has_unit_norm() const {
-  return unit_norm;
+  return unit_norm_;
 }
 
-int * CintEnv::get_atm() const {
-  return const_cast<int *>(cint_atm.data());
+int * CintEnv::atm() const {
+  return const_cast<int *>(cint_atm_.data());
 }
 
-int CintEnv::get_natm() const {
-  return (int) (cint_atm.size()/ATM_SLOTS);
+int CintEnv::natm() const {
+  return (int) (cint_atm_.size()/ATM_SLOTS);
 }
 
-int * CintEnv::get_bas() const {
-  return const_cast<int *>(cint_bas.data());
+int * CintEnv::bas() const {
+  return const_cast<int *>(cint_bas_.data());
 }
 
-int CintEnv::get_nbas() const {
-  return (int) (cint_bas.size()/BAS_SLOTS);
+int CintEnv::nbas() const {
+  return (int) (cint_bas_.size()/BAS_SLOTS);
 }
 
-const std::vector<double> & CintEnv::get_env() const {
-  return cint_env;
+const std::vector<double> & CintEnv::env() const {
+  return cint_env_;
 }
 
-void * CintEnv::get_opt(cint_kernel_t kernel) const {
+void * CintEnv::opt(cint_kernel_t kernel) const {
   // An environment built without the optimizers passes NULL, which
   // libcint accepts (at the cost of recomputing the pair data)
-  return opts ? opts->opts[kernel] : nullptr;
+  return opts_ ? opts_->opts[kernel] : nullptr;
 }
