@@ -326,7 +326,7 @@ void AngularGrid::hirshfeld_weights(const Hirshfeld & hirsh) {
   // Compute weights of points.
   for(size_t ip=0;ip<grid.size();ip++)
     // The Hirshfeld weight is
-    grid[ip].w*=hirsh.get_weight(info.atind,grid[ip].r);
+    grid[ip].w*=hirsh.weight(info.atind,grid[ip].r);
 }
 
 void AngularGrid::prune_points() {
