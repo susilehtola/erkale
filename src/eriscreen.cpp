@@ -113,9 +113,9 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
 
   // Shell-pair list
   ScreeningData s = basp->compute_screening(shtol,omega_,alpha_,beta_,verbose);
-  Q_ = std::move(s.Q_);
-  M_ = std::move(s.M_);
-  shpairs_ = std::move(s.shpairs_);
+  Q_ = std::move(s.Q);
+  M_ = std::move(s.M);
+  shpairs_ = std::move(s.shpairs);
 
   // Worker pools are tied to (basis, omega_/alpha_/beta_). Basis just
   // changed, so reset; size to omp_get_max_threads() so threads can
