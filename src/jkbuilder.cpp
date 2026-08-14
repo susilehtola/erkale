@@ -276,7 +276,7 @@ class JKBackend {
       }
     }
     void init_rs(double omega) override {
-      const bool fill = !tab_rs.get_N() || tab_rs.get_range_separation().omega != omega;
+      const bool fill = !tab_rs.N() || tab_rs.range_separation().omega != omega;
       if(!fill) return;
       Timer t;
       if(verbose) { printf("Computing short-range repulsion integrals ... "); fflush(stdout); }

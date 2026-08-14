@@ -36,74 +36,74 @@
 
 
 ERItable::ERItable() {
-  omega=0.0;
-  alpha=1.0;
-  beta=0.0;
+  omega_=0.0;
+  alpha_=1.0;
+  beta_=0.0;
 }
 
 ERItable::~ERItable() {
 }
 
 void ERItable::set_range_separation(double w, double a, double b) {
-  omega=w;
-  alpha=a;
-  beta=b;
+  omega_=w;
+  alpha_=a;
+  beta_=b;
 }
 
-void ERItable::get_range_separation(double & w, double & a, double & b) const {
-  w=omega;
-  a=alpha;
-  b=beta;
+void ERItable::range_separation(double & w, double & a, double & b) const {
+  w=omega_;
+  a=alpha_;
+  b=beta_;
 }
 
 size_t ERItable::N_ints(const BasisSet * basp, double thr) {
   // Get ERI pairs
-  ScreeningData s = basp->compute_screening(thr, omega, alpha, beta);
-  Q = std::move(s.Q);
-  M = std::move(s.M);
-  shpairs = std::move(s.shpairs);
+  ScreeningData s = basp->compute_screening(thr, omega_, alpha_, beta_);
+  Q_ = std::move(s.Q_);
+  M_ = std::move(s.M_);
+  shpairs_ = std::move(s.shpairs_);
 
   // Form offset table and calculate amount of integrals
   size_t N=0;
-  shoff.resize(shpairs.size());
+  shoff_.resize(shpairs_.size());
 
-  shoff[0]=0;
-  for(size_t ip=0;ip<shpairs.size()-1;ip++) {
-    size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+  shoff_[0]=0;
+  for(size_t ip=0;ip<shpairs_.size()-1;ip++) {
+    size_t Nij=shpairs_[ip].Ni*shpairs_[ip].Nj;
     for(size_t jp=0;jp<=ip;jp++) {
-      N+=Nij*shpairs[jp].Ni*shpairs[jp].Nj;
+      N+=Nij*shpairs_[jp].Ni*shpairs_[jp].Nj;
     }
-    shoff[ip+1]=N;
+    shoff_[ip+1]=N;
   }
 
   // Contribution from last shell (no importance to offset)
-  size_t ip=shpairs.size()-1;
-  size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+  size_t ip=shpairs_.size()-1;
+  size_t Nij=shpairs_[ip].Ni*shpairs_[ip].Nj;
   for(size_t jp=0;jp<=ip;jp++) {
-    N+=Nij*shpairs[jp].Ni*shpairs[jp].Nj;
+    N+=Nij*shpairs_[jp].Ni*shpairs_[jp].Nj;
   }
 
   return N;
 }
 
-size_t ERItable::get_N() const {
-  return ints.size();
+size_t ERItable::N() const {
+  return ints_.size();
 }
 
 size_t ERItable::offset(size_t ip, size_t jp) const {
   // Calculate offset in integrals table
-  size_t ioff(shoff[ip]);
-  size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+  size_t ioff(shoff_[ip]);
+  size_t Nij=shpairs_[ip].Ni*shpairs_[ip].Nj;
   for(size_t jj=0;jj<jp;jj++)
-    ioff+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
+    ioff+=Nij*shpairs_[jj].Ni*shpairs_[jj].Nj;
 
   return ioff;
 }
 
 arma::mat ERItable::calcJ(const arma::mat & P) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERItable: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERItable: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -120,10 +120,10 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shpairs.size();ip++)
+    for(size_t ip=0;ip<shpairs_.size();ip++)
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++)
-	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
+	dig.digest(shpairs_,ip,jp,ints_,offset(ip,jp));
 
 #ifdef _OPENMP
 #pragma omp critical
@@ -135,9 +135,9 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 }
 
 arma::mat ERItable::calcK(const arma::mat & P) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERItable: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERItable: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -154,10 +154,10 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shpairs.size();ip++)
+    for(size_t ip=0;ip<shpairs_.size();ip++)
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++)
-	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
+	dig.digest(shpairs_,ip,jp,ints_,offset(ip,jp));
 
 #ifdef _OPENMP
 #pragma omp critical
@@ -169,9 +169,9 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 }
 
 arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+  if(P.n_rows != Nbf_ || P.n_cols != Nbf_) {
     std::ostringstream oss;
-    oss << "Error in ERItable: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    oss << "Error in ERItable: Nbf = " << Nbf_ << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
 
@@ -188,10 +188,10 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shpairs.size();ip++)
+    for(size_t ip=0;ip<shpairs_.size();ip++)
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++)
-	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
+	dig.digest(shpairs_,ip,jp,ints_,offset(ip,jp));
 
 #ifdef _OPENMP
 #pragma omp critical
@@ -203,7 +203,7 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 }
 
 size_t ERItable::fill(const BasisSet * basp, double tol) {
-  Nbf=basp->get_Nbf();
+  Nbf_=basp->get_Nbf();
 
   // libcint description of the basis, shared by the workers
   CintEnv cenv(*basp);
@@ -222,7 +222,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
   }
 
   try {
-    ints.assign(N,0.0);
+    ints_.assign(N,0.0);
   } catch(std::bad_alloc &) {
     std::ostringstream oss;
 
@@ -232,14 +232,14 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
   }
 
   // Get number of shell pairs
-  const size_t Npairs=shpairs.size();
+  const size_t Npairs=shpairs_.size();
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif // ifdef _OPENMP
   {
     // ERI worker
-    auto eri = make_eri_worker(cenv, omega, alpha, beta);
+    auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
 
     // Integral array
     const std::vector<double> * erip;
@@ -251,28 +251,28 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++) {
 	// Shells on first pair
-	size_t is=shpairs[ip].is;
-	size_t js=shpairs[ip].js;
+	size_t is=shpairs_[ip].is;
+	size_t js=shpairs_[ip].js;
 	// and those on the second pair
-	size_t ks=shpairs[jp].is;
-	size_t ls=shpairs[jp].js;
+	size_t ks=shpairs_[jp].is;
+	size_t ls=shpairs_[jp].js;
 
 	// Amount of functions on the first pair
-	size_t Ni=shpairs[ip].Ni;
-	size_t Nj=shpairs[ip].Nj;
+	size_t Ni=shpairs_[ip].Ni;
+	size_t Nj=shpairs_[ip].Nj;
 	// and on the second
-	size_t Nk=shpairs[jp].Ni;
-	size_t Nl=shpairs[jp].Nj;
+	size_t Nk=shpairs_[jp].Ni;
+	size_t Nl=shpairs_[jp].Nj;
 	// Amount of integrals is
 	size_t Nints=Ni*Nj*Nk*Nl;
 
 	// Initialize table
 	size_t ioff(offset(ip,jp));
 	for(size_t i=0;i<Nints;i++)
-	  ints[ioff+i]=0.0;
+	  ints_[ioff+i]=0.0;
 
         // Schwarz screening estimate
-        double QQ=Q(is,js)*Q(ks,ls);
+        double QQ=Q_(is,js)*Q_(ks,ls);
         if(QQ<tol) {
           // Skip due to small value of integral. Because the
           // integrals have been ordered wrt Q, all the next ones
@@ -281,8 +281,8 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
         }
 
         // Distance screening estimate
-        double MM1=M(is,ks)*M(js,ls);
-        double MM2=M(is,ls)*M(js,ks);
+        double MM1=M_(is,ks)*M_(js,ls);
+        double MM2=M_(is,ls)*M_(js,ks);
         if(MM1<tol || MM2<tol) {
           // This pair is negligible
           continue;
@@ -294,10 +294,10 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 
 	// Store integrals
 	for(size_t ii=0;ii<Nints;ii++)
-	  ints[ioff+ii]=(*erip)[ii];
+	  ints_[ioff+ii]=(*erip)[ii];
       }
     }
   }
 
-  return shpairs.size();
+  return shpairs_.size();
 }

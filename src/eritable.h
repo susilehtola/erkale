@@ -44,23 +44,23 @@ class BasisSet;
 class ERItable {
  protected:
   /// Integral pairs sorted by value
-  std::vector<eripair_t> shpairs;
+  std::vector<eripair_t> shpairs_;
   /// Screening matrices
-  arma::mat Q, M;
+  arma::mat Q_, M_;
   /// Number of basis functions
-  size_t Nbf;
+  size_t Nbf_;
 
   /// Table of integrals
-  std::vector<double> ints;
+  std::vector<double> ints_;
   /// Offset lookup
-  std::vector<size_t> shoff;
+  std::vector<size_t> shoff_;
 
   /// Range separation parameter
-  double omega;
+  double omega_;
   /// Fraction of long-range (i.e. exact) exchange
-  double alpha;
+  double alpha_;
   /// Fraction of short-range exchange
-  double beta;
+  double beta_;
 
   /// Calculate offset in integrals table
   size_t offset(size_t ip, size_t jp) const;
@@ -75,8 +75,8 @@ class ERItable {
   void set_range_separation(double omega, double alpha, double beta);
   void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   /// Get range separation
-  void get_range_separation(double & omega, double & alpha, double & beta) const;
-  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
+  void range_separation(double & omega, double & alpha, double & beta) const;
+  RangeSeparation range_separation() const { RangeSeparation rs; range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /// Fill table, return amount of significant shell pairs
   size_t fill(const BasisSet * basis, double thr);
@@ -88,7 +88,7 @@ class ERItable {
   void print() const;
 
   /// Get size of ERI table
-  size_t get_N() const;
+  size_t N() const;
 
   /// Form Coulomb matrix
   arma::mat calcJ(const arma::mat & P) const;
