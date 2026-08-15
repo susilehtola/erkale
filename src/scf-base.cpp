@@ -1879,67 +1879,67 @@ void calculate(const BasisSet & basis, bool force) {
 	chkpt.cwrite("CW",sol.cC);
 
 	PZStability stab(&solver,verbose);
-	stab.set_method(dft,oodft,pzw,pzscale,pzscaleexp);
-	stab.set(sol);
+	stab.configure_method(dft,oodft,pzw,pzscale,pzscaleexp);
+	stab.set_reference(sol);
 
 	while(true) {
 	  double dEo=0.0, dEv=0.0;
 	  if(pzoo) {
 	    // First, optimize the OO transformations
-	    stab.set_params(true,pzimag==1,false,true);
+	    stab.configure_dof(true,pzimag==1,false,true);
 	    dEo=stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
-	    sol=stab.get_rsol();
+	    sol=stab.rsol();
 	  }
 	  if(pzov) {
 	    // Then the OV transformations
-	    stab.set_params(true,pzimag==1,true,false);
+	    stab.configure_dof(true,pzimag==1,true,false);
 	    dEv=stab.optimize(pzmax,pzOVthr,0.0,pzEthr,pzprec);
-	    sol=stab.get_rsol();
+	    sol=stab.rsol();
 	  }
 	  if(dEo!=0.0 || dEv!=0.0)
 	    continue;
 
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
-	    stab.set_params(true,pzimag==1,false,true);
+	    stab.configure_dof(true,pzimag==1,false,true);
 	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
-	      sol=stab.get_rsol();
+	      sol=stab.rsol();
 	      continue;
 	    }
 
 	    // Imaginary instability?
 	    if(pzimag==-1) {
-	      stab.set_params(false,true,false,true);
+	      stab.configure_dof(false,true,false,true);
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
 		if(pzov) {
-		  stab.set_params(false,true,true,false);
+		  stab.configure_dof(false,true,true,false);
 		  stab.optimize(pzmax,pzOVthr,pzNRthr,0.0,pzprec);
 		}
-		sol=stab.get_rsol();
+		sol=stab.rsol();
 		continue;
 	      }
 	    }
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
-	    stab.set_params(true,pzimag==1,pzov,pzoo);
+	    stab.configure_dof(true,pzimag==1,pzov,pzoo);
 	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
-	      sol=stab.get_rsol();
+	      sol=stab.rsol();
 	      continue;
 	    }
 
 	    // Imaginary instability?
 	    if(pzimag==-1) {
-	      stab.set_params(false,true,pzov,pzoo);
+	      stab.configure_dof(false,true,pzov,pzoo);
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
-		sol=stab.get_rsol();
+		sol=stab.rsol();
 		continue;
 	      }
 	    }
@@ -1950,12 +1950,12 @@ void calculate(const BasisSet & basis, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set_params(true,pzimag!=0,false,true);
+	  stab.configure_dof(true,pzimag!=0,false,true);
 	  stab.check();
 	}
 	if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set_params(true,pzimag!=0,pzov,pzoo);
+	  stab.configure_dof(true,pzimag!=0,pzov,pzoo);
 	  stab.check();
 	}
       }
@@ -2353,67 +2353,67 @@ void calculate(const BasisSet & basis, bool force) {
         }
 
 	PZStability stab(&solver,verbose);
-	stab.set_method(dft,oodft,pzw,pzscale,pzscaleexp);
-	stab.set(sol);
+	stab.configure_method(dft,oodft,pzw,pzscale,pzscaleexp);
+	stab.set_reference(sol);
 
 	while(true) {
 	  double dEo=0.0, dEv=0.0;
 	  if(pzoo) {
 	    // First, optimize the OO transformations
-	    stab.set_params(true,pzimag==1,false,true);
+	    stab.configure_dof(true,pzimag==1,false,true);
 	    dEo=stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
-	    sol=stab.get_usol();
+	    sol=stab.usol();
 	  }
 	  if(pzov) {
 	    // Then the OV transformations
-	    stab.set_params(true,pzimag==1,true,false);
+	    stab.configure_dof(true,pzimag==1,true,false);
 	    dEv=stab.optimize(pzmax,pzOVthr,0.0,pzEthr,pzprec);
-	    sol=stab.get_usol();
+	    sol=stab.usol();
 	  }
 	  if(dEo!=0.0 || dEv!=0.0)
 	    continue;
 
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
-	    stab.set_params(true,pzimag==1,false,true);
+	    stab.configure_dof(true,pzimag==1,false,true);
 	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
-	      sol=stab.get_usol();
+	      sol=stab.usol();
 	      continue;
 	    }
 
 	    // Imaginary instability?
 	    if(pzimag==-1) {
-	      stab.set_params(false,true,false,true);
+	      stab.configure_dof(false,true,false,true);
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
 		if(pzov) {
-		  stab.set_params(false,true,true,false);
+		  stab.configure_dof(false,true,true,false);
 		  stab.optimize(pzmax,pzOVthr,pzNRthr,0.0,pzprec);
 		}
-		sol=stab.get_usol();
+		sol=stab.usol();
 		continue;
 	      }
 	    }
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
-	    stab.set_params(true,pzimag==1,pzov,pzoo);
+	    stab.configure_dof(true,pzimag==1,pzov,pzoo);
 	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
-	      sol=stab.get_usol();
+	      sol=stab.usol();
 	      continue;
 	    }
 
 	    // Imaginary instability?
 	    if(pzimag==-1) {
-	      stab.set_params(false,true,pzov,pzoo);
+	      stab.configure_dof(false,true,pzov,pzoo);
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		stab.optimize(pzmax,pzOOthr,0.0,pzEthr,pzprec);
-		sol=stab.get_usol();
+		sol=stab.usol();
 		continue;
 	      }
 	    }
@@ -2424,12 +2424,12 @@ void calculate(const BasisSet & basis, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set_params(true,pzimag!=0,false,true);
+	  stab.configure_dof(true,pzimag!=0,false,true);
 	  stab.check();
 	}
 	else if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set_params(true,pzimag!=0,pzov,pzoo);
+	  stab.configure_dof(true,pzimag!=0,pzov,pzoo);
 	  stab.check();
 	}
 
