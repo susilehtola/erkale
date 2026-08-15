@@ -46,7 +46,7 @@ BaderGrid::~BaderGrid() {
 
 void BaderGrid::set(const BasisSet & basis, bool ver, bool lobatto) {
   wrk=AngularGrid(lobatto);
-  wrk.set_basis(basis);
+  wrk.basis(basis);
   basp=&basis;
   // Only need function values
   wrk.set_grad_tau_lapl(false,false,false);
@@ -111,13 +111,13 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
   size_t oldatom=-1;
   for(size_t ig=0;ig<grids.size();ig++) {
     // Construct the shell
-    wrk.set_grid(grids[ig]);
+    wrk.set_shell(grids[ig]);
     grids[ig]=wrk.construct_becke(otoler/nrad[grids[ig].atind]);
     // Form the grid again
     wrk.form_grid();
 
     // Extract the points on the shell
-    std::vector<gridpoint_t> shellpoints(wrk.get_grid());
+    std::vector<gridpoint_t> shellpoints(wrk.grid());
     if(!shellpoints.size())
       continue;
 
@@ -286,13 +286,13 @@ void BaderGrid::construct_voronoi(double otoler) {
 
   for(size_t ig=0;ig<grids.size();ig++) {
     // Construct the shell
-    wrk.set_grid(grids[ig]);
+    wrk.set_shell(grids[ig]);
     grids[ig]=wrk.construct_becke(otoler/nrad[grids[ig].atind]);
     // Form the grid again
     wrk.form_grid();
 
     // Extract the points on the shell
-    std::vector<gridpoint_t> shellpoints(wrk.get_grid());
+    std::vector<gridpoint_t> shellpoints(wrk.grid());
 
     // Loop over the points on the shell
     for(size_t ip=0;ip<shellpoints.size();ip++) {
@@ -375,7 +375,7 @@ arma::mat BaderGrid::regional_overlap(size_t ireg) {
   arma::rowvec w(reggrid[ireg].size());
   for(size_t ip=0;ip<reggrid[ireg].size();ip++) {
     // Weight is
-    w(ip)=reggrid[ireg][ip].w;
+    w(ip)=reggrid[ireg][ip].w_;
     // Basis function values are
     bf.col(ip)=basp->eval_func(reggrid[ireg][ip].r.x,reggrid[ireg][ip].r.y,reggrid[ireg][ip].r.z);
   }

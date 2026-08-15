@@ -44,7 +44,7 @@ typedef struct {
   /// Coordinates of the point
   coords_t r;
   /// Integration weight (both spherical jacobian and Becke weight)
-  double w;
+  double w_;
 
   /// Index of first basis function on grid point
   size_t f0;
@@ -169,113 +169,113 @@ typedef struct {
 class AngularGrid {
  protected:
   /// Shell info
-  angshell_t info;
+  angshell_t info_;
   /// Basis set pointer
-  const BasisSet *basp;
+  const BasisSet *basp_;
   /// Use Lobatto quadrature? (Default is Lebedev)
-  bool use_lobatto;
+  bool use_lobatto_;
 
   /// Integration points
-  std::vector<gridpoint_t> grid;
+  std::vector<gridpoint_t> grid_;
 
   /// List of potentially important shells
-  std::vector<size_t> pot_shells;
+  std::vector<size_t> pot_shells_;
   /// List of potentially important functions
-  arma::uvec pot_bf_ind;
+  arma::uvec pot_bf_ind_;
 
   /// List of important shells
-  std::vector<size_t> shells;
+  std::vector<size_t> shells_;
   /// Indices of first functions on shell
-  arma::uvec bf_i0;
+  arma::uvec bf_i0_;
   /// Amount of functions on shell
-  arma::uvec bf_N;
+  arma::uvec bf_N_;
 
   /// List of important functions
-  arma::uvec bf_ind;
+  arma::uvec bf_ind_;
   /// List of important functions in potentials' list
-  arma::uvec bf_potind;
+  arma::uvec bf_potind_;
 
   /// Duplicate values of weights here
-  arma::rowvec w;
+  arma::rowvec w_;
   /// Values of important functions in grid points, Nbf * Ngrid
-  arma::mat bf;
+  arma::mat bf_;
   /// x gradient
-  arma::mat bf_x;
+  arma::mat bf_x_;
   /// y gradient
-  arma::mat bf_y;
+  arma::mat bf_y_;
   /// z gradient
-  arma::mat bf_z;
+  arma::mat bf_z_;
   /// Values of laplacians in grid points, (3*Nbf) * Ngrid
-  arma::mat bf_lapl;
+  arma::mat bf_lapl_;
 
   /// Values of Hessians in grid points, (9*Nbf) * Ngrid; used for GGA force
-  arma::mat bf_hess;
+  arma::mat bf_hess_;
   /// Values of x gradient of laplacian; used for MGGA force
-  arma::mat bf_lx;
+  arma::mat bf_lx_;
   /// Values of y gradient of laplacian; used for MGGA force
-  arma::mat bf_ly;
+  arma::mat bf_ly_;
   /// Values of z gradient of laplacian; used for MGGA force
-  arma::mat bf_lz;
+  arma::mat bf_lz_;
 
   /// Density helper matrices: P_{uv} chi_v, and P_{uv} nabla(chi_v)
-  arma::mat Pv, Pv_x, Pv_y, Pv_z;
+  arma::mat Pv, Pv_x, Pv_y, Pv_z_;
   /// Same for spin-polarized
-  arma::mat Pav, Pav_x, Pav_y, Pav_z;
-  arma::mat Pbv, Pbv_x, Pbv_y, Pbv_z;
+  arma::mat Pav, Pav_x, Pav_y, Pav_z_;
+  arma::mat Pbv, Pbv_x, Pbv_y, Pbv_z_;
 
   /// Laplacian matrix; used for MGGA force
-  arma::mat Plapl, Palapl, Pblapl;
+  arma::mat Plapl, Palapl, Pblapl_;
 
   /// Is gradient needed?
-  bool do_grad;
+  bool do_grad_;
   /// Is kinetic energy density needed?
-  bool do_tau;
+  bool do_tau_;
   /// Is laplacian needed?
-  bool do_lapl;
+  bool do_lapl_;
   /// Is Hessian needed? (For GGA force)
-  bool do_hess;
+  bool do_hess_;
   /// Is gradient of laplacian needed? (For MGGA force)
-  bool do_lgrad;
+  bool do_lgrad_;
 
   /// Spin-polarized calculation?
-  bool polarized;
+  bool polarized_;
 
   /// GGA functional used? (Set in compute_xc, only affects eval_Fxc)
-  bool do_gga;
+  bool do_gga_;
   /// Meta-GGA tau used? (Set in compute_xc, only affects eval_Fxc)
-  bool do_mgga_t;
+  bool do_mgga_t_;
   /// Meta-GGA lapl used? (Set in compute_xc, only affects eval_Fxc)
-  bool do_mgga_l;
+  bool do_mgga_l_;
 
   // LDA stuff:
 
   /// Density, Nrho x Npts
-  arma::mat rho;
+  arma::mat rho_;
   /// Energy density, Npts
-  arma::vec exc;
+  arma::vec exc_;
   /// Functional derivative of energy wrt electron density, Nrho x Npts
-  arma::mat vxc;
+  arma::mat vxc_;
 
   // GGA stuff
 
   /// Gradient of electron density, (3 x Nrho) x Npts
-  arma::mat grho;
+  arma::mat grho_;
   /// Dot products of gradient of electron density, N x Npts; N=1 for closed-shell and 3 for open-shell
-  arma::mat sigma;
+  arma::mat sigma_;
   /// Functional derivative of energy wrt gradient of electron density
-  arma::mat vsigma;
+  arma::mat vsigma_;
 
   // Meta-GGA stuff
 
   /// Laplacian of electron density
-  arma::mat lapl;
+  arma::mat lapl_;
   /// Kinetic energy density
-  arma::mat tau;
+  arma::mat tau_;
 
   /// Functional derivative of energy wrt laplacian of electron density
-  arma::mat vlapl;
+  arma::mat vlapl_;
   /// Functional derivative of energy wrt kinetic energy density
-  arma::mat vtau;
+  arma::mat vtau_;
 
   // VV10 stuff
   /// Density threshold
@@ -284,11 +284,11 @@ class AngularGrid {
   arma::mat VV10_arr;
 
   /// Get density data for wanted point
-  libxc_dens_t get_dens(size_t idx) const;
+  libxc_dens_t dens(size_t idx) const;
   /// Get potential data for wanted point
-  libxc_pot_t get_pot(size_t idx) const;
+  libxc_pot_t pot(size_t idx) const;
   /// Get density and potential data for wanted point
-  libxc_debug_t get_data(size_t idx) const;
+  libxc_debug_t data(size_t idx) const;
 
   /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
   void lobatto_shell();
@@ -297,7 +297,7 @@ class AngularGrid {
   /// Update list of important basis functions
   void update_shell_list();
   /// Collect weights from grid into w array
-  void get_weights();
+  void compute_weights();
 
   /// Next angular grid
   void next_grid();
@@ -311,17 +311,17 @@ class AngularGrid {
   ~AngularGrid();
 
   /// Set basis set
-  void set_basis(const BasisSet & basis);
+  void basis(const BasisSet & basis);
   /// Set radial shell
-  void set_grid(const angshell_t & shell);
+  void set_shell(const angshell_t & shell);
 
   /// Get the quadrature grid
-  std::vector<gridpoint_t> get_grid() const;
+  std::vector<gridpoint_t> grid() const;
 
   /// Check necessity of computing gradient and laplacians, necessary for compute_bf!
   void check_grad_tau_lapl(int x_func, int c_func);
   /// Get necessity of computing gradient and laplacians
-  void get_grad_tau_lapl(bool & grad, bool & tau, bool & lapl) const;
+  void grad_tau_lapl(bool & grad, bool & tau, bool & lapl) const;
   /// Set necessity of computing gradient and laplacians, necessary for compute_bf!
   void set_grad_tau_lapl(bool grad, bool tau, bool lapl);
   /// Set necessity of computing Hessian and gradient of Laplacian
@@ -379,7 +379,7 @@ class AngularGrid {
   void update_density(const arma::cx_vec & C);
 
   /// Get density list; used to determine isosurface values for orbital plots
-  void get_density(std::vector<dens_list_t> & list) const;
+  void density(std::vector<dens_list_t> & list) const;
 
   /// Compute number of electrons
   double compute_Nel() const;
@@ -497,13 +497,13 @@ class AngularGrid {
 
 class DFTGrid {
   /// Work grids
-  std::vector<AngularGrid> wrk;
+  std::vector<AngularGrid> wrk_;
   /// Radial grids
-  std::vector<angshell_t> grids;
+  std::vector<angshell_t> grids_;
   /// Basis set
-  const BasisSet * basp;
+  const BasisSet * basp_;
   /// Verbose operation?
-  bool verbose;
+  bool verbose_;
 
   /// Prune shells with no points
   void prune_shells();
@@ -517,7 +517,7 @@ class DFTGrid {
   ~DFTGrid();
 
   /// Set verbose operation
-  void set_verbose(bool ver);
+  void verbose(bool ver);
 
   /// Create fixed size grid
   void construct(int nrad, int lmax, int x_func, int c_func);
@@ -536,9 +536,9 @@ class DFTGrid {
   void construct_hirshfeld(const Hirshfeld & hirsh, double stol);
 
   /// Get amount of points
-  size_t get_Npoints() const;
+  size_t Npoints() const;
   /// Get amount of functions
-  size_t get_Nfuncs() const;
+  size_t Nfuncs() const;
 
   /// Evaluate amount of electrons
   double compute_Nel(const arma::mat & P);

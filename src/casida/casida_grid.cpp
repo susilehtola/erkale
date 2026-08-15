@@ -30,10 +30,10 @@ CasidaShell::~CasidaShell() {
 }
 
 void CasidaShell::compute_orbs(const std::vector<arma::mat> & C) {
-  if(C.size()==1 && polarized) {
+  if(C.size()==1 && polarized_) {
     ERROR_INFO();
     throw std::runtime_error("Trying to calculate restricted orbitals with unrestricted grid.\n");
-  } else if(C.size()>1 && !polarized) {
+  } else if(C.size()>1 && !polarized_) {
     ERROR_INFO();
     throw std::runtime_error("Trying to calculate unrestricted orbitals with restricted grid.\n");
   }
@@ -41,10 +41,10 @@ void CasidaShell::compute_orbs(const std::vector<arma::mat> & C) {
   orbs.resize(C.size());
   for(size_t ispin=0;ispin<C.size();ispin++)
     // Resize to number of grid points
-    orbs[ispin].resize(grid.size());
+    orbs[ispin].resize(grid_.size());
 
   // Loop over grid points
-  for(size_t ip=0;ip<grid.size();ip++) {
+  for(size_t ip=0;ip<grid_.size();ip++) {
     // Initialize orbital values
     for(size_t ispin=0;ispin<C.size();ispin++) {
       orbs[ispin][ip].resize(C[ispin].n_cols);
@@ -55,9 +55,9 @@ void CasidaShell::compute_orbs(const std::vector<arma::mat> & C) {
 
   for(size_t ispin=0;ispin<C.size();ispin++) {
     // Orbital values are
-    arma::mat Cval=arma::trans(C[ispin].rows(bf_ind))*bf;
+    arma::mat Cval=arma::trans(C[ispin].rows(bf_ind_))*bf_;
     // Store values
-    for(size_t ip=0;ip<grid.size();ip++)
+    for(size_t ip=0;ip<grid_.size();ip++)
       for(size_t io=0;io<Cval.n_rows;io++)
 	orbs[ispin][ip][io]=Cval(io,ip);
   }
@@ -65,22 +65,22 @@ void CasidaShell::compute_orbs(const std::vector<arma::mat> & C) {
 
 void CasidaShell::eval_fxc(int x_func, int c_func) {
   int nspin;
-  if(!polarized)
+  if(!polarized_)
     nspin=XC_UNPOLARIZED;
   else
     nspin=XC_POLARIZED;
 
   // Allocate memory for fx and fc
-  if(!polarized) {
-    if(fx.size()!=grid.size())
-      fx.resize(grid.size());
-    if(fc.size()!=grid.size())
-      fc.resize(grid.size());
+  if(!polarized_) {
+    if(fx.size()!=grid_.size())
+      fx.resize(grid_.size());
+    if(fc.size()!=grid_.size())
+      fc.resize(grid_.size());
   } else {
-    if(fc.size()!=3*grid.size())
-      fc.resize(3*grid.size());
-    if(fx.size()!=3*grid.size())
-      fx.resize(3*grid.size());
+    if(fc.size()!=3*grid_.size())
+      fc.resize(3*grid_.size());
+    if(fx.size()!=3*grid_.size())
+      fx.resize(3*grid_.size());
   }
 
   // Correlation and exchange functionals
@@ -99,7 +99,7 @@ void CasidaShell::eval_fxc(int x_func, int c_func) {
     }
 
     // Evaluate fx
-    xc_lda_fxc(&xfunc, grid.size(), &rho[0], &fx[0]);
+    xc_lda_fxc(&xfunc, grid_.size(), &rho_[0], &fx[0]);
 
     // Free the functional
     xc_func_end(&xfunc);
@@ -124,7 +124,7 @@ void CasidaShell::eval_fxc(int x_func, int c_func) {
     }
 
     // Evaluate fx and fc
-    xc_lda_fxc(&cfunc, grid.size(), &rho[0], &fc[0]);
+    xc_lda_fxc(&cfunc, grid_.size(), &rho_[0], &fc[0]);
 
     // Free the functionals
     xc_func_end(&cfunc);
@@ -138,10 +138,10 @@ void CasidaShell::eval_fxc(int x_func, int c_func) {
 void CasidaShell::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & K) const {
   double wxc;
 
-  if(polarized && pairs.size()!=2) {
+  if(polarized_ && pairs.size()!=2) {
     ERROR_INFO();
     throw std::runtime_error("Running with polarized grid but non-polarized pairs!\n");
-  } else if(!polarized && pairs.size()==2) {
+  } else if(!polarized_ && pairs.size()==2) {
     ERROR_INFO();
     throw std::runtime_error("Running with unpolarized grid but polarized pairs!\n");
   }
@@ -157,9 +157,9 @@ void CasidaShell::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, a
 
       if(ispin==jspin) {
 	// Loop over grid points
-	for(size_t ip=0;ip<grid.size();ip++) {
+	for(size_t ip=0;ip<grid_.size();ip++) {
 	  // Factor in common for all orbitals. First case is polarized (up-up or down-down), second case is unpolarized
-	  wxc=polarized ? grid[ip].w*(fx[3*ip+2*ispin]+fc[3*ip+2*ispin]) : grid[ip].w*(fx[ip]+fc[ip]);
+	  wxc=polarized_ ? grid_[ip].w_*(fx[3*ip+2*ispin]+fc[3*ip+2*ispin]) : grid_[ip].w_*(fx[ip]+fc[ip]);
 
 	  // Loop over pairs
 	  for(size_t ipair=0;ipair<pairs[ispin].size();ipair++) {
@@ -176,9 +176,9 @@ void CasidaShell::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, a
 	}
       } else {
 	// Loop over grid points
-	for(size_t ip=0;ip<grid.size();ip++) {
+	for(size_t ip=0;ip<grid_.size();ip++) {
 	  // Factor in common for all orbitals
-	  wxc=grid[ip].w*(fx[3*ip+1]+fc[3*ip+1]); // up-down and down-up
+	  wxc=grid_[ip].w_*(fx[3*ip+1]+fc[3*ip+1]); // up-down and down-up
 
 	  // Cross-spin (ispin != jspin) block is rectangular: iterate
 	  // jpair over the full pairs[jspin] range, not the lower
@@ -221,7 +221,7 @@ CasidaGrid::CasidaGrid(const BasisSet * bas, bool lobatto, bool ver) {
 #endif
 
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_basis(*bas);
+    wrk[i].basis(*bas);
 }
 
 CasidaGrid::~CasidaGrid() {
@@ -278,7 +278,7 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int 
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<grids.size();i++) {
-      wrk[ith].set_grid(grids[i]);
+      wrk[ith].set_shell(grids[i]);
       if(P.size()==1)
 	grids[i]=wrk[ith].construct(P[0],ftoler/nrad[grids[i].atind],x_func,c_func);
       else if(P.size()==2)
@@ -336,7 +336,7 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
 #endif
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
-      wrk[ith].set_grid(grids[i]);
+      wrk[ith].set_shell(grids[i]);
       wrk[ith].form_grid();
 
       // Update the density
