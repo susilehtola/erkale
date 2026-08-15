@@ -26,11 +26,11 @@ class Timer;
 class FDHessian {
  protected:
   /// Verbose operation?
-  bool verbose;
+  bool verbose_;
   /// Finite difference derivative step size
-  double ss_fd;
+  double ss_fd_;
   /// Line search step size
-  double ss_ls;
+  double ss_ls_;
 
   /// Print optimization status
   virtual void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
@@ -81,54 +81,54 @@ typedef enum {
 class PZStability: public FDHessian {
  protected:
   /// SCF solver, used for energy calculations
-  SCF * solverp;
+  SCF * solverp_;
   /// Basis set
-  BasisSet basis;
+  BasisSet basis_;
   /// DFT grid
-  DFTGrid grid;
+  DFTGrid grid_;
   /// NL grid
-  DFTGrid nlgrid;
+  DFTGrid nlgrid_;
 
   /// OV method
-  dft_t ovmethod;
+  dft_t ovmethod_;
   /// OO method
-  dft_t oomethod;
+  dft_t oomethod_;
   /// Weight for PZ correction
-  double pzw;
+  double pzw_;
   /// or scaling method
-  pz_scaling_t scale;
+  pz_scaling_t scale_;
   /// and scaling exponent
-  double scaleexp;
+  double scaleexp_;
 
   /// Reference solution. Spin-restricted
-  rscf_t rsol;
+  rscf_t rsol_;
   /// or unrestricted
-  uscf_t usol;
+  uscf_t usol_;
   /// Reference self-interaction energies
-  arma::vec ref_Eorb, ref_Eorba, ref_Eorbb;
+  arma::vec ref_Eorb_, ref_Eorba_, ref_Eorbb_;
   /// Reference orbital Fock matrices
-  std::vector<arma::cx_mat> ref_Forb, ref_Forba, ref_Forbb;
+  std::vector<arma::cx_mat> ref_Forb_, ref_Forba_, ref_Forbb_;
   /// Reference weighting factors
-  arma::vec ref_worb, ref_worba, ref_worbb;
+  arma::vec ref_worb_, ref_worba_, ref_worbb_;
 
   /// Real part of transformations?
-  bool real;
+  bool real_;
   /// Imaginary part of transformations?
-  bool imag;
+  bool imag_;
   /// Check stability of canonical orbitals?
-  bool cancheck;
+  bool cancheck_;
   /// Check stability of oo block
-  bool oocheck;
+  bool oocheck_;
 
   /// Spin-restricted?
-  bool restr;
+  bool restr_;
   /// Amount of occupied orbitals
-  size_t oa, ob;
+  size_t oa_, ob_;
   /// Amount of virtual orbitals
-  size_t va, vb;
+  size_t va_, vb_;
 
   /// Maximum step size
-  double Tmu;
+  double Tmu_;
 
   /// Count amount of parameters for rotations
   size_t count_ov_params(size_t o, size_t v) const;
@@ -198,9 +198,9 @@ class PZStability: public FDHessian {
   void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb, const arma::vec & worb);
 
   /// Get the full Fock matrix
-  arma::cx_mat get_H(const rscf_t & sol) const;
+  arma::cx_mat make_H(const rscf_t & sol) const;
   /// Get the full Fock matrix
-  arma::cx_mat get_H(const uscf_t & sol, bool spin) const;
+  arma::cx_mat make_H(const uscf_t & sol, bool spin) const;
 
   /// Precondition gradient vector with unified Hamiltonian
   arma::vec precondition_unified(const arma::vec & g) const;
@@ -208,17 +208,17 @@ class PZStability: public FDHessian {
   arma::vec precondition_orbital(const arma::vec & g) const;
 
   /// Get occupied orbitals (restricted)
-  arma::cx_mat get_CO(const rscf_t & sol) const;
-  arma::cx_mat get_CO() const;
+  arma::cx_mat make_CO(const rscf_t & sol) const;
+  arma::cx_mat make_CO() const;
   /// Get occupied orbitals (unrestricted)
-  arma::cx_mat get_CO(bool spin, const uscf_t & sol) const;
-  arma::cx_mat get_CO(bool spin) const;
+  arma::cx_mat make_CO(bool spin, const uscf_t & sol) const;
+  arma::cx_mat make_CO(bool spin) const;
   /// Get virtual orbitals (restricted)
-  arma::cx_mat get_CV(const rscf_t & sol) const;
-  arma::cx_mat get_CV() const;
+  arma::cx_mat make_CV(const rscf_t & sol) const;
+  arma::cx_mat make_CV() const;
     /// Get virtual orbitals (unrestricted)
-  arma::cx_mat get_CV(bool spin, const uscf_t & sol) const;
-  arma::cx_mat get_CV(bool spin) const;
+  arma::cx_mat make_CV(bool spin, const uscf_t & sol) const;
+  arma::cx_mat make_CV(bool spin) const;
 
  public:
   /// Constructor
@@ -227,22 +227,22 @@ class PZStability: public FDHessian {
   ~PZStability();
 
   /// Set method and weight
-  void set_method(const dft_t & ovmethod, const dft_t & oomethod, double pzw, pz_scaling_t scale, double scaleexp);
+  void configure_method(const dft_t & ovmethod, const dft_t & oomethod, double pzw, pz_scaling_t scale, double scaleexp);
   /// Set parameters. real: real rotations? imag: imaginary rotations? ov: ov rotations? oo: oo rotations?
-  void set_params(bool real, bool imag, bool ov, bool oo);
+  void configure_dof(bool real, bool imag, bool ov, bool oo);
 
   /// Set reference
-  void set(const rscf_t & sol);
+  void set_reference(const rscf_t & sol);
   /// Set reference
-  void set(const uscf_t & sol);
+  void set_reference(const uscf_t & sol);
 
   /// Evaluate energy
-  double get_E();
+  double energy();
 
   /// Get updated solution
-  rscf_t get_rsol() const;
+  rscf_t rsol() const;
   /// Get updated solution
-  uscf_t get_usol() const;
+  uscf_t usol() const;
 
   /// Check stability of solution.
   bool check(bool stability=false, double cutoff=-1e-3, double dEthr=-1e-7);
