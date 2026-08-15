@@ -2956,8 +2956,8 @@ void PZStability::set(const rscf_t & sol) {
 }
 
 void PZStability::update_grid(bool init) {
-  grid.set_verbose(verbose);
-  nlgrid.set_verbose(verbose);
+  grid.verbose(verbose);
+  nlgrid.verbose(verbose);
   if(ovmethod.adaptive) {
     arma::cx_mat Ctilde;
     if(restr)
