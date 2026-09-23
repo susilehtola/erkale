@@ -102,7 +102,7 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
     return 0;
 
   basp=basisv;
-  Nbf_=basisv->get_Nbf();
+  Nbf_=basisv->Nbf();
 
   // libcint description of the basis: the tables and the integral
   // optimizers are built once here and shared by the worker pools
@@ -149,15 +149,15 @@ arma::mat ERIscreen::density_bounds(const arma::mat & P) const {
   // D(i,j) = max |P(mu,nu)| over the (shell i, shell j) block. Used to
   // bound each shell-quartet's contribution to J/K (the integral times
   // the largest coupled density element).
-  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
+  const std::vector<GaussianShell> & shells=basp->shells_ref();
   const size_t Nsh=shells.size();
 
   // Per-shell function-index vectors. Built once and reused for the
   // Nsh^2 block reductions below.
   std::vector<arma::uvec> idx(Nsh);
   for(size_t i=0;i<Nsh;i++) {
-    const size_t i0=shells[i].get_first_ind();
-    const size_t Ni=shells[i].get_Nbf();
+    const size_t i0=shells[i].first_ind();
+    const size_t Ni=shells[i].Nbf();
     idx[i]=arma::regspace<arma::uvec>(i0, i0+Ni-1);
   }
 
@@ -170,7 +170,7 @@ arma::mat ERIscreen::density_bounds(const arma::mat & P) const {
 
 void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & digest, const arma::mat & D, double tol) const {
   // Shells in basis set
-  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
+  const std::vector<GaussianShell> & shells=basp->shells_ref();
   // Get number of shell pairs
   const size_t Npairs=shpairs_.size();
 
@@ -268,12 +268,12 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 
 arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const {
   // Shells
-  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
+  const std::vector<GaussianShell> & shells=basp->shells_ref();
   // Get number of shell pairs
   const size_t Npairs=shpairs_.size();
 
   // Forces
-  arma::vec F(3*basp->get_Nnuc());
+  arma::vec F(3*basp->Nnuc());
   F.zeros();
 
 #ifdef _OPENMP
@@ -309,10 +309,10 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	size_t ls=shpairs_[jp].js;
 
 	// Shell centers
-	inuc=shells[is].get_center_ind();
-	jnuc=shells[js].get_center_ind();
-	knuc=shells[ks].get_center_ind();
-	lnuc=shells[ls].get_center_ind();
+	inuc=shells[is].center_ind();
+	jnuc=shells[js].center_ind();
+	knuc=shells[ks].center_ind();
+	lnuc=shells[ls].center_ind();
 
 	// Skip when all functions are on the same nucleus - force will vanish
 	if(inuc==jnuc && jnuc==knuc && knuc==lnuc)

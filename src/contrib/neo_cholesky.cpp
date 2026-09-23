@@ -34,10 +34,10 @@ namespace {
   /// unique first_ind: electronic functions occupy [0, Ne), protonic [Ne, Ne+Np).
   /// The pivot index matrix and DirectCDBlocks both address this space.
   std::vector<GaussianShell> concatenate_shells(const BasisSet & ebasis, const BasisSet & pbasis) {
-    std::vector<GaussianShell> shells = ebasis.get_shells();
-    const size_t Ne = ebasis.get_Nbf();
-    for(GaussianShell sh: pbasis.get_shells()) {
-      sh.set_first_ind(sh.get_first_ind() + Ne);
+    std::vector<GaussianShell> shells = ebasis.shells();
+    const size_t Ne = ebasis.Nbf();
+    for(GaussianShell sh: pbasis.shells()) {
+      sh.first_ind(sh.first_ind() + Ne);
       shells.push_back(sh);
     }
     return shells;
@@ -68,17 +68,17 @@ namespace {
       for(size_t ip=0; ip<piv_sp.size(); ip++) {
         const size_t is = piv_sp[ip].first;
         const size_t js = piv_sp[ip].second;
-        const size_t Ni = shells[is].get_Nbf();
-        const size_t Nj = shells[js].get_Nbf();
-        const size_t i0 = shells[is].get_first_ind();
-        const size_t j0 = shells[js].get_first_ind();
+        const size_t Ni = shells[is].Nbf();
+        const size_t Nj = shells[js].Nbf();
+        const size_t i0 = shells[is].first_ind();
+        const size_t j0 = shells[js].first_ind();
         for(size_t jp=0; jp<=ip; jp++) {
           const size_t ks = piv_sp[jp].first;
           const size_t ls = piv_sp[jp].second;
-          const size_t Nk = shells[ks].get_Nbf();
-          const size_t Nl = shells[ls].get_Nbf();
-          const size_t k0 = shells[ks].get_first_ind();
-          const size_t l0 = shells[ls].get_first_ind();
+          const size_t Nk = shells[ks].Nbf();
+          const size_t Nl = shells[ls].Nbf();
+          const size_t k0 = shells[ks].first_ind();
+          const size_t l0 = shells[ls].first_ind();
 
           eri->compute(is,js,ks,ls);
           const std::vector<double> * erip = eri->getp();
@@ -116,8 +116,8 @@ void neo_shared_cholesky(const BasisSet & ebasis, const BasisSet & pbasis,
                          DensityFit & dfit, DensityFit & pfit) {
   Timer ttot;
 
-  const size_t Ne = ebasis.get_Nbf();
-  const size_t Np = pbasis.get_Nbf();
+  const size_t Ne = ebasis.Nbf();
+  const size_t Np = pbasis.Nbf();
   if(!Np)
     throw std::runtime_error("neo_shared_cholesky: no protonic basis functions.\n");
 
@@ -135,7 +135,7 @@ void neo_shared_cholesky(const BasisSet & ebasis, const BasisSet & pbasis,
   const size_t Nselected = Nsel_e + Nsel_p;
 
   const std::vector<GaussianShell> piv_shells = concatenate_shells(ebasis, pbasis);
-  const size_t nesh = ebasis.get_shells().size();
+  const size_t nesh = ebasis.shells().size();
 
   // Pivot shellpairs: electronic first, then protonic with shell indices shifted
   // into the concatenated list. Ranks follow the same order, so the electronic
@@ -158,8 +158,8 @@ void neo_shared_cholesky(const BasisSet & ebasis, const BasisSet & pbasis,
     piv_index(Ne+invmap_p(1,pii), Ne+invmap_p(0,pii)) = Nsel_e + p;
   }
 
-  const int piv_max_am = std::max(ebasis.get_max_am(), pbasis.get_max_am());
-  const int piv_max_contr = std::max(ebasis.get_max_Ncontr(), pbasis.get_max_Ncontr());
+  const int piv_max_am = std::max(ebasis.max_am(), pbasis.max_am());
+  const int piv_max_contr = std::max(ebasis.max_Ncontr(), pbasis.max_Ncontr());
 
   Timer t;
   arma::mat M = pivot_metric(piv_shells, piv_sp, piv_index, sentinel, Nselected);

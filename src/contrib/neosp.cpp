@@ -199,8 +199,8 @@ int main_guarded(int argc, char **argv) {
 
   std::function<arma::mat(const BasisSet &, const arma::mat &, const BasisSet &)> multicomponent_coulomb_tei = [&](const BasisSet & source_basis, const arma::mat & source_density, const BasisSet & target_basis) {
     // Shells in the two basis sets
-    std::vector<GaussianShell> sshells=source_basis.get_shells();
-    std::vector<GaussianShell> tshells=target_basis.get_shells();
+    std::vector<GaussianShell> sshells=source_basis.shells();
+    std::vector<GaussianShell> tshells=target_basis.shells();
 
     // Get shellpairs
     double shtol=settings.get_double("IntegralThresh");
@@ -213,10 +213,10 @@ int main_guarded(int argc, char **argv) {
     const std::vector<eripair_t> & tpairs = t_scr.shpairs;
 
     // Sanity check
-    if(source_density.n_rows != source_basis.get_Nbf() or source_density.n_cols != source_basis.get_Nbf())
+    if(source_density.n_rows != source_basis.Nbf() or source_density.n_cols != source_basis.Nbf())
       throw std::logic_error("Density matrix does not correspond to basis set!\n");
     // Target matrix
-    arma::mat Jt(target_basis.get_Nbf(), target_basis.get_Nbf(), arma::fill::zeros);
+    arma::mat Jt(target_basis.Nbf(), target_basis.Nbf(), arma::fill::zeros);
 
     // libcint environment: the target shells, followed by the source
     // shells of the other species

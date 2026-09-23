@@ -128,7 +128,7 @@ DirectDFPerturbedBlocks::DirectDFPerturbedBlocks(
   // max_NmuNnu_) so for_each_pert never reallocs.
   max_Na_ = 0;
   for(size_t ia=0; ia<aux_shells_.size(); ia++)
-    max_Na_ = std::max(max_Na_, aux_shells_[ia].get_Nbf());
+    max_Na_ = std::max(max_Na_, aux_shells_[ia].Nbf());
   max_NmuNnu_ = 0;
   for(size_t ip=0; ip<sizes_.size(); ip++)
     max_NmuNnu_ = std::max(max_NmuNnu_, sizes_[ip].first * sizes_[ip].second);
@@ -164,8 +164,8 @@ void DirectDFPerturbedBlocks::for_each_pert(
   const size_t inus = shellpairs_[ip].second;
   const size_t Nmu = sizes_[ip].first;
   const size_t Nnu = sizes_[ip].second;
-  const size_t inuc = orb_shells_[imus].get_center_ind();
-  const size_t jnuc = orb_shells_[inus].get_center_ind();
+  const size_t inuc = orb_shells_[imus].center_ind();
+  const size_t jnuc = orb_shells_[inus].center_ind();
 
   dERIWorker * deri = thread_deri();
 #ifdef _OPENMP
@@ -185,9 +185,9 @@ void DirectDFPerturbedBlocks::for_each_pert(
 
   const size_t Nsh_orb = cenv_->Nsh_orb();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
-    const size_t Na = aux_shells_[ia].get_Nbf();
-    const size_t a0 = aux_shells_[ia].get_first_ind();
-    const size_t anuc = aux_shells_[ia].get_center_ind();
+    const size_t Na = aux_shells_[ia].Nbf();
+    const size_t a0 = aux_shells_[ia].first_ind();
+    const size_t anuc = aux_shells_[ia].center_ind();
 
     // If all three centres coincide the integral can't depend on
     // any nuclear coordinate (translational invariance leaves no
@@ -327,10 +327,10 @@ arma::mat DirectCDBlocks::get_block(size_t ip) const {
   for(size_t pp=0; pp<pivot_shellpairs_.size(); pp++) {
     const size_t ks = pivot_shellpairs_[pp].first;
     const size_t ls = pivot_shellpairs_[pp].second;
-    const size_t Nk = piv_shells_[ks].get_Nbf();
-    const size_t Nl = piv_shells_[ls].get_Nbf();
-    const size_t k0 = piv_shells_[ks].get_first_ind();
-    const size_t l0 = piv_shells_[ls].get_first_ind();
+    const size_t Nk = piv_shells_[ks].Nbf();
+    const size_t Nl = piv_shells_[ls].Nbf();
+    const size_t k0 = piv_shells_[ks].first_ind();
+    const size_t l0 = piv_shells_[ls].first_ind();
 
     eri->compute(imus, inus, piv_offset_+ks, piv_offset_+ls);
     const std::vector<double> * erip = eri->getp();
@@ -390,8 +390,8 @@ arma::mat DirectDFBlocks::get_block(size_t ip) const {
   const size_t Nsh_orb = cenv_->Nsh_orb();
   double * buf_ptr = buf.memptr();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
-    const size_t Na = aux_shells_[ia].get_Nbf();
-    const size_t a0 = aux_shells_[ia].get_first_ind();
+    const size_t Na = aux_shells_[ia].Nbf();
+    const size_t a0 = aux_shells_[ia].first_ind();
     eri->compute_3c(imus, inus, Nsh_orb+ia);
     const std::vector<double> * erip = eri->getp();
     for(size_t imu=0; imu<Nmu; imu++)

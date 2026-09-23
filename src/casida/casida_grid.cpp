@@ -242,17 +242,17 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int 
     wrk[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp->get_Nnuc());
+  std::vector<size_t> nrad(basp->Nnuc());
 
   // Form radial shells
-  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp->get_nuclear_coords(iat);
+    sh.cen=basp->nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
+    size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->Z(iat)])));
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev(nr,rad,wrad);
@@ -377,10 +377,10 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
 
 void CasidaGrid::print_grid() const {
   // Amount of integration points
-  arma::uvec np(basp->get_Nnuc());
+  arma::uvec np(basp->Nnuc());
   np.zeros();
   // Amount of function values
-  arma::uvec nf(basp->get_Nnuc());
+  arma::uvec nf(basp->Nnuc());
   nf.zeros();
 
   for(size_t i=0;i<grids.size();i++) {
@@ -389,6 +389,6 @@ void CasidaGrid::print_grid() const {
   }
 
   printf("Composition of %s grid:\n %7s %7s %10s\n","XC","atom","Npoints","Nfuncs");
-  for(size_t i=0;i<basp->get_Nnuc();i++)
-    printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+  for(size_t i=0;i<basp->Nnuc();i++)
+    printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->symbol(i).c_str(), (int) np(i), (int) nf(i));
 }

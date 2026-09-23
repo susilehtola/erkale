@@ -397,35 +397,35 @@ void prod_gaussian_3d::print() const {
 
 std::vector<prod_gaussian_3d> compute_product(const BasisSet & bas, size_t is, size_t js) {
   // Shells (may be generally contracted)
-  const GaussianShell shi=bas.get_shell(is);
-  const GaussianShell shj=bas.get_shell(js);
+  const GaussianShell shi=bas.shell(is);
+  const GaussianShell shj=bas.shell(js);
 
   // Cartesian functions on shells (shared by every contraction)
-  const std::vector<shellf_t> icart=bas.get_cart(is);
-  const std::vector<shellf_t> jcart=bas.get_cart(js);
+  const std::vector<shellf_t> icart=bas.cart(is);
+  const std::vector<shellf_t> jcart=bas.cart(js);
 
   // Centers of shells
-  const coords_t icen=bas.get_shell_center(is);
-  const coords_t jcen=bas.get_shell_center(js);
+  const coords_t icen=bas.shell_center(is);
+  const coords_t jcen=bas.shell_center(js);
 
   // Per-contraction function counts and the whole-shell (generally
-  // contracted) target sizes get_Nbf = nctr*Nlm.
+  // contracted) target sizes Nbf() = nctr*Nlm.
   const bool lm_i=bas.lm_in_use(is), lm_j=bas.lm_in_use(js);
-  const size_t Ni_lm= lm_i ? (size_t)(2*bas.get_am(is)+1) : icart.size();
-  const size_t Nj_lm= lm_j ? (size_t)(2*bas.get_am(js)+1) : jcart.size();
-  const size_t Nj_tgt=shj.get_Nctr()*Nj_lm;
+  const size_t Ni_lm= lm_i ? (size_t)(2*bas.am(is)+1) : icart.size();
+  const size_t Nj_lm= lm_j ? (size_t)(2*bas.am(js)+1) : jcart.size();
+  const size_t Nj_tgt=shj.Nctr()*Nj_lm;
 
   // Returned array, indexed [i-function][j-function] with the whole-shell
   // (contraction-slowest) function order.
-  std::vector<prod_gaussian_3d> ret(shi.get_Nctr()*Ni_lm*Nj_tgt);
+  std::vector<prod_gaussian_3d> ret(shi.Nctr()*Ni_lm*Nj_tgt);
 
   // Loop over the contractions of the two shells: each pair gives a
   // single-contraction product block, which is transformed and scattered
   // into the generally contracted output at its contraction offset.
-  for(size_t ci=0;ci<shi.get_Nctr();ci++) {
-    const std::vector<contr_t> icontr=shi.get_contr(ci);
-    for(size_t cj=0;cj<shj.get_Nctr();cj++) {
-      const std::vector<contr_t> jcontr=shj.get_contr(cj);
+  for(size_t ci=0;ci<shi.Nctr();ci++) {
+    const std::vector<contr_t> icontr=shi.contr(ci);
+    for(size_t cj=0;cj<shj.Nctr();cj++) {
+      const std::vector<contr_t> jcontr=shj.contr(cj);
 
       // Cartesian products for this contraction pair
       std::vector<prod_gaussian_3d> block;
@@ -464,21 +464,21 @@ std::vector<prod_gaussian_3d> spherical_transform(const BasisSet & bas, size_t i
   bool lm_i=bas.lm_in_use(is);
   bool lm_j=bas.lm_in_use(js);
 
-  const size_t Ni_cart=bas.get_Ncart(is);
-  const size_t Nj_cart=bas.get_Ncart(js);
+  const size_t Ni_cart=bas.Ncart(is);
+  const size_t Nj_cart=bas.Ncart(js);
 
   // Single-contraction block: the target sizes are the per-contraction
   // spherical-harmonic (or cartesian) counts, not the whole shell's
-  // get_Nbf, which for a generally contracted shell spans nctr blocks.
-  const size_t Ni_tgt= lm_i ? (size_t)(2*bas.get_am(is)+1) : Ni_cart;
-  const size_t Nj_tgt= lm_j ? (size_t)(2*bas.get_am(js)+1) : Nj_cart;
+  // Nbf(), which for a generally contracted shell spans nctr blocks.
+  const size_t Ni_tgt= lm_i ? (size_t)(2*bas.am(is)+1) : Ni_cart;
+  const size_t Nj_tgt= lm_j ? (size_t)(2*bas.am(js)+1) : Nj_cart;
 
   // First, transform over j. Helper array
   std::vector<prod_gaussian_3d> tmp(Ni_cart*Nj_tgt);
 
   if(lm_j) {
     // Get transformation matrix
-    arma::mat trans_j=bas.get_trans(js);
+    arma::mat trans_j=bas.transmat(js);
 
     // Loop over functions
     for(size_t iic=0;iic<Ni_cart;iic++)
@@ -491,7 +491,7 @@ std::vector<prod_gaussian_3d> spherical_transform(const BasisSet & bas, size_t i
 
   if(lm_i) {
     // Get transformation matrix
-    arma::mat trans_i=bas.get_trans(is);
+    arma::mat trans_i=bas.transmat(is);
 
     // Resize output vector
     res.resize(Ni_tgt*Nj_tgt);
@@ -521,23 +521,23 @@ std::vector<prod_gaussian_3d> spherical_transform(const BasisSet & bas, size_t i
 
 std::vector<prod_gaussian_3d> compute_products(const BasisSet & bas) {
   // Amount of basis functions is
-  size_t Nbf=bas.get_Nbf();
+  size_t Nbf=bas.Nbf();
 
   // .. so the size of the returned array is
   std::vector<prod_gaussian_3d> ret(Nbf*(Nbf+1)/2);
 
   // Get shells in the basis set.
-  std::vector<GaussianShell> shells=bas.get_shells();
+  std::vector<GaussianShell> shells=bas.shells();
 
   // Amount of functions on shells
   std::vector<size_t> nbf(shells.size());
   for(size_t is=0;is<shells.size();is++)
-    nbf[is]=shells[is].get_Nbf();
+    nbf[is]=shells[is].Nbf();
 
   // First functions on shells
   std::vector<size_t> ind0(shells.size());
   for(size_t is=0;is<shells.size();is++)
-    ind0[is]=shells[is].get_first_ind();
+    ind0[is]=shells[is].first_ind();
 
 
   // Form products

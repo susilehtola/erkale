@@ -290,21 +290,21 @@ void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
   const GaussianShell & shl=envp->shell(ls);
   const GaussianShell * shs[4]={&shi, &shj, &shk, &shl};
 
-  const std::vector<shellf_t> & ci=shi.get_cart_ref();
-  const std::vector<shellf_t> & cj=shj.get_cart_ref();
-  const std::vector<shellf_t> & ck=shk.get_cart_ref();
-  const std::vector<shellf_t> & cl=shl.get_cart_ref();
+  const std::vector<shellf_t> & ci=shi.cart_ref();
+  const std::vector<shellf_t> & cj=shj.cart_ref();
+  const std::vector<shellf_t> & ck=shk.cart_ref();
+  const std::vector<shellf_t> & cl=shl.cart_ref();
 
-  const coords_t Ri(shi.get_center()), Rj(shj.get_center()), Rk(shk.get_center()), Rl(shl.get_center());
+  const coords_t Ri(shi.center()), Rj(shj.center()), Rk(shk.center()), Rl(shl.center());
 
   // Per-index cartesian and final function counts, and per-contraction
   // (single-column) function count Nlm[q]=Nbf[q]/nctr[q]. A generally
   // contracted shell carries nctr[q]>1 columns; each is transformed
   // separately and stacked contraction-slowest, matching the engine.
-  const size_t nctr[4]={shi.get_Nctr(), shj.get_Nctr(), shk.get_Nctr(), shl.get_Nctr()};
+  const size_t nctr[4]={shi.Nctr(), shj.Nctr(), shk.Nctr(), shl.Nctr()};
   size_t Ncart[4], Nbf[4], Nlm[4];
   for(int q=0;q<4;q++) {
-    Ncart[q]=shs[q]->get_Ncart();
+    Ncart[q]=shs[q]->Ncart();
     Nbf[q]=envp->Nbf(q==0 ? is : (q==1 ? js : (q==2 ? ks : ls)));
     Nlm[q]=Nbf[q]/nctr[q];
   }
@@ -314,13 +314,13 @@ void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
   // Loop over every combination of the four shells' contractions: the
   // exponents are shared, only the contraction coefficients differ.
   for(size_t di=0;di<nctr[0];di++) {
-    const std::vector<contr_t> coni(shi.get_contr(di));
+    const std::vector<contr_t> coni(shi.contr(di));
     for(size_t dj=0;dj<nctr[1];dj++) {
-      const std::vector<contr_t> conj(shj.get_contr(dj));
+      const std::vector<contr_t> conj(shj.contr(dj));
       for(size_t dk=0;dk<nctr[2];dk++) {
-        const std::vector<contr_t> conk(shk.get_contr(dk));
+        const std::vector<contr_t> conk(shk.contr(dk));
         for(size_t dl=0;dl<nctr[3];dl++) {
-          const std::vector<contr_t> conl(shl.get_contr(dl));
+          const std::vector<contr_t> conl(shl.contr(dl));
 
           // Cartesian integrals over the Huzinaga routines
           std::vector<double> cart(ci.size()*cj.size()*ck.size()*cl.size(),0.0);
@@ -351,7 +351,7 @@ void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
             const bool trans=envp->lm_in_use() && shs[q]->lm_in_use();
             if(!trans)
               continue;
-            const arma::mat T(shs[q]->get_trans());
+            const arma::mat T(shs[q]->transmat());
 
             // Sizes of the indices, with the ones before q already
             // transformed (per contraction, so Nlm rather than Nbf)

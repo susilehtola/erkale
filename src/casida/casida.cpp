@@ -436,7 +436,7 @@ arma::mat Casida::transition(const BasisSet & basis, const arma::vec & q) const 
   }
 
   // Form products of basis functions.
-  const size_t Nbf=basis.get_Nbf();
+  const size_t Nbf=basis.Nbf();
   std::vector<prod_gaussian_3d> bfprod=compute_products(basis);
 
   // and their Fourier transforms
@@ -455,14 +455,14 @@ arma::mat Casida::transition(const BasisSet & basis, const arma::vec & q) const 
 
 arma::mat Casida::transition(const BasisSet & basis, double qr) const {
   // Form products of basis functions.
-  const size_t Nbf=basis.get_Nbf();
+  const size_t Nbf=basis.Nbf();
   std::vector<prod_gaussian_3d> bfprod=compute_products(basis);
 
   // and their Fourier transforms
   std::vector<prod_fourier> bffour=fourier_transform(bfprod);
 
   // Get the grid for computing the spherical averages.
-  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
+  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.max_am());
   // We normalize the weights so that for purely dipolar transitions we
   // get the same output as with using the dipole matrix.
   for(size_t i=0;i<grid.size();i++) {
@@ -514,19 +514,19 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
     fitlib.load_basis(settings.get_string("FittingBasis"));
 
     // Construct fitting basis
-    construct_basis(dfitbas,basis.get_nuclei(),fitlib);
+    construct_basis(dfitbas,basis.nuclei(),fitlib);
   }
 
   // Amount of auxiliary functions
-  const size_t Naux=dfitbas.get_Nbf();
+  const size_t Naux=dfitbas.Nbf();
 
   // Get the shells
-  std::vector<GaussianShell> orbshells=basis.get_shells();
-  std::vector<GaussianShell> auxshells=dfitbas.get_shells();
+  std::vector<GaussianShell> orbshells=basis.shells();
+  std::vector<GaussianShell> auxshells=dfitbas.shells();
 
   // Get list of pairs
-  std::vector<shellpair_t> orbpairs=basis.get_unique_shellpairs();
-  std::vector<shellpair_t> auxpairs=dfitbas.get_unique_shellpairs();
+  std::vector<shellpair_t> orbpairs=basis.unique_shellpairs();
+  std::vector<shellpair_t> auxpairs=dfitbas.unique_shellpairs();
 
   // Dummy shell, helper for computing ERIs
   // libcint environment: orbital shells followed by the auxiliary ones
@@ -557,10 +557,10 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       erip=eri.getp();
 
       // Store integrals
-      for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
-	for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
-	  ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=(*erip)[ii*auxshells[js].get_Nbf()+jj];
-	  ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=(*erip)[ii*auxshells[js].get_Nbf()+jj];
+      for(size_t ii=0;ii<auxshells[is].Nbf();ii++)
+	for(size_t jj=0;jj<auxshells[js].Nbf();jj++) {
+	  ab(auxshells[is].first_ind()+ii,auxshells[js].first_ind()+jj)=(*erip)[ii*auxshells[js].Nbf()+jj];
+	  ab(auxshells[js].first_ind()+jj,auxshells[is].first_ind()+ii)=(*erip)[ii*auxshells[js].Nbf()+jj];
 	}
     }
   }
@@ -640,20 +640,20 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 #endif
 
       // Amount of functions on shell
-      size_t Nmu=orbshells[imu].get_Nbf();
+      size_t Nmu=orbshells[imu].Nbf();
       // Index of first function on shell
-      size_t mu0=orbshells[imu].get_first_ind();
+      size_t mu0=orbshells[imu].first_ind();
 
       // Amount of functions on shell
-      size_t Nnu=orbshells[inu].get_Nbf();
+      size_t Nnu=orbshells[inu].Nbf();
       // Index of first function on shell
-      size_t nu0=orbshells[inu].get_first_ind();
+      size_t nu0=orbshells[inu].first_ind();
 
       for(size_t ia=0;ia<auxshells.size();ia++) {
 	// Amount of functions on shell
-	size_t Na=auxshells[ia].get_Nbf();
+	size_t Na=auxshells[ia].Nbf();
 	// Index of first function on shell
-	size_t a0=auxshells[ia].get_first_ind();
+	size_t a0=auxshells[ia].first_ind();
 
 	// Compute the integral over the AOs. The three-center integrals
 	// run the auxiliary index fastest.

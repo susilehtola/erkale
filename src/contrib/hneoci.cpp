@@ -128,7 +128,7 @@ static proton_trap_t build_proton_trap(const BasisSet & pbasis, double proton_ma
   tr.enabled = settings.get_bool("NEOTrap");
   tr.wpar = tr.wperp = tr.g = tr.lam_cross = 0.0;
   tr.x0 = tr.y0 = tr.z0 = 0.0;
-  tr.V.zeros(pbasis.get_Nbf(), pbasis.get_Nbf());
+  tr.V.zeros(pbasis.Nbf(), pbasis.Nbf());
   if(!tr.enabled && !want_moments)
     return tr;
 
@@ -141,7 +141,7 @@ static proton_trap_t build_proton_trap(const BasisSet & pbasis, double proton_ma
       throw std::runtime_error("TrapCenter needs three numbers: x y z (bohr).\n");
     tr.x0=readdouble(tok[0]); tr.y0=readdouble(tok[1]); tr.z0=readdouble(tok[2]);
   } else {
-    std::vector<nucleus_t> nuc = pbasis.get_nuclei();
+    std::vector<nucleus_t> nuc = pbasis.nuclei();
     if(nuc.size() != 1)
       throw std::runtime_error("NEOTrap v1 supports a single quantum proton; set TrapCenter for a multi-proton trap.\n");
     tr.x0=nuc[0].r.x; tr.y0=nuc[0].r.y; tr.z0=nuc[0].r.z;
@@ -453,8 +453,8 @@ int main_guarded(int argc, char **argv) {
   BasisSet pbasis;
   construct_basis(pbasis,protons,pbaslib);
 
-  printf("%i electronic and %i protonic basis functions\n", basis.get_Nbf(), pbasis.get_Nbf());
-  printf("Hamiltonian is %i x %i\n", basis.get_Nbf()*pbasis.get_Nbf(), basis.get_Nbf()*pbasis.get_Nbf());
+  printf("%i electronic and %i protonic basis functions\n", basis.Nbf(), pbasis.Nbf());
+  printf("Hamiltonian is %i x %i\n", basis.Nbf()*pbasis.Nbf(), basis.Nbf()*pbasis.Nbf());
 
   // Get the overlap matrices
   arma::mat Se(basis.overlap());
@@ -523,14 +523,14 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Compute the two-electron integrals
-  size_t e_nbf = basis.get_Nbf();
-  size_t p_nbf = pbasis.get_Nbf();
+  size_t e_nbf = basis.Nbf();
+  size_t p_nbf = pbasis.Nbf();
   size_t e_nmo = Xe.n_cols;
   size_t p_nmo = Xp.n_cols;
 
   // Shells
-  std::vector<GaussianShell> eshells=basis.get_shells();
-  std::vector<GaussianShell> pshells=pbasis.get_shells();
+  std::vector<GaussianShell> eshells=basis.shells();
+  std::vector<GaussianShell> pshells=pbasis.shells();
 
   // Compute shell pairs
   double omega=0.0;
@@ -569,17 +569,17 @@ int main_guarded(int argc, char **argv) {
           continue;
 
         // Start and end
-        size_t N_i = eshells[is].get_Nbf();
-        size_t i_start = eshells[is].get_first_ind();
+        size_t N_i = eshells[is].Nbf();
+        size_t i_start = eshells[is].first_ind();
 
-        size_t N_j = eshells[js].get_Nbf();
-        size_t j_start = eshells[js].get_first_ind();
+        size_t N_j = eshells[js].Nbf();
+        size_t j_start = eshells[js].first_ind();
 
-        size_t N_I = pshells[Is].get_Nbf();
-        size_t I_start = pshells[Is].get_first_ind();
+        size_t N_I = pshells[Is].Nbf();
+        size_t I_start = pshells[Is].first_ind();
 
-        size_t N_J = pshells[Js].get_Nbf();
-        size_t J_start = pshells[Js].get_first_ind();
+        size_t N_J = pshells[Js].Nbf();
+        size_t J_start = pshells[Js].first_ind();
 
         // Compute the integrals
         eri.compute(is,js,Nsh_e+Is,Nsh_e+Js);

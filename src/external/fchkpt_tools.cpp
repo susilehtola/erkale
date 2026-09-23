@@ -720,9 +720,9 @@ BasisSet form_basis(const Storage & stor) {
   bas.finalize(true,true);
 
   // Check that we get the same amount of basis functions
-  if((int) bas.get_Nbf() != stor.get_int("Number of basis functions")) {
+  if((int) bas.Nbf() != stor.get_int("Number of basis functions")) {
     std::ostringstream oss;
-    oss << "\nERKALE basis has " << bas.get_Nbf() << " functions while Gaussian has " << stor.get_int("Number of basis functions") << " functions!\n";
+    oss << "\nERKALE basis has " << bas.Nbf() << " functions while Gaussian has " << stor.get_int("Number of basis functions") << " functions!\n";
     throw std::runtime_error(oss.str());
   }
 

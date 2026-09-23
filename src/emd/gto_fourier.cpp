@@ -318,18 +318,18 @@ std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std
     const size_t rep=idents[i][0];
     // Cartesians and (if used) the spherical-harmonic transform are the
     // same for every contraction of the shell
-    const std::vector<shellf_t> cart=bas.get_cart(rep);
+    const std::vector<shellf_t> cart=bas.cart(rep);
     const bool lm=bas.lm_in_use(rep);
-    const arma::mat transmat= lm ? bas.get_trans(rep) : arma::mat();
-    const int l=bas.get_am(rep);
+    const arma::mat transmat= lm ? bas.transmat(rep) : arma::mat();
+    const int l=bas.am(rep);
     // The shell may be generally contracted: expand each contraction and
     // stack the results contraction-slowest, matching the basis function
-    // order (get_Nbf = nctr*(2l+1)).
-    const GaussianShell sh=bas.get_shell(rep);
+    // order (Nbf() = nctr*(2l+1)).
+    const GaussianShell sh=bas.shell(rep);
 
     std::vector<GTO_Fourier> shell_expansion;
-    for(size_t ic=0;ic<sh.get_Nctr();ic++) {
-      const std::vector<contr_t> contr=sh.get_contr(ic);
+    for(size_t ic=0;ic<sh.Nctr();ic++) {
+      const std::vector<contr_t> contr=sh.contr(ic);
 
       // Form expansions of cartesian functions for this contraction
       std::vector<GTO_Fourier> cart_expansion;
@@ -386,7 +386,7 @@ double eval_emd(const BasisSet & bas, const arma::cx_mat & P, const std::vector<
     fpoly[i].resize(fourier[i].size());
 
   // Amount of basis functions
-  const size_t Nbf=bas.get_Nbf();
+  const size_t Nbf=bas.Nbf();
   // Values of the basis functions, i.e. the above with the additional phase factor
   std::vector< std::complex<double> > fvals(Nbf);
 
@@ -404,13 +404,13 @@ double eval_emd(const BasisSet & bas, const arma::cx_mat & P, const std::vector<
       // The current shell is
       size_t is=idents[ii][jj];
       // and it is centered at
-      coords_t cen=bas.get_shell_center(is);
+      coords_t cen=bas.shell_center(is);
       // thus the phase factor we get is
       std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
 
       // Now we just store the individual function values.
-      size_t i0=bas.get_first_ind(is);
-      size_t Ni=bas.get_Nbf(is);
+      size_t i0=bas.first_ind(is);
+      size_t Ni=bas.Nbf(is);
       for(size_t fi=0;fi<Ni;fi++)
 	fvals[i0+fi]=phase*fpoly[ii][fi];
     }

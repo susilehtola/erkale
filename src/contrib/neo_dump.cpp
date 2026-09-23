@@ -113,10 +113,10 @@ namespace {
   // stores the full tensor instead of contracting with a density.
   arma::mat exact_ep(const BasisSet & ebasis, const BasisSet & pbasis,
                      double omega, double alpha, double beta) {
-    std::vector<GaussianShell> eshells = ebasis.get_shells();
-    std::vector<GaussianShell> pshells = pbasis.get_shells();
-    size_t Ne = ebasis.get_Nbf();
-    size_t Np = pbasis.get_Nbf();
+    std::vector<GaussianShell> eshells = ebasis.shells();
+    std::vector<GaussianShell> pshells = pbasis.shells();
+    size_t Ne = ebasis.Nbf();
+    size_t Np = pbasis.Nbf();
 
     arma::mat G(Ne*Ne, Np*Np, arma::fill::zeros);
 
@@ -128,17 +128,17 @@ namespace {
     ERIWorker * eri = eri_owner.get();
 
     for(size_t i=0;i<eshells.size();i++) {
-      size_t Ni = eshells[i].get_Nbf();
-      size_t i0 = eshells[i].get_first_ind();
+      size_t Ni = eshells[i].Nbf();
+      size_t i0 = eshells[i].first_ind();
       for(size_t j=0;j<eshells.size();j++) {
-        size_t Nj = eshells[j].get_Nbf();
-        size_t j0 = eshells[j].get_first_ind();
+        size_t Nj = eshells[j].Nbf();
+        size_t j0 = eshells[j].first_ind();
         for(size_t k=0;k<pshells.size();k++) {
-          size_t Nk = pshells[k].get_Nbf();
-          size_t k0 = pshells[k].get_first_ind();
+          size_t Nk = pshells[k].Nbf();
+          size_t k0 = pshells[k].first_ind();
           for(size_t l=0;l<pshells.size();l++) {
-            size_t Nl = pshells[l].get_Nbf();
-            size_t l0 = pshells[l].get_first_ind();
+            size_t Nl = pshells[l].Nbf();
+            size_t l0 = pshells[l].first_ind();
 
             eri->compute(i,j,Nsh_e+k,Nsh_e+l);
             const std::vector<double> & ints = *eri->getp();
@@ -261,8 +261,8 @@ void neo_dump(const std::string & filename,
   }
   bool dense = (representation == "dense");
 
-  size_t Ne = ebasis.get_Nbf();
-  size_t Np = pbasis.get_Nbf();
+  size_t Ne = ebasis.Nbf();
+  size_t Np = pbasis.Nbf();
 
   printf("\nWriting NEO-SCF dump to %s (%s integrals).\n", filename.c_str(), representation.c_str());
   fflush(stdout);

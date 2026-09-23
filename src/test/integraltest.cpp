@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
   chkpt.read(basis);
 
   // Get shells in basis set
-  std::vector<GaussianShell> shells(basis.get_shells());
+  std::vector<GaussianShell> shells(basis.shells());
 
   // libcint description of the basis
   CintEnv cenv(basis);
@@ -49,10 +49,10 @@ int main(int argc, char **argv) {
 	    std::vector<double> huzinaga(eri.get());
 
 	    // Compare integrals
-	    size_t Ni=shells[is].get_Nbf();
-	    size_t Nj=shells[js].get_Nbf();
-	    size_t Nk=shells[ks].get_Nbf();
-	    size_t Nl=shells[ls].get_Nbf();
+	    size_t Ni=shells[is].Nbf();
+	    size_t Nj=shells[js].Nbf();
+	    size_t Nk=shells[ks].Nbf();
+	    size_t Nl=shells[ls].Nbf();
 
 	    for(size_t ii=0;ii<Ni;ii++)
 	      for(size_t jj=0;jj<Nj;jj++)
@@ -78,11 +78,11 @@ int main(int argc, char **argv) {
 		      throw std::runtime_error("Integrals are wrong.\n");
 		    }
 		  }
-	    //printf("%c %c %c %c OK\n",shell_types[shells[is].get_am()],shell_types[shells[js].get_am()],shell_types[shells[ks].get_am()],shell_types[shells[ls].get_am()]);
+	    //printf("%c %c %c %c OK\n",shell_types[shells[is].am()],shell_types[shells[js].am()],shell_types[shells[ks].am()],shell_types[shells[ls].am()]);
 	  }
-	  //printf("%c %c %c * OK\n",shell_types[shells[is].get_am()],shell_types[shells[js].get_am()],shell_types[shells[ks].get_am()]);
+	  //printf("%c %c %c * OK\n",shell_types[shells[is].am()],shell_types[shells[js].am()],shell_types[shells[ks].am()]);
 	}
-	printf("%c %c * * OK\n",shell_types[shells[is].get_am()],shell_types[shells[js].get_am()]);
+	printf("%c %c * * OK\n",shell_types[shells[is].am()],shell_types[shells[js].am()]);
       }
     }
   }

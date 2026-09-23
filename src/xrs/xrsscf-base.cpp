@@ -144,11 +144,11 @@ std::vector<double> fch_occ(size_t excited, size_t nocc) {
 std::vector<size_t> atom_list(const BasisSet & basis, size_t xcatom, bool verbose) {
   // Localize on all the atoms of the same type than the excited atom
   std::vector<ovl_sort_t> locind;
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    if(!basis.get_nucleus(i).bsse && stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
+  for(size_t i=0;i<basis.Nnuc();i++)
+    if(!basis.nucleus(i).bsse && stricmp(basis.symbol(i),basis.symbol(xcatom))==0) {
       ovl_sort_t tmp;
       tmp.idx=i;
-      tmp.S=norm(basis.get_nuclear_coords(i)-basis.get_nuclear_coords(xcatom));
+      tmp.S=norm(basis.nuclear_coords(i)-basis.nuclear_coords(xcatom));
       locind.push_back(tmp);
     }
   // Sort in increasing distance
@@ -187,7 +187,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
     throw std::runtime_error("Invalid number of initial orbital.\n");
 
   // Charge of atom is
-  int Z=basis.get_nucleus(xcatom).Z;
+  int Z=basis.nucleus(xcatom).Z;
   // Pad to next noble atom to account for multiplicity and state
   for(size_t i=0;i<sizeof(magicno)/sizeof(magicno[0])-1;i++) {
     if(Z==magicno[i])
@@ -217,7 +217,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
     nloc=nocc;
 
   // The atom is located at
-  coords_t cen=basis.get_nuclear_coords(xcatom);
+  coords_t cen=basis.nuclear_coords(xcatom);
 
   // Compute moment integrals around the nucleus
   std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);

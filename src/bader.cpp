@@ -42,8 +42,8 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
   Timer t;
 
   // Get nuclei and nuclear coordinate matrix
-  nuclei=basis.get_nuclei();
-  nucc=basis.get_nuclear_coords();
+  nuclei=basis.nuclei();
+  nucc=basis.nuclear_coords();
 
   // Minimum and maximum coordinates
   start=arma::trans(arma::min(nucc)-padding);
@@ -94,9 +94,9 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
   double dL=sqrt(3.0/8.0)*L;
 
   // Shell ranges. Basically this could be more agressive, i.e.
-  //  std::vector<double> shran=basis.get_shell_ranges(sqrt(SMALLDENSITY));
+  //  std::vector<double> shran=basis.shell_ranges(sqrt(SMALLDENSITY));
   // but for the moment this causes problems in the near-grid algorithm...
-  std::vector<double> shran=basis.get_shell_ranges(SMALLDENSITY);
+  std::vector<double> shran=basis.shell_ranges(SMALLDENSITY);
 
   // Fill array. Integrated charge
   double Q=0.0;
@@ -109,16 +109,16 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
 
     // Form list of important shells in the partition region
     std::vector<size_t> compute_shells;
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
       // Compute distance from grid element center to nucleus
       coords_t gp;
       gp.x=cen(0);
       gp.y=cen(1);
       gp.z=cen(2);
-      double dist=norm(basis.get_nuclear_coords(inuc)-gp);
+      double dist=norm(basis.nuclear_coords(inuc)-gp);
 
       // Get indices of shells centered on the nucleus
-      std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
+      std::vector<size_t> shellinds=basis.shell_inds(inuc);
 
       // Do the shells contribute?
       for(size_t is=0;is<shellinds.size();is++)
@@ -147,7 +147,7 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
 	    arma::vec bf=basis.eval_func(compute_shells[is],x,y,z);
 	    for(size_t fi=0;fi<bf.size();fi++) {
 	      bf_f_t f;
-	      f.ind=basis.get_first_ind(compute_shells[is])+fi;
+	      f.ind=basis.first_ind(compute_shells[is])+fi;
 	      f.f=bf(fi);
 	      flist.push_back(f);
 	    }
@@ -1411,7 +1411,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
 #pragma omp parallel for schedule(dynamic,1)
 #endif
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
-    Sat[ireg].zeros(basis.get_Nbf(),basis.get_Nbf());
+    Sat[ireg].zeros(basis.Nbf(),basis.Nbf());
 
     for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
       for(arma::sword iix=0;iix<array_size(0);iix++)

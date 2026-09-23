@@ -41,7 +41,7 @@ const double odegthr=1e-4;
 
 // Check proper normalization of basis
 void check_norm(const BasisSet & bas) {
-  size_t Nbf=bas.get_Nbf();
+  size_t Nbf=bas.Nbf();
   arma::mat S=bas.overlap();
 
   for(size_t i=0;i<Nbf;i++)

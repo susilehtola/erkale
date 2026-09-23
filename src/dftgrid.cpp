@@ -244,7 +244,7 @@ void AngularGrid::becke_weights(double a) {
   // Compute weights of points.
 
   // Number of atoms in system
-  const size_t Nat=basp_->get_Nnuc();
+  const size_t Nat=basp_->Nnuc();
 
   // Helper arrays
   arma::vec atom_dist;
@@ -261,7 +261,7 @@ void AngularGrid::becke_weights(double a) {
   smu_ab.zeros(Nat,Nat);
 
   // Get nuclei
-  std::vector<nucleus_t> nuccoords=basp_->get_nuclei();
+  std::vector<nucleus_t> nuccoords=basp_->nuclei();
 
   // Get nuclear distances
   arma::mat nucdist=basp_->nuclear_distances();
@@ -2112,7 +2112,7 @@ arma::vec AngularGrid::eval_force_u() const {
   }
 
   // Initialize force
-  arma::vec f(3*basp_->get_Nnuc());
+  arma::vec f(3*basp_->Nnuc());
   f.zeros();
 
   // Screen quadrature points by small densities
@@ -2122,14 +2122,14 @@ arma::vec AngularGrid::eval_force_u() const {
     return f;
 
   // Loop over nuclei
-  for(size_t inuc=0;inuc<basp_->get_Nnuc();inuc++) {
+  for(size_t inuc=0;inuc<basp_->Nnuc();inuc++) {
     // Grad rho in grid points wrt functions centered on nucleus
     arma::mat gradrhoa(3,grid_.size());
     gradrhoa.zeros();
     arma::mat gradrhob(3,grid_.size());
     gradrhob.zeros();
     for(size_t iish=0;iish<shells_.size();iish++)
-      if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+      if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	// Increment grad rho.
 	for(size_t iip=0;iip<screen.n_elem;iip++) {
 	  size_t ip(screen(iip));
@@ -2165,7 +2165,7 @@ arma::vec AngularGrid::eval_force_u() const {
       Xb.zeros();
 
       for(size_t iish=0;iish<shells_.size();iish++)
-	if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+	if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	  // First contribution
 	  for(size_t iip=0;iip<screen.n_elem;iip++) {
 	    size_t ip(screen(iip));
@@ -2248,7 +2248,7 @@ arma::vec AngularGrid::eval_force_u() const {
 	arma::mat Yb(3,grid_.size());
 	Yb.zeros();
 	for(size_t iish=0;iish<shells_.size();iish++)
-	  if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+	  if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	    for(size_t iip=0;iip<screen.n_elem;iip++) {
 	      size_t ip(screen(iip));
 	      for(size_t mu=bf_i0_(iish);mu<bf_i0_(iish)+bf_N_(iish);mu++) {
@@ -2270,7 +2270,7 @@ arma::vec AngularGrid::eval_force_u() const {
 	  Za.zeros(3,grid_.size());
 	  Zb.zeros(3,grid_.size());
 	  for(size_t iish=0;iish<shells_.size();iish++)
-	    if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+	    if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	      for(size_t iip=0;iip<screen.n_elem;iip++) {
 		size_t ip(screen(iip));
 		for(size_t mu=bf_i0_(iish);mu<bf_i0_(iish)+bf_N_(iish);mu++) {
@@ -2339,7 +2339,7 @@ arma::vec AngularGrid::eval_force_r() const {
   }
 
   // Initialize force
-  arma::vec f(3*basp_->get_Nnuc());
+  arma::vec f(3*basp_->Nnuc());
   f.zeros();
 
   // Screen quadrature points by small densities
@@ -2349,12 +2349,12 @@ arma::vec AngularGrid::eval_force_r() const {
     return f;
 
   // Loop over nuclei
-  for(size_t inuc=0;inuc<basp_->get_Nnuc();inuc++) {
+  for(size_t inuc=0;inuc<basp_->Nnuc();inuc++) {
     // Grad rho in grid points wrt functions centered on nucleus
     arma::mat gradrho(3,grid_.size());
     gradrho.zeros();
     for(size_t iish=0;iish<shells_.size();iish++)
-      if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+      if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	// Increment grad rho.
 	for(size_t iip=0;iip<screen.n_elem;iip++) {
 	  size_t ip(screen(iip));
@@ -2382,7 +2382,7 @@ arma::vec AngularGrid::eval_force_r() const {
       X.zeros();
 
       for(size_t iish=0;iish<shells_.size();iish++)
-	if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+	if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	  // First contribution
 	  for(size_t iip=0;iip<screen.n_elem;iip++) {
 	    size_t ip(screen(iip));
@@ -2438,7 +2438,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	arma::mat Y(3,grid_.size());
 	Y.zeros();
 	for(size_t iish=0;iish<shells_.size();iish++)
-	  if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+	  if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	    for(size_t iip=0;iip<screen.n_elem;iip++) {
 	      size_t ip(screen(iip));
 	      for(size_t mu=bf_i0_(iish);mu<bf_i0_(iish)+bf_N_(iish);mu++) {
@@ -2455,7 +2455,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	if(do_mgga_l_) {
 	  Z.zeros(3,grid_.size());
 	  for(size_t iish=0;iish<shells_.size();iish++)
-	    if(basp_->get_shell_center_ind(shells_[iish])==inuc) {
+	    if(basp_->shell_center_ind(shells_[iish])==inuc) {
 	      for(size_t iip=0;iip<screen.n_elem;iip++) {
 		size_t ip(screen(iip));
 		for(size_t mu=bf_i0_(iish);mu<bf_i0_(iish)+bf_N_(iish);mu++) {
@@ -2975,23 +2975,23 @@ void AngularGrid::form_hirshfeld_grid(const Hirshfeld & hirsh) {
 
 void AngularGrid::update_shell_list() {
   // Form list of important basis functions. Shell ranges
-  std::vector<double> shran=basp_->get_shell_ranges();
-  if(shran.size() != basp_->get_Nshells())
+  std::vector<double> shran=basp_->shell_ranges();
+  if(shran.size() != basp_->Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
   // Distances to other nuclei
-  std::vector<double> nucdist=basp_->get_nuclear_distances(info_.atind);
+  std::vector<double> nucdist=basp_->nuclear_distances(info_.atind);
 
   // Current radius
   double rad=info_.R;
   // Shells that might contribute, and the amount of functions
   pot_shells_.clear();
   size_t Nbf=0;
-  for(size_t inuc=0;inuc<basp_->get_Nnuc();inuc++) {
+  for(size_t inuc=0;inuc<basp_->Nnuc();inuc++) {
     // Closest distance of shell to nucleus. Covers both nucleus
     // inside shell, and nucleus outside the shell.
     double dist=fabs(nucdist[inuc]-rad);
     // Get indices of shells centered on nucleus
-    std::vector<size_t> shellinds=basp_->get_shell_inds(inuc);
+    std::vector<size_t> shellinds=basp_->shell_inds(inuc);
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
@@ -3000,7 +3000,7 @@ void AngularGrid::update_shell_list() {
 	// Add shell to list of shells to compute
 	pot_shells_.push_back(shellinds[ish]);
 	// Increment amount of important functions
-	Nbf+=basp_->get_Nbf(shellinds[ish]);
+	Nbf+=basp_->Nbf(shellinds[ish]);
       }
     }
   }
@@ -3010,9 +3010,9 @@ void AngularGrid::update_shell_list() {
   size_t ioff=0;
   for(size_t i=0;i<pot_shells_.size();i++) {
     // Amount of functions on shell is
-    size_t Nsh=basp_->get_Nbf(pot_shells_[i]);
+    size_t Nsh=basp_->Nbf(pot_shells_[i]);
     // Shell offset
-    size_t sh0=basp_->get_first_ind(pot_shells_[i]);
+    size_t sh0=basp_->first_ind(pot_shells_[i]);
     // Indices
     arma::uvec ls=(arma::linspace<arma::uvec>(sh0,sh0+Nsh-1,Nsh));
     pot_bf_ind_.subvec(ioff,ioff+Nsh-1)=ls;
@@ -3022,15 +3022,15 @@ void AngularGrid::update_shell_list() {
 
 void AngularGrid::compute_bf() {
   // Create list of shells that actually contribute. Shell ranges
-  std::vector<double> shran=basp_->get_shell_ranges();
-  if(shran.size() != basp_->get_Nshells())
+  std::vector<double> shran=basp_->shell_ranges();
+  if(shran.size() != basp_->Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
 
   shells_.clear();
   size_t Nbf=0;
   for(size_t is=0;is<pot_shells_.size();is++) {
     // Shell center is
-    coords_t cen(basp_->get_shell_center(pot_shells_[is]));
+    coords_t cen(basp_->shell_center(pot_shells_[is]));
     // Shell range is
     double rangesq(std::pow(shran[pot_shells_[is]],2));
 
@@ -3040,7 +3040,7 @@ void AngularGrid::compute_bf() {
       if(normsq(grid_[ip].r-cen)<=rangesq) {
 	// Shell is important!
 	shells_.push_back(pot_shells_[is]);
-	Nbf+=basp_->get_Nbf(pot_shells_[is]);
+	Nbf+=basp_->Nbf(pot_shells_[is]);
 	break;
       }
     }
@@ -3054,10 +3054,10 @@ void AngularGrid::compute_bf() {
   size_t ioff=0;
   for(size_t i=0;i<shells_.size();i++) {
     // Amount of functions on shell is
-    size_t Nsh=basp_->get_Nbf(shells_[i]);
+    size_t Nsh=basp_->Nbf(shells_[i]);
     bf_N_(i)=Nsh;
     // Shell offset
-    size_t sh0=basp_->get_first_ind(shells_[i]);
+    size_t sh0=basp_->first_ind(shells_[i]);
     // Local offset
     bf_i0_(i)=ioff;
     // Indices
@@ -3073,7 +3073,7 @@ void AngularGrid::compute_bf() {
   size_t joff=0;
   for(size_t i=0;i<pot_shells_.size() && j<shells_.size();i++) {
     // Amount of functions on shell is
-    size_t Nsh=basp_->get_Nbf(pot_shells_[i]);
+    size_t Nsh=basp_->Nbf(pot_shells_[i]);
     // Store indices?
     if(pot_shells_[i]==shells_[j]) {
       arma::uvec ls=(arma::linspace<arma::uvec>(joff,joff+Nsh-1,Nsh));
@@ -3145,7 +3145,7 @@ void AngularGrid::compute_bf() {
 
 void AngularGrid::eval_SAP(const SAP & sap, arma::mat & Vo) const {
   // List of nuclei
-  std::vector<nucleus_t> nuclei(basp_->get_nuclei());
+  std::vector<nucleus_t> nuclei(basp_->nuclei());
 
   // Form the potential at every grid point
   arma::rowvec vsap(grid_.size());
@@ -3179,7 +3179,7 @@ DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
   verbose_=ver;
 
   // Allocate atomic grids
-  grids_.resize(bas->get_Nnuc());
+  grids_.resize(bas->Nnuc());
 
   // Allocate work grids
 #ifdef _OPENMP
@@ -3239,13 +3239,13 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool
   nrad=rad.size(); // Sanity check
 
   // Construct grids
-  size_t Nat=basp_->get_Nnuc();
+  size_t Nat=basp_->Nnuc();
   grids_.clear();
   // Loop over atoms
   for(size_t iat=0;iat<Nat;iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp_->get_nuclear_coords(iat);
+    sh.cen=basp_->nuclear_coords(iat);
     sh.tol=tol;
     sh.np=0;
     sh.nfunc=0;
@@ -3301,17 +3301,17 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
     wrk_[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp_->get_Nnuc());
+  std::vector<size_t> nrad(basp_->Nnuc());
 
   // Form radial shells
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp_->get_nuclear_coords(iat);
+    sh.cen=basp_->nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=koster_nrad(ftoler,basp_->get_Z(iat));
+    size_t nr=koster_nrad(ftoler,basp_->Z(iat));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -3369,17 +3369,17 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
     wrk_[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp_->get_Nnuc());
+  std::vector<size_t> nrad(basp_->Nnuc());
 
   // Form radial shells
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp_->get_nuclear_coords(iat);
+    sh.cen=basp_->nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=koster_nrad(ftoler,basp_->get_Z(iat));
+    size_t nr=koster_nrad(ftoler,basp_->Z(iat));
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev_jac(nr,rad,wrad);
@@ -3435,17 +3435,17 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
     wrk_[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp_->get_Nnuc());
+  std::vector<size_t> nrad(basp_->Nnuc());
 
   // Form radial shells
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp_->get_nuclear_coords(iat);
+    sh.cen=basp_->nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=koster_nrad(ftoler,basp_->get_Z(iat));
+    size_t nr=koster_nrad(ftoler,basp_->Z(iat));
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev_jac(nr,rad,wrad);
@@ -3531,20 +3531,20 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
 void DFTGrid::krack_grid_info(double otoler) const {
   printf("Maximal composition of Krack adaptive grid\n");
   printf("%3s %3s %4s %4s\n","idx","sym","nrad","lmax");
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
-    int nr=krack_nrad(otoler,basp_->get_Z(iat));
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
+    int nr=krack_nrad(otoler,basp_->Z(iat));
     int nl=krack_lmax(otoler);
-    printf("%3i %-3s %4i %4i\n",(int) iat+1,basp_->get_symbol(iat).c_str(),nr,nl);
+    printf("%3i %-3s %4i %4i\n",(int) iat+1,basp_->symbol(iat).c_str(),nr,nl);
   }
 }
 
 void DFTGrid::koster_grid_info(double otoler) const {
   printf("Maximal composition of Koster adaptive grid\n");
   printf("%3s %3s %4s %4s\n","idx","sym","nrad","lmax");
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
-    int nr=koster_nrad(otoler,basp_->get_Z(iat));
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
+    int nr=koster_nrad(otoler,basp_->Z(iat));
     int nl=koster_lmax(otoler);
-    printf("%3i %-3s %4i %4i\n",(int) iat+1,basp_->get_symbol(iat).c_str(),nr,nl);
+    printf("%3i %-3s %4i %4i\n",(int) iat+1,basp_->symbol(iat).c_str(),nr,nl);
   }
 }
 
@@ -3560,19 +3560,19 @@ void DFTGrid::construct_becke(double otoler) {
     wrk_[i].set_grad_tau_lapl(false,false,false);
 
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp_->get_Nnuc());
+  std::vector<size_t> nrad(basp_->Nnuc());
 
   Timer t;
 
   // Form radial shells
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp_->get_nuclear_coords(iat);
+    sh.cen=basp_->nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=krack_nrad(otoler,basp_->get_Z(iat));
+    size_t nr=krack_nrad(otoler,basp_->Z(iat));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -3626,19 +3626,19 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
     wrk_[i].set_grad_tau_lapl(false,false,false);
 
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp_->get_Nnuc());
+  std::vector<size_t> nrad(basp_->Nnuc());
 
   Timer t;
 
   // Form radial shells
-  for(size_t iat=0;iat<basp_->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp_->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp_->get_nuclear_coords(iat);
+    sh.cen=basp_->nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=krack_nrad(otoler,basp_->get_Z(iat));
+    size_t nr=krack_nrad(otoler,basp_->Z(iat));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -3696,7 +3696,7 @@ size_t DFTGrid::Nfuncs() const {
 
 arma::mat DFTGrid::eval_overlap() {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrix
   arma::mat S(N,N);
@@ -3741,7 +3741,7 @@ arma::mat DFTGrid::eval_overlap() {
 
 arma::mat DFTGrid::eval_overlap(size_t inuc) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrix
   arma::mat Sat(N,N);
@@ -3789,11 +3789,11 @@ arma::mat DFTGrid::eval_overlap(size_t inuc) {
 
 std::vector<arma::mat> DFTGrid::eval_overlaps() {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
-  std::vector<arma::mat> Sat(basp_->get_Nnuc());
-  for(size_t inuc=0;inuc<basp_->get_Nnuc();inuc++)
+  std::vector<arma::mat> Sat(basp_->Nnuc());
+  for(size_t inuc=0;inuc<basp_->Nnuc();inuc++)
     Sat[inuc].zeros(N,N);
 
 #ifdef _OPENMP
@@ -3837,7 +3837,7 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
 
 arma::mat DFTGrid::eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, double thr) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
   arma::mat S(N,N);
@@ -3885,7 +3885,7 @@ arma::mat DFTGrid::eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, 
 
 arma::mat DFTGrid::eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
   arma::mat S(N,N);
@@ -3933,7 +3933,7 @@ arma::mat DFTGrid::eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi
 
 arma::mat DFTGrid::eval_tau_overlap(const arma::cx_mat & Cocc, double k, double thr) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
   arma::mat S(N,N);
@@ -3982,7 +3982,7 @@ arma::mat DFTGrid::eval_tau_overlap(const arma::cx_mat & Cocc, double k, double 
 
 arma::mat DFTGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
   arma::mat S(N,N);
@@ -4031,7 +4031,7 @@ arma::mat DFTGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma:
 
 arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
   arma::mat Sat(N,N);
@@ -4061,11 +4061,11 @@ arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) 
 
 std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh) {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
-  std::vector<arma::mat> Sat(basp_->get_Nnuc());
-  for(size_t inuc=0;inuc<basp_->get_Nnuc();inuc++)
+  std::vector<arma::mat> Sat(basp_->Nnuc());
+  for(size_t inuc=0;inuc<basp_->Nnuc();inuc++)
     Sat[inuc].zeros(N,N);
 
 #ifdef _OPENMP
@@ -4224,7 +4224,7 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
 }
 
 arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
-  arma::vec Nel(basp_->get_Nnuc());
+  arma::vec Nel(basp_->Nnuc());
   Nel.zeros();
 
 #ifdef _OPENMP
@@ -4266,7 +4266,7 @@ arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
 
 
 arma::vec DFTGrid::compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat & P) {
-  arma::vec Nel(basp_->get_Nnuc());
+  arma::vec Nel(basp_->Nnuc());
   Nel.zeros();
 
 #ifdef _OPENMP
@@ -4695,7 +4695,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
 }
 
 arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
-  arma::vec f(3*basp_->get_Nnuc());
+  arma::vec f(3*basp_->Nnuc());
   f.zeros();
 
 #ifdef _OPENMP
@@ -4760,7 +4760,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 }
 
 arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb) {
-  arma::vec f(3*basp_->get_Nnuc());
+  arma::vec f(3*basp_->Nnuc());
   f.zeros();
 
 #ifdef _OPENMP
@@ -4826,7 +4826,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 
 arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma::mat & P) {
   // Forces on atoms
-  arma::vec f(3*basp_->get_Nnuc());
+  arma::vec f(3*basp_->Nnuc());
   f.zeros();
 
   // Original gradient and laplacian settings
@@ -5146,10 +5146,10 @@ void DFTGrid::check_potential(int func_id, const arma::mat & Pa, const arma::mat
 
 void DFTGrid::print_grid(std::string met) const {
   // Amount of integration points
-  arma::uvec np(basp_->get_Nnuc());
+  arma::uvec np(basp_->Nnuc());
   np.zeros();
   // Amount of function values
-  arma::uvec nf(basp_->get_Nnuc());
+  arma::uvec nf(basp_->Nnuc());
   nf.zeros();
 
   for(size_t i=0;i<grids_.size();i++) {
@@ -5163,8 +5163,8 @@ void DFTGrid::print_grid(std::string met) const {
   */
 
   printf("Composition of %s grid:\n %7s %7s %10s\n",met.c_str(),"atom","Npoints","Nfuncs");
-  for(size_t i=0;i<basp_->get_Nnuc();i++)
-    printf(" %4i %-2s %7i %10i\n",(int) i+1, basp_->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+  for(size_t i=0;i<basp_->Nnuc();i++)
+    printf(" %4i %-2s %7i %10i\n",(int) i+1, basp_->symbol(i).c_str(), (int) np(i), (int) nf(i));
 }
 
 double DFTGrid::density_threshold(const arma::mat & P, double thr) {
@@ -5187,7 +5187,7 @@ double DFTGrid::density_threshold(const arma::mat & P, double thr) {
 
 arma::mat DFTGrid::eval_SAP() {
   // Amount of basis functions
-  size_t N=basp_->get_Nbf();
+  size_t N=basp_->Nbf();
 
   // Returned matrices
   arma::mat V(N,N);

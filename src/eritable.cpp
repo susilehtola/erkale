@@ -203,13 +203,13 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 }
 
 size_t ERItable::fill(const BasisSet * basp, double tol) {
-  Nbf_=basp->get_Nbf();
+  Nbf_=basp->Nbf();
 
   // libcint description of the basis, shared by the workers
   CintEnv cenv(*basp);
 
   // Shells
-  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
+  const std::vector<GaussianShell> & shells=basp->shells_ref();
 
   // Compute memory requirements
   size_t N;

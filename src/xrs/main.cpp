@@ -109,7 +109,7 @@ BasisSet augment_basis(const BasisSet & basis) {
     const size_t ind=augind[iaug];
 
     // The symbol of the atom
-    std::string el=basis.get_symbol(ind);
+    std::string el=basis.symbol(ind);
 
     // The basis to use for the atom.
     ElementBasisSet elbas;
@@ -123,11 +123,11 @@ BasisSet augment_basis(const BasisSet & basis) {
     }
 
     // Get original number of shells
-    size_t Nsh_orig=augbas.get_Nshells();
+    size_t Nsh_orig=augbas.Nshells();
     // Add shells, no sorting.
     augbas.add_shells(ind,elbas,false);
     // Convert contractions on the added shells
-    for(size_t ish=Nsh_orig;ish<augbas.get_Nshells();ish++)
+    for(size_t ish=Nsh_orig;ish<augbas.Nshells();ish++)
       augbas.convert_contraction(ish);
   }
 
@@ -153,9 +153,9 @@ void augmented_solution(const BasisSet & basis, const uscf_t & sol, size_t nocca
 
 
   // Amount of functions in original basis set is
-  const size_t Nbf=basis.get_Nbf();
+  const size_t Nbf=basis.Nbf();
   // Total number of functions in augmented set is
-  const size_t Ntot=augbas.get_Nbf();
+  const size_t Ntot=augbas.Nbf();
   // Amount of augmentation functions is
   const size_t Naug=Ntot-Nbf;
 
@@ -384,7 +384,7 @@ std::vector<spectrum_t> compute_transitions(const BasisSet & basis, const arma::
   std::vector<spectrum_t> ret;
 
   // Coordinates of excited atom
-  coords_t xccen=basis.get_nuclear_coords(iat);
+  coords_t xccen=basis.nuclear_coords(iat);
   // Dipole moment matrix
   std::vector<arma::mat> mom1=basis.moment(1,xccen.x,xccen.y,xccen.z);
   // Compute RHS of transition
@@ -419,7 +419,7 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_series(const Bas
   Timer t;
 
   // Get the grid for computing the spherical averages.
-  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
+  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.max_am());
   // We normalize the weights so that for purely dipolar transitions we
   // get the same output as with using the dipole matrix.
   for(size_t i=0;i<grid.size();i++) {
@@ -503,7 +503,7 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
   printf("Computing transitions using Fourier method.\n");
 
   // Form products of basis functions.
-  const size_t Nbf=basis.get_Nbf();
+  const size_t Nbf=basis.Nbf();
 
   std::vector<prod_gaussian_3d> bfprod=compute_products(basis);
 
@@ -516,7 +516,7 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
   t.set();
 
   // Get the grid for computing the spherical averages.
-  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
+  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.max_am());
   // We normalize the weights so that for purely dipolar transitions we
   // get the same output as with using the dipole matrix.
   for(size_t i=0;i<grid.size();i++) {
@@ -602,7 +602,7 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_local(const Basi
   }
 
   // Do lm expansion of orbitals
-  lmtrans lm(C,basis,basis.get_nuclear_coords(iat),Nrad,Lmax,Lquad);
+  lmtrans lm(C,basis,basis.nuclear_coords(iat),Nrad,Lmax,Lquad);
 
   printf("\n");
   lm.print_info();
@@ -714,7 +714,7 @@ enum loadresult load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol, a
 
   if(ok) {
     // Get number of basis functions
-    size_t Nbf=basis.get_Nbf();
+    size_t Nbf=basis.Nbf();
 
     if(sol.Ca.n_rows != Nbf)
       ok=LOAD_FAIL;

@@ -216,22 +216,22 @@ bool operator==(const contr_t & lhs, const contr_t & rhs);
 /// Basis set
 class BasisSet {
   /// Nuclei
-  std::vector<nucleus_t> nuclei;
+  std::vector<nucleus_t> nuclei_;
   /// Basis functions
-  std::vector<GaussianShell> shells;
+  std::vector<GaussianShell> shells_;
 
   /// Use spherical harmonics by default as basis?
-  bool uselm;
+  bool uselm_;
   /// Use cartesian s and p functions if spherical harmonics are used?
-  bool optlm;
+  bool optlm_;
 
   /// Internuclear distances
-  arma::mat nucleardist;
+  arma::mat nucleardist_;
   /// List of unique shell pairs
-  std::vector<shellpair_t> shellpairs;
+  std::vector<shellpair_t> shellpairs_;
 
   /// Ranges of shells
-  std::vector<double> shell_ranges;
+  std::vector<double> shell_ranges_;
 
   /// Check for same geometry
   bool same_geometry(const BasisSet & rhs) const;
@@ -333,7 +333,7 @@ public:
   /// Form list of unique shell pairs
   void form_unique_shellpairs();
   /// Get list of unique shell pairs
-  std::vector<shellpair_t> get_unique_shellpairs() const;
+  std::vector<shellpair_t> unique_shellpairs() const;
 
   /// Build ScreeningData: Schwarz Q, distance estimate M, and a
   /// value-sorted, threshold-truncated shell-pair list. Single
@@ -360,43 +360,43 @@ public:
   arma::mat nuclear_distances() const;
 
   /// Get angular momentum of shell
-  int get_am(size_t shind) const;
+  int am(size_t shind) const;
   /// Get maximum angular momentum in basis set
-  int get_max_am() const;
+  int max_am() const;
   /// Get maximum number of contractions
-  size_t get_max_Ncontr() const;
+  size_t max_Ncontr() const;
 
   /// Get index of last function, throws an exception if no functions exist
-  size_t get_last_ind() const;
+  size_t last_ind() const;
   /// Get index of first function on shell
-  size_t get_first_ind(size_t shind) const;
+  size_t first_ind(size_t shind) const;
   /// Get index of last function on shell
-  size_t get_last_ind(size_t shind) const;
+  size_t last_ind(size_t shind) const;
 
   /// Get R^2 expectation value (measure of basis function extent)
-  arma::vec get_bf_Rsquared() const;
+  arma::vec bf_Rsquared() const;
   /// Get shell indices of basis functions
   arma::uvec shell_indices() const;
   /// Find shell index of basis function
   size_t find_shell_ind(size_t find) const;
 
   /// Get shells in basis set
-  std::vector<GaussianShell> get_shells() const;
+  std::vector<GaussianShell> shells() const;
   /// Get shells in basis set (reference, no copy)
-  const std::vector<GaussianShell> & get_shells_ref() const;
+  const std::vector<GaussianShell> & shells_ref() const;
   /// Get ind:th shell
-  GaussianShell get_shell(size_t shind) const;
+  GaussianShell shell(size_t shind) const;
   /// Get index of the center of the ind'th shell
-  size_t get_shell_center_ind(size_t shind) const;
+  size_t shell_center_ind(size_t shind) const;
   /// Get coordinates of center of ind'th shell
-  coords_t get_shell_center(size_t shind) const;
+  coords_t shell_center(size_t shind) const;
 
   /// Get exponential contraction of the ind:th shell
-  std::vector<contr_t> get_contr(size_t ind) const;
+  std::vector<contr_t> contr(size_t ind) const;
   /// Get normalized exponential contraction of the ind:th shell
-  std::vector<contr_t> get_contr_normalized(size_t ind) const;
+  std::vector<contr_t> contr_normalized(size_t ind) const;
   /// Get the cartesian functions on the ind:th shell
-  std::vector<shellf_t> get_cart(size_t ind) const;
+  std::vector<shellf_t> cart(size_t ind) const;
 
   /// Are spherical harmonics the default for new shells?
   bool is_lm_default() const;
@@ -406,7 +406,7 @@ public:
   void set_lm(size_t ind, bool lm);
 
   /// Get m values of basis functions
-  arma::ivec get_m_values() const;
+  arma::ivec m_values() const;
   /// Unique m values in basis set
   arma::ivec unique_m_values() const;
   /// Mapping from m value to unique m value
@@ -420,24 +420,24 @@ public:
   arma::uvec m_indices(int m) const;
 
   /// Get transformation matrix
-  arma::mat get_trans(size_t ind) const;
+  arma::mat transmat(size_t ind) const;
 
   /// Fill spherical harmonics transformation table
   void fill_sph_transmat();
 
   /// Get size of basis set
-  size_t get_Nbf() const;
+  size_t Nbf() const;
   /// Get amount of cartesian functions on shell
-  size_t get_Ncart() const;
+  size_t Ncart() const;
   /// Get amount of spherical harmonics on shell
-  size_t get_Nlm() const;
+  size_t Nlm() const;
 
   /// Get number of shells
-  size_t get_Nshells() const;
+  size_t Nshells() const;
   /// Get number of basis functions on shell
-  size_t get_Nbf(size_t ind) const;
+  size_t Nbf(size_t ind) const;
   /// Get number of cartesians on shell
-  size_t get_Ncart(size_t ind) const;
+  size_t Ncart(size_t ind) const;
 
   /**
    * Get range of shell (distance at which functions have dropped below epsilon)
@@ -450,38 +450,38 @@ public:
   /// Function that actually computes the
   void compute_shell_ranges(double eps);
   /// Get precomputed ranges of shells
-  std::vector<double> get_shell_ranges() const;
+  std::vector<double> shell_ranges() const;
   /// Get range of shells with given value of epsilon
-  std::vector<double> get_shell_ranges(double eps) const;
+  std::vector<double> shell_ranges(double eps) const;
 
   /// Get distances to other nuclei
-  std::vector<double> get_nuclear_distances(size_t inuc) const;
+  std::vector<double> nuclear_distances(size_t inuc) const;
 
   /// Get number of nuclei
-  size_t get_Nnuc() const;
+  size_t Nnuc() const;
   /// Get nucleus
-  nucleus_t get_nucleus(size_t inuc) const;
+  nucleus_t nucleus(size_t inuc) const;
   /// Get nuclei
-  std::vector<nucleus_t> get_nuclei() const;
+  std::vector<nucleus_t> nuclei() const;
 
   /// Get coordinates of all nuclei
-  arma::mat get_nuclear_coords() const;
+  arma::mat nuclear_coords() const;
   /// Set coordinates of all nuclei
   void set_nuclear_coords(const arma::mat & coords);
 
   /// Get coordinates of nucleus
-  coords_t get_nuclear_coords(size_t inuc) const;
+  coords_t nuclear_coords(size_t inuc) const;
   /// Get charge of nucleus
-  int get_Z(size_t inuc) const;
+  int Z(size_t inuc) const;
   /// Get symbol of nucleus
-  std::string get_symbol(size_t inuc) const;
+  std::string symbol(size_t inuc) const;
   /// Get human readable symbol of nucleus (-Bq)
-  std::string get_symbol_hr(size_t inuc) const;
+  std::string symbol_hr(size_t inuc) const;
 
   /// Get basis functions centered on a given atom
-  std::vector<GaussianShell> get_funcs(size_t inuc) const;
+  std::vector<GaussianShell> funcs(size_t inuc) const;
   /// Get indices of shells centered on a given atom
-  std::vector<size_t> get_shell_inds(size_t inuc) const;
+  std::vector<size_t> shell_inds(size_t inuc) const;
 
   /// Evaluate functions at (x,y,z)
   arma::vec eval_func(double x, double y, double z) const;
@@ -597,17 +597,17 @@ public:
  */
 class GaussianShell {
   /// Number of first function on shell
-  size_t indstart;
+  size_t indstart_;
 
   /// Coordinates of center
-  coords_t cen;
+  coords_t cen_;
   /// Index of center
-  size_t cenind;
+  size_t cenind_;
 
   /// Use spherical harmonics?
-  bool uselm;
+  bool uselm_;
   /// Transformation matrix to spherical basis
-  arma::mat transmat;
+  arma::mat transmat_;
 
   /**
    * Contraction of unnormalized primitives. This carries the shared
@@ -617,7 +617,7 @@ class GaussianShell {
    * copy; the coefficients are a synced view of cf.
    * N.B. Normalization is wrt first function of shell.
    */
-  std::vector<contr_t> c;
+  std::vector<contr_t> c_;
 
   /**
    * Coefficient matrix of the generally contracted shell: cf(iprim,
@@ -626,19 +626,19 @@ class GaussianShell {
    * are shared. For a segmented shell nctr = cf.n_cols = 1 and cf is a
    * single column equal to the c[*].c coefficients.
    */
-  arma::mat cf;
+  arma::mat cf_;
 
   /// Sync c[*].c to cf.col(0) after a coefficient change
   void sync_c();
 
   /// Angular momentum of shell
-  int am;
+  int am_;
 
   /**
    * Table of cartesians, containing am indices
    * and relative normalization factors.
    */
-  std::vector<shellf_t> cart;
+  std::vector<shellf_t> cart_;
 
 public:
   /// Dummy constructor
@@ -649,7 +649,7 @@ public:
   ~GaussianShell();
 
   /// Set index of first basis function
-  void set_first_ind(size_t ind);
+  void first_ind(size_t ind);
   /// Set center
   void set_center(const coords_t & cenv, size_t cenindv);
 
@@ -675,15 +675,15 @@ public:
 
   /// Get the exponential contraction (the first contraction, for a
   /// generally contracted shell)
-  std::vector<contr_t> get_contr() const;
+  std::vector<contr_t> contr() const;
   /// Get the ictr'th contraction (exponents zipped with cf.col(ictr))
-  std::vector<contr_t> get_contr(size_t ictr) const;
+  std::vector<contr_t> contr(size_t ictr) const;
   /// Get the exponential contraction (reference, no copy). For a
   /// generally contracted shell this is the first contraction; use
-  /// get_contr(ictr) or get_coefs() for the rest.
-  const std::vector<contr_t> & get_contr_ref() const;
+  /// contr(ictr) or coefs() for the rest.
+  const std::vector<contr_t> & contr_ref() const;
   /// Number of contractions (columns of the coefficient matrix)
-  size_t get_Nctr() const;
+  size_t Nctr() const;
   /// Merge another shell in as an additional contraction: rhs must
   /// share this shell's center, angular momentum, spherical/cartesian
   /// choice and primitive exponents. Its contraction columns are
@@ -694,11 +694,11 @@ public:
   /// May the other shell be merged in as an additional contraction?
   bool same_primitives(const GaussianShell & rhs) const;
   /// The coefficient matrix (nprim x nctr) of the generally contracted shell
-  const arma::mat & get_coefs() const;
+  const arma::mat & coefs() const;
   /// Get cartesians
-  std::vector<shellf_t> get_cart() const;
+  std::vector<shellf_t> cart() const;
   /// Get cartesians (reference, no copy)
-  const std::vector<shellf_t> & get_cart_ref() const;
+  const std::vector<shellf_t> & cart_ref() const;
 
   /**
    * Get contraction coefficients of normalized primitives. For some
@@ -706,17 +706,17 @@ public:
    * cc-pVXZ basis set data from the ESML basis set exchange.  Maybe
    * the input isn't really normalized..?
    */
-  std::vector<contr_t> get_contr_normalized() const;
+  std::vector<contr_t> contr_normalized() const;
   /// Get contraction coefficients of normalized primitives for the
   /// ictr'th contraction
-  std::vector<contr_t> get_contr_normalized(size_t ictr) const;
+  std::vector<contr_t> contr_normalized(size_t ictr) const;
 
   /// Number of functions on shell
-  size_t get_Nbf() const;
+  size_t Nbf() const;
   /// Number of cartesians on shell
-  size_t get_Ncart() const;
+  size_t Ncart() const;
   /// Number of spherical harmonics on shell
-  size_t get_Nlm() const;
+  size_t Nlm() const;
 
   /**
    * Compute range of shell - how far must one go for absolute value
@@ -729,16 +729,16 @@ public:
   /// Toggle use of spherical harmonics
   void set_lm(bool lm);
   /// Get transformation matrix to spherical harmonics basis
-  arma::mat get_trans() const;
+  arma::mat transmat() const;
 
   /// Get number of contractions
-  size_t get_Ncontr() const;
+  size_t Ncontr() const;
   /// Get angular momentum
-  int get_am() const;
+  int am() const;
   /// Get nucleus index
-  size_t get_center_ind() const;
+  size_t center_ind() const;
   /// Get coordinates
-  coords_t get_center() const;
+  coords_t center() const;
 
   /// Comparison operator for angular momentum ordering
   bool operator<(const GaussianShell & rhs) const;
@@ -746,9 +746,9 @@ public:
   bool operator==(const GaussianShell & rhs) const;
 
   /// Get index of first function on shell
-  size_t get_first_ind() const;
+  size_t first_ind() const;
   /// Get index of last function on shell
-  size_t get_last_ind() const;
+  size_t last_ind() const;
 
   /// Print out information about shell
   void print() const;

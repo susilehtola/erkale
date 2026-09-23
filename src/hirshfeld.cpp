@@ -29,18 +29,18 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
   // Set spacing
   dr_=drv;
 
-  if(basis.get_Nnuc()>1) {
+  if(basis.Nnuc()>1) {
     ERROR_INFO();
     fprintf(stderr,"Warning - more than one nucleus in system!\n");
   }
-  if(basis.get_Nnuc()==0) {
+  if(basis.Nnuc()==0) {
     throw std::runtime_error("No nucleus in system!\n");
   }
   // Get coordinates of nucleus
-  coords_t nuc=basis.get_nuclear_coords(0);
+  coords_t nuc=basis.nuclear_coords(0);
 
   // Maximum component that can appear in density is 2L.
-  int lmax=next_lebedev(2*basis.get_max_am());
+  int lmax=next_lebedev(2*basis.max_am());
 
   // Get Lebedev rule
   std::vector<lebedev_point_t> ang=lebedev_sphere(lmax);
@@ -125,12 +125,12 @@ Hirshfeld::Hirshfeld() {
 
 void Hirshfeld::compute(const BasisSet & basis, std::string method) {
   // Store atomic centers.
-  cen_.resize(basis.get_Nnuc());
+  cen_.resize(basis.Nnuc());
   for(size_t i=0;i<cen_.size();i++)
-    cen_[i]=basis.get_nucleus(i).r;
+    cen_[i]=basis.nucleus(i).r;
 
   // Reserve memory for atomic densities
-  atoms_.resize(basis.get_Nnuc());
+  atoms_.resize(basis.Nnuc());
 
   // Get list of identical nuclei
   std::vector< std::vector<size_t> > idnuc=basis.find_identical_nuclei();
@@ -157,15 +157,15 @@ void Hirshfeld::compute(const BasisSet & basis, std::string method) {
 
 void Hirshfeld::load(const BasisSet & basis) {
   // Store atomic centers.
-  cen_.resize(basis.get_Nnuc());
+  cen_.resize(basis.Nnuc());
   for(size_t i=0;i<cen_.size();i++)
-    cen_[i]=basis.get_nucleus(i).r;
+    cen_[i]=basis.nucleus(i).r;
 
   // Reserve memory for atomic densities
-  atoms_.resize(basis.get_Nnuc());
+  atoms_.resize(basis.Nnuc());
 
   // Get list of nuclei
-  std::vector<nucleus_t> nuc=basis.get_nuclei();
+  std::vector<nucleus_t> nuc=basis.nuclei();
   // Get list of elements in system
   std::vector< std::vector<size_t> > Zv(maxZ+1);
   for(size_t i=0;i<nuc.size();i++) {

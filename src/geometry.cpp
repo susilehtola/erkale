@@ -210,11 +210,11 @@ void run_calc_num(const BasisSet & basis, bool force, int npoints, double h) {
   // We have converged the energy, next compute force by finite
   // differences.
   arma::mat fm;
-  fm.zeros(3,basis.get_Nnuc());
+  fm.zeros(3,basis.Nnuc());
 
   // Nuclear coordinates. Take the transpose so that (x,y,z) are
   // stored consecutively in memory
-  arma::mat nuccoord(basis.get_nuclear_coords().t());
+  arma::mat nuccoord(basis.nuclear_coords().t());
 
   // Get the stencil
   if(npoints<2)
@@ -255,7 +255,7 @@ void run_calc_num(const BasisSet & basis, bool force, int npoints, double h) {
   t.set();
 
   // Loop over degrees of freedom
-  size_t Ndof=3*basis.get_Nnuc()-3;
+  size_t Ndof=3*basis.Nnuc()-3;
   printf("Calculating %i displacements with %i point stencil\n",(int) Ndof,(int) dx.n_elem);
   fflush(stdout);
   for(size_t idof=0;idof<Ndof;idof++) {

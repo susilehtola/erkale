@@ -941,7 +941,7 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
 
   BasisSet dummy(1);
   construct_basis(dummy, atoms, dumlib);
-  std::vector<GaussianShell> shells(dummy.get_shells());
+  std::vector<GaussianShell> shells(dummy.shells());
 
   // If we use the overlap metric, we use all shells since there's no
   // benefit to pre-screening
@@ -976,11 +976,11 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
     size_t is=it->first;
     size_t js=it->second;
     // Angular momenta
-    int li=shells[is].get_am();
-    int lj=shells[js].get_am();
+    int li=shells[is].am();
+    int lj=shells[js].am();
     // Exponents
-    double zi=shells[is].get_contr()[0].z;
-    double zj=shells[js].get_contr()[0].z;
+    double zi=shells[is].contr()[0].z;
+    double zj=shells[js].contr()[0].z;
     double zsum=zi+zj;
 
     // Form products

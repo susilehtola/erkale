@@ -478,7 +478,7 @@ class DensityFit {
   /// *this and returns true; on a missing file, missing key, or
   /// Nbf / Naux mismatch returns false and leaves *this unchanged.
   /// `auxbas` selects DF (non-null) vs CD (null) entries; in DF mode
-  /// the loaded Naux is checked against auxbas.get_Nbf(). The basis
+  /// the loaded Naux is checked against auxbas.Nbf(). The basis
   /// is the orbital basis for the run; it must match Nbf and is used
   /// to repopulate orbpair / orbshell / aux-shell state.
   bool load(const BasisSet & basis, const BasisSet * auxbas, const std::string & fname);

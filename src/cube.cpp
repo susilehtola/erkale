@@ -77,14 +77,14 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % e % e % e\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) bas.Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
   fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
-  for(size_t i=0;i<bas.get_Nnuc();i++) {
-    nucleus_t nuc=bas.get_nucleus(i);
+  for(size_t i=0;i<bas.Nnuc();i++) {
+    nucleus_t nuc=bas.nucleus(i);
     fprintf(out,"%7i %e % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
@@ -212,14 +212,14 @@ void densitydiff_cube(const BasisSet & bas, const arma::mat & P, const BasisSet 
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % e % e % e\n",(int) basref.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) basref.Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
   fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
-  for(size_t i=0;i<bas.get_Nnuc();i++) {
-    nucleus_t nuc=bas.get_nucleus(i);
+  for(size_t i=0;i<bas.Nnuc();i++) {
+    nucleus_t nuc=bas.nucleus(i);
     fprintf(out,"%7i %g % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
@@ -348,14 +348,14 @@ void potential_cube(const BasisSet & bas, const arma::mat & P, const std::vector
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % e % e % e\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) bas.Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
   fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
-  for(size_t i=0;i<bas.get_Nnuc();i++) {
-    nucleus_t nuc=bas.get_nucleus(i);
+  for(size_t i=0;i<bas.Nnuc();i++) {
+    nucleus_t nuc=bas.nucleus(i);
     fprintf(out,"%7i %g % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
@@ -471,14 +471,14 @@ void elf_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % e % e % e\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) bas.Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
   fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
   fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
-  for(size_t i=0;i<bas.get_Nnuc();i++) {
-    nucleus_t nuc=bas.get_nucleus(i);
+  for(size_t i=0;i<bas.Nnuc();i++) {
+    nucleus_t nuc=bas.nucleus(i);
     fprintf(out,"%7i %g % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
@@ -613,14 +613,14 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 
   for(size_t io=0;io<out.size();io++) {
     // Write out starting point. Because orbitals, amount of atoms is printed out negatively
-    fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",-((int) bas.get_Nnuc()),x_arr[0],y_arr[0],z_arr[0]);
+    fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",-((int) bas.Nnuc()),x_arr[0],y_arr[0],z_arr[0]);
     // Print amount of points and step sizes in the directions
     fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",(int) x_arr.size(),dx,0.0,0.0);
     fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",(int) y_arr.size(),0.0,dy,0.0);
     fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",(int) z_arr.size(),0.0,0.0,dz);
     // Print out atoms
-    for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
-      nucleus_t nuc=bas.get_nucleus(inuc);
+    for(size_t inuc=0;inuc<bas.Nnuc();inuc++) {
+      nucleus_t nuc=bas.nucleus(inuc);
       fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f % 11.6f\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
     }
   }
@@ -838,7 +838,7 @@ int main_guarded(int argc, char **argv) {
     double spacing=settings.get_double("AutoSpacing")*ANGSTROMINBOHR;
 
     // Get coordinate matrix
-    arma::mat coords=basis.get_nuclear_coords();
+    arma::mat coords=basis.nuclear_coords();
 
     // Buffer to put in each side
     double extra=settings.get_double("AutoBuffer")*ANGSTROMINBOHR;

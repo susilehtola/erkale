@@ -26,29 +26,29 @@
 
 void print_analysis(const BasisSet & basis, const std::string & msg, const arma::vec & q) {
   printf("\n%s charges\n",msg.c_str());
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
+  for(size_t i=0;i<basis.Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.symbol_hr(i).c_str(), q(i));
   printf("Sum of %s charges %e\n",msg.c_str(),arma::sum(q));
 }
 
 void print_analysis(const BasisSet & basis, const std::string & msg, const arma::mat & q) {
   printf("\n%s charges: alpha, beta, total (incl. nucleus)\n",msg.c_str());
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
+  for(size_t i=0;i<basis.Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
   printf("Sum of %s charges %e\n",msg.c_str(),arma::sum(q.col(2)));
 }
 
 arma::vec add_nuclear_charges(const BasisSet & basis, const arma::vec & q) {
-  if(basis.get_Nnuc()!=q.n_elem) {
+  if(basis.Nnuc()!=q.n_elem) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Nuclear charge vector does not match amount of nuclei in system.\n" << "Nnuc = " << basis.get_Nnuc() << ", q.n_elem = " << q.n_elem << "\n";
+    oss << "Nuclear charge vector does not match amount of nuclei in system.\n" << "Nnuc = " << basis.Nnuc() << ", q.n_elem = " << q.n_elem << "\n";
     throw std::runtime_error(oss.str());
   }
 
   arma::vec qr(q);
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    nucleus_t nuc=basis.get_nucleus(inuc);
+  for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
+    nucleus_t nuc=basis.nucleus(inuc);
     if(!nuc.bsse)
       qr(inuc)+=nuc.Z;
   }
@@ -58,7 +58,7 @@ arma::vec add_nuclear_charges(const BasisSet & basis, const arma::vec & q) {
 
 arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
   // Amount of nuclei in basis set
-  size_t Nnuc=basis.get_Nnuc();
+  size_t Nnuc=basis.Nnuc();
 
   arma::mat ret(Nnuc,Nnuc);
   ret.zeros();
@@ -69,12 +69,12 @@ arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
   // Loop over nuclei
   for(size_t ii=0;ii<Nnuc;ii++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    std::vector<GaussianShell> ifuncs=basis.funcs(ii);
 
     // Loop over nuclei
     for(size_t jj=0;jj<=ii;jj++) {
       // Get shells on nucleus
-      std::vector<GaussianShell> jfuncs=basis.get_funcs(jj);
+      std::vector<GaussianShell> jfuncs=basis.funcs(jj);
 
       // Initialize output
       ret(ii,jj)=0.0;
@@ -82,14 +82,14 @@ arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
       // Loop over shells
       for(size_t fi=0;fi<ifuncs.size();fi++) {
 	// First function on shell is
-	size_t ifirst=ifuncs[fi].get_first_ind();
+	size_t ifirst=ifuncs[fi].first_ind();
 	// Last function on shell is
-	size_t ilast=ifuncs[fi].get_last_ind();
+	size_t ilast=ifuncs[fi].last_ind();
 
 	// Loop over shells
 	for(size_t fj=0;fj<jfuncs.size();fj++) {
-	  size_t jfirst=jfuncs[fj].get_first_ind();
-	  size_t jlast=jfuncs[fj].get_last_ind();
+	  size_t jfirst=jfuncs[fj].first_ind();
+	  size_t jlast=jfuncs[fj].last_ind();
 
 	  // Loop over functions
 	  for(size_t i=ifirst;i<=ilast;i++)
@@ -109,7 +109,7 @@ arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
 
 arma::mat bond_order(const BasisSet & basis, const arma::mat & P) {
   // Amount of nuclei in basis set
-  size_t Nnuc=basis.get_Nnuc();
+  size_t Nnuc=basis.Nnuc();
 
   arma::mat ret(Nnuc,Nnuc);
   ret.zeros();
@@ -123,12 +123,12 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & P) {
   // Loop over nuclei
   for(size_t ii=0;ii<Nnuc;ii++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    std::vector<GaussianShell> ifuncs=basis.funcs(ii);
 
     // Loop over nuclei
     for(size_t jj=0;jj<=ii;jj++) {
       // Get shells on nucleus
-      std::vector<GaussianShell> jfuncs=basis.get_funcs(jj);
+      std::vector<GaussianShell> jfuncs=basis.funcs(jj);
 
       // Initialize output
       ret(ii,jj)=0.0;
@@ -136,14 +136,14 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & P) {
       // Loop over shells
       for(size_t fi=0;fi<ifuncs.size();fi++) {
 	// First function on shell is
-	size_t ifirst=ifuncs[fi].get_first_ind();
+	size_t ifirst=ifuncs[fi].first_ind();
 	// Last function on shell is
-	size_t ilast=ifuncs[fi].get_last_ind();
+	size_t ilast=ifuncs[fi].last_ind();
 
 	// Loop over shells
 	for(size_t fj=0;fj<jfuncs.size();fj++) {
-	  size_t jfirst=jfuncs[fj].get_first_ind();
-	  size_t jlast=jfuncs[fj].get_last_ind();
+	  size_t jfirst=jfuncs[fj].first_ind();
+	  size_t jlast=jfuncs[fj].last_ind();
 
 	  // Loop over functions
 	  for(size_t i=ifirst;i<=ilast;i++)
@@ -194,18 +194,18 @@ arma::vec mulliken_charges(const BasisSet & basis, const arma::mat & P) {
   // Compute PS
   arma::mat PS=P*S;
 
-  arma::vec q(basis.get_Nnuc());
+  arma::vec q(basis.Nnuc());
   q.zeros();
 
   // Loop over nuclei
-  for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
+  for(size_t ii=0;ii<basis.Nnuc();ii++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    std::vector<GaussianShell> ifuncs=basis.funcs(ii);
 
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
-      size_t ifirst=ifuncs[fi].get_first_ind();
-      size_t ilast=ifuncs[fi].get_last_ind();
+      size_t ifirst=ifuncs[fi].first_ind();
+      size_t ilast=ifuncs[fi].last_ind();
 
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++)
@@ -224,18 +224,18 @@ arma::mat mulliken_charges(const BasisSet & basis, const arma::mat & Pa, const a
   arma::mat PaS=Pa*S;
   arma::mat PbS=Pb*S;
 
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
   q.zeros();
 
   // Loop over nuclei
-  for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
+  for(size_t ii=0;ii<basis.Nnuc();ii++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    std::vector<GaussianShell> ifuncs=basis.funcs(ii);
 
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
-      size_t ifirst=ifuncs[fi].get_first_ind();
-      size_t ilast=ifuncs[fi].get_last_ind();
+      size_t ifirst=ifuncs[fi].first_ind();
+      size_t ilast=ifuncs[fi].last_ind();
 
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++) {
@@ -288,18 +288,18 @@ arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
   // Compute ShPSh
   arma::mat ShPSh=Sh*P*Sh;
 
-  arma::vec q(basis.get_Nnuc());
+  arma::vec q(basis.Nnuc());
   q.zeros();
 
   // Loop over nuclei
-  for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
+  for(size_t ii=0;ii<basis.Nnuc();ii++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    std::vector<GaussianShell> ifuncs=basis.funcs(ii);
 
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
-      size_t ifirst=ifuncs[fi].get_first_ind();
-      size_t ilast=ifuncs[fi].get_last_ind();
+      size_t ifirst=ifuncs[fi].first_ind();
+      size_t ilast=ifuncs[fi].last_ind();
 
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++)
@@ -322,18 +322,18 @@ arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arm
   arma::mat SPaS=Sh*Pa*Sh;
   arma::mat SPbS=Sh*Pb*Sh;
 
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
   q.zeros();
 
   // Loop over nuclei
-  for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
+  for(size_t ii=0;ii<basis.Nnuc();ii++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    std::vector<GaussianShell> ifuncs=basis.funcs(ii);
 
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
-      size_t ifirst=ifuncs[fi].get_first_ind();
-      size_t ilast=ifuncs[fi].get_last_ind();
+      size_t ifirst=ifuncs[fi].first_ind();
+      size_t ilast=ifuncs[fi].last_ind();
 
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++) {
@@ -412,14 +412,14 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, std::string m
   std::vector< std::vector<size_t> > idx;
   arma::mat iao=construct_IAO(basis,C,idx,true,minbas);
 
-  arma::vec q(basis.get_Nnuc());
+  arma::vec q(basis.Nnuc());
   q.zeros();
 
   // Construct density matrix
   arma::mat SPS(S*C*arma::trans(C)*S);
 
   // Loop over nuclei
-  for(size_t ii=0;ii<basis.get_Nnuc();ii++)
+  for(size_t ii=0;ii<basis.Nnuc();ii++)
     // Loop over functions on nucleus
     for(size_t fi=0;fi<idx[ii].size();fi++) {
       // IAO orbital index is
@@ -439,14 +439,14 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::cx_mat & C, std::strin
   std::vector< std::vector<size_t> > idx;
   arma::cx_mat iao=construct_IAO(basis,C,idx,true,minbas);
 
-  arma::vec q(basis.get_Nnuc());
+  arma::vec q(basis.Nnuc());
   q.zeros();
 
   // Construct density matrix
   arma::cx_mat SPS(S*C*arma::trans(C)*S);
 
   // Loop over nuclei
-  for(size_t ii=0;ii<basis.get_Nnuc();ii++)
+  for(size_t ii=0;ii<basis.Nnuc();ii++)
     // Loop over functions on nucleus
     for(size_t fi=0;fi<idx[ii].size();fi++) {
       // IAO orbital index is
@@ -459,9 +459,9 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::cx_mat & C, std::strin
 }
 
 arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
-  arma::vec ret(basis.get_Nnuc());
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++)
-    ret(inuc)=compute_density(P,basis,basis.get_nuclear_coords(inuc));
+  arma::vec ret(basis.Nnuc());
+  for(size_t inuc=0;inuc<basis.Nnuc();inuc++)
+    ret(inuc)=compute_density(P,basis,basis.nuclear_coords(inuc));
   return ret;
 }
 
@@ -497,7 +497,7 @@ arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol)
 }
 
 arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);
@@ -552,7 +552,7 @@ arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::st
 }
 
 arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol) {
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
@@ -614,7 +614,7 @@ arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & 
 }
 
 arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol) {
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
 
   // Iterative Hirshfeld atomic charges
   HirshfeldI hirshi;
@@ -674,7 +674,7 @@ arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, doubl
 }
 
 arma::mat stockholder_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
 
   // Stockholder atomic charges
   Stockholder stock(basis,Pa+Pb);
@@ -732,7 +732,7 @@ arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma
   // Construct grid
   intgrid.construct_bader(Pa+Pb,tol);
 
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
   q.col(0)=intgrid.nuclear_charges(Pa);
   q.col(1)=intgrid.nuclear_charges(Pb);
   q.col(2)=q.col(0)+q.col(1);
@@ -779,7 +779,7 @@ arma::mat voronoi_charges(const BasisSet & basis, const arma::mat & Pa, const ar
   // Construct grid
   intgrid.construct_voronoi(tol);
 
-  arma::mat q(basis.get_Nnuc(),3);
+  arma::mat q(basis.Nnuc(),3);
   q.col(0)=intgrid.nuclear_charges(Pa);
   q.col(1)=intgrid.nuclear_charges(Pb);
   q.col(2)=q.col(0)+q.col(1);
@@ -793,8 +793,8 @@ void nuclear_analysis(const BasisSet & basis, const arma::mat & P) {
   arma::vec nucd=nuclear_density(basis,P);
 
   printf("\nElectron density at nuclei\n");
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i));
+  for(size_t i=0;i<basis.Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.symbol_hr(i).c_str(), nucd(i));
 }
 
 void nuclear_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
@@ -809,8 +809,8 @@ void nuclear_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::
   nucd.col(2)=nucd_a+nucd_b;
 
   printf("\nElectron density at nuclei: alpha, beta, total\n");
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
+  for(size_t i=0;i<basis.Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.symbol_hr(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
 }
 
 void population_analysis(const BasisSet & basis, const arma::mat & P) {
@@ -867,9 +867,9 @@ double darwin_1e(const BasisSet & basis, const arma::mat & P) {
   nucleus_t nuc;
 
   // Loop over nuclei
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+  for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
     // Get nucleus
-    nuc=basis.get_nucleus(inuc);
+    nuc=basis.nucleus(inuc);
 
     if(!nuc.bsse)
       // Don't do correction for BSSE nuclei

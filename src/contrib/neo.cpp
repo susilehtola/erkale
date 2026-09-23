@@ -321,7 +321,7 @@ int main_guarded(int argc, char **argv) {
       // Construct fitting basis
       bool uselm=settings.get_bool("UseLM");
       settings.set_bool("UseLM",true);
-      construct_basis(dfitbas,basis.get_nuclei(),fitlib);
+      construct_basis(dfitbas,basis.nuclei(),fitlib);
       dfitbas.coulomb_normalize();
     settings.set_bool("UseLM",uselm);
     }
@@ -360,8 +360,8 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
-  printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.get_unique_shellpairs().size());
+  printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.unique_shellpairs().size());
+  printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.unique_shellpairs().size());
   fflush(stdout);
 
   // Calculate matrices
@@ -383,13 +383,13 @@ int main_guarded(int argc, char **argv) {
 
   std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [&] (const arma::mat & F) {
     arma::mat Fblock(F.n_rows,F.n_cols,arma::fill::zeros);
-    for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
+    for(size_t inuc=0;inuc<pbasis.Nnuc();inuc++) {
       // Get shells on nucleus
-      auto shells = pbasis.get_shell_inds(inuc);
+      auto shells = pbasis.shell_inds(inuc);
       // Accumulate list of functions on atom
       std::vector<size_t> idx;
       for(auto shell_idx: shells)
-        for(size_t ibf=pbasis.get_first_ind(shell_idx); ibf<=pbasis.get_last_ind(shell_idx); ibf++)
+        for(size_t ibf=pbasis.first_ind(shell_idx); ibf<=pbasis.last_ind(shell_idx); ibf++)
           idx.push_back(ibf);
       arma::uvec idxv(arma::conv_to<arma::uvec>::from(idx));
       Fblock(idxv,idxv) = F(idxv,idxv);
@@ -431,8 +431,8 @@ int main_guarded(int argc, char **argv) {
 
   std::function<arma::mat(const BasisSet &, const arma::mat &, const BasisSet &)> multicomponent_coulomb_tei = [&](const BasisSet & source_basis, const arma::mat & source_density, const BasisSet & target_basis) {
     // Shells in the two basis sets
-    std::vector<GaussianShell> sshells=source_basis.get_shells();
-    std::vector<GaussianShell> tshells=target_basis.get_shells();
+    std::vector<GaussianShell> sshells=source_basis.shells();
+    std::vector<GaussianShell> tshells=target_basis.shells();
 
     // Get shellpairs
     double shtol=settings.get_double("IntegralThresh");
@@ -445,10 +445,10 @@ int main_guarded(int argc, char **argv) {
     const std::vector<eripair_t> & tpairs = t_scr.shpairs;
 
     // Sanity check
-    if(source_density.n_rows != source_basis.get_Nbf() or source_density.n_cols != source_basis.get_Nbf())
+    if(source_density.n_rows != source_basis.Nbf() or source_density.n_cols != source_basis.Nbf())
       throw std::logic_error("Density matrix does not correspond to basis set!\n");
     // Target matrix
-    arma::mat Jt(target_basis.get_Nbf(), target_basis.get_Nbf(), arma::fill::zeros);
+    arma::mat Jt(target_basis.Nbf(), target_basis.Nbf(), arma::fill::zeros);
 
     // libcint environment: the target shells, followed by the source
     // shells of the other species
@@ -872,7 +872,7 @@ int main_guarded(int argc, char **argv) {
       BasisSet spbasis;
       construct_basis(spbasis,quantum_protons,spbaslib);
 
-      size_t Np=spbasis.get_Nbf();
+      size_t Np=spbasis.Nbf();
       arma::mat oldCp(Np,Np);
       oldCp.eye();
 
