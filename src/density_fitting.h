@@ -96,7 +96,7 @@ class DensityFit {
   /// libcint description of the orbital basis, followed by the
   /// auxiliary basis (in two-step CD there is no separate auxiliary
   /// basis, and the environment holds the orbital shells alone)
-  CintEnv cenv;
+  CintEnv cenv_;
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs_;
