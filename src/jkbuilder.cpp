@@ -83,12 +83,12 @@ namespace {
   arma::vec fourindex_force(ERIscreen & scr, ERIscreen & scr_rs, const BasisSet * basisp,
                             double intthr, bool verbose, const arma::mat & Ptot,
                             double kfull, double kshort, double omega, double tol) {
-    if(scr.N() != basisp->get_Nbf())
+    if(scr.N() != basisp->Nbf())
       scr.fill(basisp, intthr, verbose);
     arma::vec f = (kfull != 0.0) ? scr.forceJK(Ptot, tol, kfull) : scr.forceJ(Ptot, tol);
     if(omega != 0.0) {
       scr_rs.set_range_separation({omega, 0.0, 1.0});
-      if(scr_rs.N() != basisp->get_Nbf())
+      if(scr_rs.N() != basisp->Nbf())
         scr_rs.fill(basisp, intthr, verbose);
       f += scr_rs.forceK(Ptot, tol, kshort);
     }
@@ -100,12 +100,12 @@ namespace {
                             double intthr, bool verbose, const arma::mat & Ptot,
                             const arma::mat & Pa, const arma::mat & Pb,
                             double kfull, double kshort, double omega, double tol) {
-    if(scr.N() != basisp->get_Nbf())
+    if(scr.N() != basisp->Nbf())
       scr.fill(basisp, intthr, verbose);
     arma::vec f = (kfull != 0.0) ? scr.forceJK(Pa, Pb, tol, kfull) : scr.forceJ(Ptot, tol);
     if(omega != 0.0) {
       scr_rs.set_range_separation({omega, 0.0, 1.0});
-      if(scr_rs.N() != basisp->get_Nbf())
+      if(scr_rs.N() != basisp->Nbf())
         scr_rs.fill(basisp, intthr, verbose);
       f += scr_rs.forceK(Pa, Pb, tol, kshort);
     }
@@ -272,7 +272,7 @@ class JKBackend {
       size_t Npairs=tab.fill(&basis,cfg.intthr);
       if(verbose) {
         printf("done (%s)\n",t.elapsed().c_str());
-        printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+        printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.unique_shellpairs().size());
       }
     }
     void init_rs(double omega) override {
@@ -409,7 +409,7 @@ class JKBackend {
       if(verbose) {
         printf("done (%s)\n",t.elapsed().c_str());
         const BasisSet & b = cfg.decfock ? decbas : basis;
-        printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) b.get_unique_shellpairs().size());
+        printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) b.unique_shellpairs().size());
       }
     }
     void init_rs(double omega) override {
@@ -522,7 +522,7 @@ class JKBackend {
         if(!try_cache_load(dfit, basis, nullptr, cfg.cholmode, cfg.direct, cfg.cholfile, verbose, t)) {
           if(verbose) { t.set(); printf("Computing repulsion integrals (two-step CD).\n"); fflush(stdout); }
           size_t Npairs = dfit.fill_cholesky(basis, cfg.direct, cfg.cholthr, cfg.cholshthr, cfg.intthr, cfg.fitcholthr, verbose);
-          if(verbose) { printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size()); fflush(stdout); }
+          if(verbose) { printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.unique_shellpairs().size()); fflush(stdout); }
           try_cache_save(dfit, cfg.cholmode, cfg.direct, cfg.cholfile, verbose);
         }
         return;
@@ -534,7 +534,7 @@ class JKBackend {
         if(method==JKBuilder::Method::CDFit) {
           if(verbose) { t.set(); printf("Building auxiliary basis from pivoted Cholesky decomposition (CDFit) ... "); fflush(stdout); }
           dfitbas = basis.cholesky_aux_basis(cfg.cholthr, cfg.fitlmaxinc);
-          if(verbose) { printf("done (%s)\n",t.elapsed().c_str()); printf("Auxiliary basis contains %i functions.\n",(int) dfitbas.get_Nbf()); fflush(stdout); }
+          if(verbose) { printf("done (%s)\n",t.elapsed().c_str()); printf("Auxiliary basis contains %i functions.\n",(int) dfitbas.Nbf()); fflush(stdout); }
         } else {
           // RI: resolve the FittingBasis keyword.
           bool rik=false;
@@ -559,7 +559,7 @@ class JKBackend {
             fitlib.load_basis(cfg.fittingbasis);
             bool uselm=settings.get_bool("UseLM");
             settings.set_bool("UseLM",true);
-            construct_basis(dfitbas,basis.get_nuclei(),fitlib);
+            construct_basis(dfitbas,basis.nuclei(),fitlib);
             dfitbas.coulomb_normalize();
             settings.set_bool("UseLM",uselm);
           }
@@ -576,7 +576,7 @@ class JKBackend {
         size_t Npairs=dfit.fill(basis,dfitbas,cfg.direct,cfg.intthr,cfg.fitthr,cfg.fitcholthr);
         if(verbose) {
           printf("done (%s)\n",t.elapsed().c_str());
-          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.unique_shellpairs().size());
           printf("Auxiliary basis contains %i functions.\n",(int) dfit.Naux());
           fflush(stdout);
         }
@@ -598,7 +598,7 @@ class JKBackend {
           if(verbose) { printf("Computing short-range repulsion integrals (two-step CD).\n"); fflush(stdout); }
           t.set();
           size_t Npairs = dfit_rs.fill_cholesky(*basisp, cfg.direct, cfg.cholthr, cfg.cholshthr, cfg.intthr, cfg.fitcholthr, verbose);
-          if(verbose) { printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size()); fflush(stdout); }
+          if(verbose) { printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->unique_shellpairs().size()); fflush(stdout); }
         } else {
           std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,cfg.intthr,cfg.direct));
           if(verbose) {
@@ -610,7 +610,7 @@ class JKBackend {
           size_t Npairs=dfit_rs.fill(*basisp,dfitbas,cfg.direct,cfg.intthr,cfg.fitthr,cfg.fitcholthr);
           if(verbose) {
             printf("done (%s)\n",t.elapsed().c_str());
-            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->unique_shellpairs().size());
             printf("Auxiliary basis contains %i functions.\n",(int) dfit.Naux());
             fflush(stdout);
           }

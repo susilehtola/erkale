@@ -69,13 +69,13 @@ CintEnv::CintEnv() : Nsh_orb_(0), max_Nbf_(0), lm_(true) {
 }
 
 CintEnv::CintEnv(const BasisSet & basis, bool build_opts) {
-  const std::vector<GaussianShell> & sh = basis.get_shells_ref();
+  const std::vector<GaussianShell> & sh = basis.shells_ref();
   build(sh, sh.size(), build_opts);
 }
 
 CintEnv::CintEnv(const BasisSet & basis, const BasisSet & aux, bool build_opts) {
-  std::vector<GaussianShell> sh(basis.get_shells());
-  const std::vector<GaussianShell> & auxsh = aux.get_shells_ref();
+  std::vector<GaussianShell> sh(basis.shells());
+  const std::vector<GaussianShell> & auxsh = aux.shells_ref();
   const size_t Norb = sh.size();
   sh.insert(sh.end(), auxsh.begin(), auxsh.end());
   build(sh, Norb, build_opts);
@@ -112,7 +112,7 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   // all have to agree.
   bool have_lm=false, have_cart=false;
   for(size_t is=0;is<shells_.size();is++) {
-    if(shells_[is].get_am()<2)
+    if(shells_[is].am()<2)
       continue;
     if(shells_[is].lm_in_use())
       have_lm=true;
@@ -129,7 +129,7 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   std::vector<coords_t> centers;
   std::vector<size_t> shell_center(shells_.size());
   for(size_t is=0;is<shells_.size();is++) {
-    const coords_t cen=shells_[is].get_center();
+    const coords_t cen=shells_[is].center();
     size_t icen;
     for(icen=0;icen<centers.size();icen++)
       if(centers[icen]==cen)
@@ -161,9 +161,9 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   size_t ibf=0;
   for(size_t is=0;is<shells_.size();is++) {
     const GaussianShell & sh=shells_[is];
-    const int l=sh.get_am();
-    const size_t nprim=sh.get_Ncontr();
-    const size_t nctr=sh.get_Nctr();
+    const int l=sh.am();
+    const size_t nprim=sh.Ncontr();
+    const size_t nctr=sh.Nctr();
 
     cint_bas_[is*BAS_SLOTS+ATOM_OF]=(int) shell_center[is];
     cint_bas_[is*BAS_SLOTS+ANG_OF]=l;
@@ -174,7 +174,7 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     // Shared primitive exponents
     cint_bas_[is*BAS_SLOTS+PTR_EXP]=(int) cint_env_.size();
     {
-      const std::vector<contr_t> c0=sh.get_contr_normalized(0);
+      const std::vector<contr_t> c0=sh.contr_normalized(0);
       for(size_t ip=0;ip<nprim;ip++)
         cint_env_.push_back(c0[ip].z);
     }
@@ -183,7 +183,7 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     // over normalized primitives (libcint contracts normalized primitives)
     cint_bas_[is*BAS_SLOTS+PTR_COEFF]=(int) cint_env_.size();
     for(size_t ic=0;ic<nctr;ic++) {
-      const std::vector<contr_t> cc=sh.get_contr_normalized(ic);
+      const std::vector<contr_t> cc=sh.contr_normalized(ic);
       for(size_t ip=0;ip<nprim;ip++)
         cint_env_.push_back(cc[ip].c*CINTgto_norm(l,cc[ip].z));
     }

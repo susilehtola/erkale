@@ -422,7 +422,7 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
   remove(role+".data");
 
   // Get number of nuclei
-  size_t Nnuc=basis.get_Nnuc();
+  size_t Nnuc=basis.Nnuc();
 
   // Initialize dataspace
   hsize_t dimsf[1];
@@ -436,7 +436,7 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
   memset(nucs,0,Nnuc*sizeof(nuc_t));
   for(size_t i=0;i<Nnuc;i++) {
     // Get nucleus
-    nucleus_t n=basis.get_nucleus(i);
+    nucleus_t n=basis.nucleus(i);
 
     // Store data
     nucs[i].ind=n.ind;
@@ -487,19 +487,19 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
      regroups the consecutive records back into generally contracted
      shells. */
 
-  const std::vector<GaussianShell> & wshells=basis.get_shells_ref();
+  const std::vector<GaussianShell> & wshells=basis.shells_ref();
   std::vector< std::vector<contr_t> > excontr;
   std::vector<shell_data_t> exdata;
   for(size_t i=0;i<wshells.size();i++) {
     const GaussianShell & sh=wshells[i];
-    const size_t Nlm=sh.lm_in_use() ? sh.get_Nlm() : sh.get_Ncart();
-    for(size_t ic=0;ic<sh.get_Nctr();ic++) {
-      excontr.push_back(sh.get_contr(ic));
+    const size_t Nlm=sh.lm_in_use() ? sh.Nlm() : sh.Ncart();
+    for(size_t ic=0;ic<sh.Nctr();ic++) {
+      excontr.push_back(sh.contr(ic));
       shell_data_t sd;
-      sd.indstart=sh.get_first_ind()+ic*Nlm;
-      sd.am=sh.get_am();
+      sd.indstart=sh.first_ind()+ic*Nlm;
+      sd.am=sh.am();
       sd.uselm=sh.lm_in_use();
-      sd.cenind=sh.get_center_ind();
+      sd.cenind=sh.center_ind();
       exdata.push_back(sd);
     }
   }

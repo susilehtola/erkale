@@ -73,18 +73,18 @@ int main(int argc, char ** argv) {
   BasisSet basis_chk; chk.read(basis_chk);
   arma::mat C; chk.read("C",C);
   int Nela=0; chk.read("Nel-a",Nela);
-  printf("Loaded %s: Nbf=%i Nel-a=%i\n",chkf.c_str(),(int)basis_chk.get_Nbf(),Nela);
+  printf("Loaded %s: Nbf=%i Nel-a=%i\n",chkf.c_str(),(int)basis_chk.Nbf(),Nela);
 
   std::vector<double> occs(C.n_cols,0.0); arma::vec occv(C.n_cols,arma::fill::zeros);
   for(int i=0;i<Nela;i++){occs[i]=2.0; occv(i)=2.0;}
   const arma::mat P=C*arma::diagmat(occv)*C.t();
 
   BasisSetLibrary baslib; baslib.load_basis(basisname);
-  const std::vector<nucleus_t> nuc0=basis_chk.get_nuclei();
+  const std::vector<nucleus_t> nuc0=basis_chk.nuclei();
   const size_t Nnuc=nuc0.size();
 
   BasisSet b0; construct_basis(b0,nuc0,baslib);
-  if(b0.get_Nbf()!=basis_chk.get_Nbf()){ fprintf(stderr,"basis mismatch\n"); return 1; }
+  if(b0.Nbf()!=basis_chk.Nbf()){ fprintf(stderr,"basis mismatch\n"); return 1; }
 
   DensityFit dfit0; dfit0.fill_cholesky(b0,false,cholthr,cholshthr,intthr,fitcholthr,false);
   const arma::vec fJ=dfit0.forceJ_cholesky(b0,P);

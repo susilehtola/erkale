@@ -155,15 +155,15 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
   std::vector<struct eigenvector<double> > orbs;
 
   // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+  for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
     // Get functions on center inuc
-    std::vector<GaussianShell> shells=basis.get_funcs(inuc);
+    std::vector<GaussianShell> shells=basis.funcs(inuc);
 
     // and store their indices
     std::vector<size_t> idx;
     for(size_t is=0;is<shells.size();is++) {
-      size_t i0=shells[is].get_first_ind();
-      for(size_t fi=0;fi<shells[is].get_Nbf();fi++)
+      size_t i0=shells[is].first_ind();
+      for(size_t fi=0;fi<shells[is].Nbf();fi++)
 	idx.push_back(i0+fi);
     }
 
@@ -187,7 +187,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
       // Occupation
       hlp.E=occs(iorb);
       // Orbital coefficients
-      hlp.c.zeros(basis.get_Nbf());
+      hlp.c.zeros(basis.Nbf());
       for(size_t ii=0;ii<idx.size();ii++)
 	hlp.c(idx[ii])=Cat(ii,iorb);
 
@@ -210,7 +210,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
   */
 
   // Collect the coefficients
-  arma::mat Cat(basis.get_Nbf(),C.n_cols);
+  arma::mat Cat(basis.Nbf(),C.n_cols);
   for(size_t i=0;i<C.n_cols;i++)
     Cat.col(i)=orbs[i].c;
 

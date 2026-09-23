@@ -386,7 +386,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
       }
 
       // If only one nucleus - nothing to do!
-      if(basis.get_Nnuc()==1)
+      if(basis.Nnuc()==1)
 	continue;
 
       func=new Pipek(chg,basis,C,P,p,verbose);
@@ -913,7 +913,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
   } else if(chg==BECKE) {
     // Amount of regions
-    N=basis.get_Nnuc();
+    N=basis.Nnuc();
     // Grid
     DFTGrid grid(&basis,ver);
     // Construct integration grid
@@ -928,7 +928,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
   } else if(chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER ) {
     // Amount of regions
-    N=basis.get_Nnuc();
+    N=basis.Nnuc();
 
     Hirshfeld hirsh;
     if(chg==HIRSHFELD)
@@ -959,7 +959,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
   } else if(chg==IAO) {
     // Amount of regions
-    N=basis.get_Nnuc();
+    N=basis.Nnuc();
 
     if(ver)
       basis.print();
@@ -988,14 +988,14 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
   } else if(chg==MULLIKEN) {
     // Amount of regions
-    N=basis.get_Nnuc();
+    N=basis.Nnuc();
     // Get overlap matrix
     arma::mat S(basis.overlap());
 
     // Get shells
     for(size_t iat=0;iat<N;iat++) {
       // List of shells on atom
-      std::vector<GaussianShell> shells(basis.get_funcs(iat));
+      std::vector<GaussianShell> shells(basis.funcs(iat));
 
       // Atomic overlap
       arma::mat Sat(C.n_rows,C.n_rows);
@@ -1003,7 +1003,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
       // Increment charge
       for(size_t is=0;is<shells.size();is++)
-	for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
+	for(size_t fi=shells[is].first_ind();fi<=shells[is].last_ind();fi++)
           Sat.col(fi)=S.col(fi);
 
       // Symmetrize
@@ -1015,7 +1015,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
   } else if(chg==LOWDIN) {
     // Amount of regions
-    N=basis.get_Nnuc();
+    N=basis.Nnuc();
 
     // Get overlap matrix
     arma::mat S(basis.overlap());
@@ -1026,7 +1026,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
     // Get shells
     for(size_t iat=0;iat<N;iat++) {
       // List of shells on atom
-      std::vector<GaussianShell> shells(basis.get_funcs(iat));
+      std::vector<GaussianShell> shells(basis.funcs(iat));
 
       // Atomic overlap
       arma::mat Sat(C.n_rows,C.n_rows);
@@ -1034,7 +1034,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
       // Increment charge
       for(size_t is=0;is<shells.size();is++)
-	for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
+	for(size_t fi=shells[is].first_ind();fi<=shells[is].last_ind();fi++)
 	  Sat+=Sh.col(fi)*arma::trans(Sh.col(fi));
 
       Sat=arma::trans(C)*Sat*C;
@@ -1204,7 +1204,7 @@ Edmiston::Edmiston(const BasisSet & basis, const BasisSet & fitbas, const arma::
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, Cholesky threshold 1e-9, use Hartree-Fock routine since it has better tolerance for linear dependencies
-  if(!fitbas.get_Nbf())
+  if(!fitbas.Nbf())
     dfit.fill(basis,basis.density_fitting(),true,1e-8,1e-9,false);
   else
     dfit.fill(basis,fitbas,true,1e-8,1e-9,false);

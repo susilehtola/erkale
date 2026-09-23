@@ -29,7 +29,7 @@ momentum_transfer_series::~momentum_transfer_series() {
 
 arma::cx_mat momentum_transfer_series::get(const arma::vec & q, double rmstol, double maxtol) {
   // Get amount of basis functions.
-  const size_t Nbf=bas->get_Nbf();
+  const size_t Nbf=bas->Nbf();
 
   // Returned array
   arma::cx_mat ret(Nbf,Nbf);

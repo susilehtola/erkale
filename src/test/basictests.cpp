@@ -225,13 +225,13 @@ void check_general_contraction() {
   GaussianShell s0(2,true,c0), s1(2,true,c1);
   s0.set_center(orig,0); s1.set_center(orig,0);
   s0.normalize(); s1.normalize();
-  s0.set_first_ind(0); s1.set_first_ind(0);
+  s0.first_ind(0); s1.first_ind(0);
 
   GaussianShell gc=s0;
   gc.merge_contraction(s1);
-  gc.set_first_ind(0);
+  gc.first_ind(0);
 
-  if(gc.get_Nctr()!=2 || gc.get_Nbf()!=2*(2*2+1))
+  if(gc.Nctr()!=2 || gc.Nbf()!=2*(2*2+1))
     throw std::runtime_error("check_general_contraction: merged shell has the wrong shape.\n");
 
   // Real-space evaluation
@@ -249,8 +249,8 @@ void check_general_contraction() {
 
   std::vector<GaussianShell> segv{s0,s1};
   CintEnv eseg(segv,false); ERIWorker wseg(eseg);
-  const size_t nb=gc.get_Nbf();
-  const size_t nlm=nb/gc.get_Nctr();
+  const size_t nb=gc.Nbf();
+  const size_t nlm=nb/gc.Nctr();
   double maxd=0.0;
   for(int ci=0;ci<2;ci++)for(int cj=0;cj<2;cj++)for(int ck=0;ck<2;ck++)for(int cl=0;cl<2;cl++) {
     wseg.compute(ci,cj,ck,cl);

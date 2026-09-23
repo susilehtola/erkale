@@ -36,13 +36,13 @@ void HirshfeldI::compute(const BasisSet & basis, const arma::mat & P, std::strin
   Timer ttot;
 
   // Store atomic centers.
-  cen.resize(basis.get_Nnuc());
+  cen.resize(basis.Nnuc());
   for(size_t i=0;i<cen.size();i++)
-    cen[i]=basis.get_nucleus(i).r;
+    cen[i]=basis.nucleus(i).r;
 
   // Reserve memory for atomic densities
-  atoms.resize(basis.get_Nnuc());
-  atQ.resize(basis.get_Nnuc());
+  atoms.resize(basis.Nnuc());
+  atQ.resize(basis.Nnuc());
 
   // Get list of identical nuclei
   std::vector< std::vector<size_t> > idnuc=basis.find_identical_nuclei();
@@ -54,7 +54,7 @@ void HirshfeldI::compute(const BasisSet & basis, const arma::mat & P, std::strin
   // Loop over list of identical nuclei. (Can't parallellize here because of HDF)
   for(size_t i=0;i<idnuc.size();i++) {
     // Get the nucleus
-    nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
+    nucleus_t nuc=basis.nucleus(idnuc[i][0]);
 
     // Resize storage
     for(size_t j=0;j<idnuc[i].size();j++) {
@@ -116,20 +116,20 @@ void HirshfeldI::compute_load(const BasisSet & basis, const arma::mat & P, doubl
   Timer ttot;
 
   // Store atomic centers.
-  cen.resize(basis.get_Nnuc());
+  cen.resize(basis.Nnuc());
   for(size_t i=0;i<cen.size();i++)
-    cen[i]=basis.get_nucleus(i).r;
+    cen[i]=basis.nucleus(i).r;
 
   // Reserve memory for atomic densities
-  atoms.resize(basis.get_Nnuc());
-  atQ.resize(basis.get_Nnuc());
+  atoms.resize(basis.Nnuc());
+  atQ.resize(basis.Nnuc());
   for(size_t i=0;i<cen.size();i++) {
     atoms[i].resize(2*dqmax+1);
     atQ[i].assign(2*dqmax+1,0.0);
   }
 
   // Get list of nuclei
-  std::vector<nucleus_t> nuc=basis.get_nuclei();
+  std::vector<nucleus_t> nuc=basis.nuclei();
   // Get list of elements in system
   std::vector< std::vector<size_t> > Zv(maxZ+1);
   for(size_t i=0;i<nuc.size();i++) {
@@ -191,7 +191,7 @@ void HirshfeldI::solve(const BasisSet & basis, const arma::mat & P, double tol, 
   // Starting guess: neutral species
   arma::vec q(cen.size());
   for(size_t i=0;i<cen.size();i++) {
-    nucleus_t nuc=basis.get_nucleus(i);
+    nucleus_t nuc=basis.nucleus(i);
     if(nuc.bsse)
       q[i]=0.0;
     else

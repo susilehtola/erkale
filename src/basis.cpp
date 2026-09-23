@@ -168,98 +168,98 @@ GaussianShell::GaussianShell(int amv, bool lm, const std::vector<contr_t> & C) {
   // fills the coefficient matrix cf with several columns.
 
   // Store contraction
-  c=C;
+  c_=C;
   // Sort the contraction
   sort();
 
   // A single contraction: the coefficient matrix is one column
-  cf.set_size(c.size(),1);
-  for(size_t i=0;i<c.size();i++)
-    cf(i,0)=c[i].c;
+  cf_.set_size(c_.size(),1);
+  for(size_t i=0;i<c_.size();i++)
+    cf_(i,0)=c_[i].c;
 
   // Set angular momentum
-  am=amv;
+  am_=amv;
   // Use spherical harmonics?
-  uselm=lm;
+  uselm_=lm;
 
   // If spherical harmonics are used, fill transformation matrix
-  if(uselm)
-    transmat=Ylm_transmat(am);
+  if(uselm_)
+    transmat_=Ylm_transmat(am_);
   else {
     // Do away with uninitialized value warnings in valgrind
-    transmat=arma::mat(1,1);
-    transmat(0,0)=1.0/0.0; // Initialize to NaN
+    transmat_=arma::mat(1,1);
+    transmat_(0,0)=1.0/0.0; // Initialize to NaN
   }
 
   // Compute necessary amount of Cartesians
-  size_t Ncart=(am+1)*(am+2)/2;
+  size_t Ncart=(am_+1)*(am_+2)/2;
   // Allocate memory
-  cart.reserve(Ncart);
-  cart.resize(Ncart);
+  cart_.reserve(Ncart);
+  cart_.resize(Ncart);
   // Initialize the shells
 
   int n=0;
-  for(int i=0; i<=am; i++) {
-    int nx = am - i;
+  for(int i=0; i<=am_; i++) {
+    int nx = am_ - i;
     for(int j=0; j<=i; j++) {
       int ny = i-j;
       int nz = j;
 
-      cart[n].l=nx;
-      cart[n].m=ny;
-      cart[n].n=nz;
-      cart[n].relnorm=1.0;
+      cart_[n].l=nx;
+      cart_[n].m=ny;
+      cart_[n].n=nz;
+      cart_[n].relnorm=1.0;
       n++;
     }
   }
 
   // Default values
-  indstart=0;
-  cenind=0;
-  cen.x=cen.y=cen.z=0.0;
+  indstart_=0;
+  cenind_=0;
+  cen_.x=cen_.y=cen_.z=0.0;
 }
 
 GaussianShell::~GaussianShell() {
 }
 
-void GaussianShell::set_first_ind(size_t ind) {
-  indstart=ind;
+void GaussianShell::first_ind(size_t ind) {
+  indstart_=ind;
 }
 
 void GaussianShell::set_center(const coords_t & cenv, size_t cenindv) {
-  cen=cenv;
-  cenind=cenindv;
+  cen_=cenv;
+  cenind_=cenindv;
 }
 
 void GaussianShell::sync_c() {
   // Mirror the first contraction's coefficients back into c, whose .z
   // fields carry the (authoritative) shared exponents
-  for(size_t i=0;i<c.size();i++)
-    c[i].c=cf(i,0);
+  for(size_t i=0;i<c_.size();i++)
+    c_[i].c=cf_(i,0);
 }
 
 void GaussianShell::sort() {
   // Order the primitives by decreasing exponent. When the coefficient
   // matrix already exists (generally contracted shell) its rows follow
   // the same permutation.
-  if(cf.n_elem==0) {
-    std::stable_sort(c.begin(),c.end());
+  if(cf_.n_elem==0) {
+    std::stable_sort(c_.begin(),c_.end());
     return;
   }
 
-  std::vector<size_t> idx(c.size());
+  std::vector<size_t> idx(c_.size());
   for(size_t i=0;i<idx.size();i++)
     idx[i]=i;
-  std::stable_sort(idx.begin(),idx.end(),[this](size_t a, size_t b){ return c[a]<c[b]; });
+  std::stable_sort(idx.begin(),idx.end(),[this](size_t a, size_t b){ return c_[a]<c_[b]; });
 
-  std::vector<contr_t> cnew(c.size());
-  arma::mat cfnew(cf.n_rows,cf.n_cols);
+  std::vector<contr_t> cnew(c_.size());
+  arma::mat cfnew(cf_.n_rows,cf_.n_cols);
   for(size_t i=0;i<idx.size();i++) {
-    cnew[i]=c[idx[i]];
-    cfnew.row(i)=cf.row(idx[i]);
+    cnew[i]=c_[idx[i]];
+    cfnew.row(i)=cf_.row(idx[i]);
   }
-  c=cnew;
-  cf=cfnew;
+  c_=cnew;
+  cf_=cfnew;
 }
 
 void GaussianShell::convert_contraction() {
@@ -267,10 +267,10 @@ void GaussianShell::convert_contraction() {
   // contraction of unnormalized gaussians.
 
   // Note - these refer to cartesian functions!
-  double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
+  double fac=pow(M_2_PI,0.75)*pow(2,am_)/sqrt(doublefact(2*am_-1));
 
-  for(size_t i=0;i<c.size();i++)
-    cf.row(i)*=fac*pow(c[i].z,am/2.0+0.75);
+  for(size_t i=0;i<c_.size();i++)
+    cf_.row(i)*=fac*pow(c_[i].z,am_/2.0+0.75);
   sync_c();
 }
 
@@ -278,9 +278,9 @@ void GaussianShell::convert_sap_contraction() {
   // Convert contraction from contraction of normalized density
   // gaussians to contraction of unnormalized gaussians.
 
-  if(am != 0) throw std::logic_error("SAP basis should only have S functions!\n");
-  for(size_t i=0;i<c.size();i++)
-    cf.row(i)*=pow(c[i].z/M_PI,1.5);
+  if(am_ != 0) throw std::logic_error("SAP basis should only have S functions!\n");
+  for(size_t i=0;i<c_.size();i++)
+    cf_.row(i)*=pow(c_[i].z/M_PI,1.5);
   sync_c();
 }
 
@@ -288,47 +288,47 @@ void GaussianShell::normalize(bool coeffs) {
   // Normalize contraction of unnormalized primitives wrt first function on shell
 
   // Check for dummy shell
-  if(c.size()==1 && c[0].z==0.0) {
+  if(c_.size()==1 && c_[0].z==0.0) {
     // Yes, this is a dummy.
-    cf(0,0)=1.0;
+    cf_(0,0)=1.0;
     sync_c();
     return;
   }
 
   if(coeffs) {
-    const double angfac=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
+    const double angfac=pow(M_PI,1.5)*doublefact(2*am_-1)/pow(2.0,am_);
 
     // Normalize each contraction to unit self-overlap independently
-    for(size_t ictr=0;ictr<cf.n_cols;ictr++) {
+    for(size_t ictr=0;ictr<cf_.n_cols;ictr++) {
       double fact=0.0;
-      for(size_t i=0;i<c.size();i++)
-	for(size_t j=0;j<c.size();j++)
-	  fact+=cf(i,ictr)*cf(j,ictr)/pow(c[i].z+c[j].z,am+1.5);
+      for(size_t i=0;i<c_.size();i++)
+	for(size_t j=0;j<c_.size();j++)
+	  fact+=cf_(i,ictr)*cf_(j,ictr)/pow(c_[i].z+c_[j].z,am_+1.5);
       fact*=angfac;
       fact=1.0/sqrt(fact);
-      cf.col(ictr)*=fact;
+      cf_.col(ictr)*=fact;
     }
     sync_c();
   }
 
   // FIXME: Do something more clever here.
-  if(!uselm) {
+  if(!uselm_) {
     // Compute relative normalization factors
-    for(size_t i=0;i<cart.size();i++)
-      cart[i].relnorm=sqrt(doublefact(2*am-1)/(doublefact(2*cart[i].l-1)*doublefact(2*cart[i].m-1)*doublefact(2*cart[i].n-1)));
+    for(size_t i=0;i<cart_.size();i++)
+      cart_[i].relnorm=sqrt(doublefact(2*am_-1)/(doublefact(2*cart_[i].l-1)*doublefact(2*cart_[i].m-1)*doublefact(2*cart_[i].n-1)));
   } else {
     // Compute self-overlap and scale the coefficients
     const arma::vec S=function_norms();
-    for(size_t i=0;i<cart.size();i++)
-      cart[i].relnorm/=sqrt(S(0));
+    for(size_t i=0;i<cart_.size();i++)
+      cart_[i].relnorm/=sqrt(S(0));
   }
 }
 
 void GaussianShell::coulomb_normalize() {
   // Normalize functions using Coulomb norm
-  size_t Ncart=cart.size();
-  size_t Nbf=get_Nbf();
-  const size_t nctr=get_Nctr();
+  size_t Ncart=cart_.size();
+  size_t Nbf=this->Nbf();
+  const size_t nctr=Nctr();
 
   // The Coulomb self-repulsion (i|j) of the functions on this shell.
   // The environment measures the current normalization of the shell, so
@@ -339,10 +339,10 @@ void GaussianShell::coulomb_normalize() {
   const std::vector<double> * erip=eri.getp();
 
   if(nctr==1) {
-    if(!uselm) {
+    if(!uselm_) {
       // Cartesian functions
       for(size_t i=0;i<Ncart;i++)
-        cart[i].relnorm*=1.0/sqrt((*erip)[i*Nbf+i]);
+        cart_[i].relnorm*=1.0/sqrt((*erip)[i*Nbf+i]);
     } else {
       // Spherical normalization, need to distribute the normalization
       // coefficient among the cartesians, so all the functions of the
@@ -364,7 +364,7 @@ void GaussianShell::coulomb_normalize() {
 
       // Scale coefficients
       for(size_t i=0;i<Ncart;i++)
-        cart[i].relnorm*=1.0/sqrt((*erip)[0]);
+        cart_[i].relnorm*=1.0/sqrt((*erip)[0]);
     }
     return;
   }
@@ -373,7 +373,7 @@ void GaussianShell::coulomb_normalize() {
   // contractions, but the contractions have different Coulomb norms, so
   // normalize each one by scaling its coefficient column instead. Within
   // a single spherical contraction all 2l+1 functions have the same norm.
-  if(!uselm) {
+  if(!uselm_) {
     ERROR_INFO();
     throw std::runtime_error("Coulomb normalization of a generally contracted cartesian shell is not supported.\n");
   }
@@ -394,62 +394,62 @@ void GaussianShell::coulomb_normalize() {
       oss << "\nSpherical functions have different norms!\n";
       throw std::runtime_error(oss.str());
     }
-    cf.col(ic)*=1.0/sqrt(n0);
+    cf_.col(ic)*=1.0/sqrt(n0);
   }
   // Mirror the (scaled) first column back into the exponent carrier
   sync_c();
 }
 
-std::vector<contr_t> GaussianShell::get_contr() const {
-  return c;
+std::vector<contr_t> GaussianShell::contr() const {
+  return c_;
 }
 
-const std::vector<contr_t> & GaussianShell::get_contr_ref() const {
-  return c;
+const std::vector<contr_t> & GaussianShell::contr_ref() const {
+  return c_;
 }
 
-std::vector<shellf_t> GaussianShell::get_cart() const {
-  return cart;
+std::vector<shellf_t> GaussianShell::cart() const {
+  return cart_;
 }
 
-const std::vector<shellf_t> & GaussianShell::get_cart_ref() const {
-  return cart;
+const std::vector<shellf_t> & GaussianShell::cart_ref() const {
+  return cart_;
 }
 
-std::vector<contr_t> GaussianShell::get_contr_normalized() const {
-  return get_contr_normalized(0);
+std::vector<contr_t> GaussianShell::contr_normalized() const {
+  return contr_normalized(0);
 }
 
-std::vector<contr_t> GaussianShell::get_contr_normalized(size_t ictr) const {
+std::vector<contr_t> GaussianShell::contr_normalized(size_t ictr) const {
   // The ictr'th contraction, its coefficients converted to those of
   // normalized primitives
-  std::vector<contr_t> cn(get_contr(ictr));
+  std::vector<contr_t> cn(contr(ictr));
 
   // Note - these refer to cartesian functions!
-  double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
+  double fac=pow(M_2_PI,0.75)*pow(2,am_)/sqrt(doublefact(2*am_-1));
 
   for(size_t i=0;i<cn.size();i++)
-    cn[i].c/=fac*pow(cn[i].z,am/2.0+0.75);
+    cn[i].c/=fac*pow(cn[i].z,am_/2.0+0.75);
 
   return cn;
 }
 
-size_t GaussianShell::get_Nbf() const {
+size_t GaussianShell::Nbf() const {
   // nctr angular blocks, one per contraction
-  return get_Nctr() * (uselm ? get_Nlm() : get_Ncart());
+  return Nctr() * (uselm_ ? Nlm() : Ncart());
 }
 
-size_t GaussianShell::get_Nctr() const {
-  return cf.n_cols;
+size_t GaussianShell::Nctr() const {
+  return cf_.n_cols;
 }
 
 bool GaussianShell::same_primitives(const GaussianShell & rhs) const {
-  if(cenind != rhs.cenind || am != rhs.am || uselm != rhs.uselm)
+  if(cenind_ != rhs.cenind_ || am_ != rhs.am_ || uselm_ != rhs.uselm_)
     return false;
-  if(c.size() != rhs.c.size())
+  if(c_.size() != rhs.c_.size())
     return false;
-  for(size_t i=0;i<c.size();i++)
-    if(c[i].z != rhs.c[i].z)
+  for(size_t i=0;i<c_.size();i++)
+    if(c_[i].z != rhs.c_[i].z)
       return false;
   return true;
 }
@@ -458,24 +458,24 @@ void GaussianShell::merge_contraction(const GaussianShell & rhs) {
   if(!same_primitives(rhs))
     throw std::logic_error("GaussianShell::merge_contraction: the shells do not share the same primitives.\n");
   // Append rhs's contraction columns after ours, preserving order
-  cf=arma::join_rows(cf,rhs.cf);
+  cf_=arma::join_rows(cf_,rhs.cf_);
 }
 
-const arma::mat & GaussianShell::get_coefs() const {
-  return cf;
+const arma::mat & GaussianShell::coefs() const {
+  return cf_;
 }
 
-std::vector<contr_t> GaussianShell::get_contr(size_t ictr) const {
-  std::vector<contr_t> ret(c.size());
-  for(size_t i=0;i<c.size();i++) {
-    ret[i].z=c[i].z;
-    ret[i].c=cf(i,ictr);
+std::vector<contr_t> GaussianShell::contr(size_t ictr) const {
+  std::vector<contr_t> ret(c_.size());
+  for(size_t i=0;i<c_.size();i++) {
+    ret[i].z=c_[i].z;
+    ret[i].c=cf_(i,ictr);
   }
   return ret;
 }
 
-size_t GaussianShell::get_Nlm() const {
-  return 2*am+1;
+size_t GaussianShell::Nlm() const {
+  return 2*am_+1;
 }
 
 double GaussianShell::range(double eps) const {
@@ -491,9 +491,9 @@ double GaussianShell::range(double eps) const {
     r*=2.0;
 
     val=0.0;
-    for(size_t i=0;i<c.size();i++)
-      val+=arma::max(arma::abs(cf.row(i)))*exp(-c[i].z*r*r);
-    val*=pow(r,am);
+    for(size_t i=0;i<c_.size();i++)
+      val+=arma::max(arma::abs(cf_.row(i)))*exp(-c_[i].z*r*r);
+    val*=pow(r,am_);
   } while(fabs(val)>eps);
 
   // OK, now the range lies in the range [oldr,r]. Use binary search to refine
@@ -506,9 +506,9 @@ double GaussianShell::range(double eps) const {
 
     // Compute value in the middle
     val=0.0;
-    for(size_t i=0;i<c.size();i++)
-      val+=arma::max(arma::abs(cf.row(i)))*exp(-c[i].z*middle*middle);
-    val*=pow(middle,am);
+    for(size_t i=0;i<c_.size();i++)
+      val+=arma::max(arma::abs(cf_.row(i)))*exp(-c_[i].z*middle*middle);
+    val*=pow(middle,am_);
 
     // Switch values
     if(fabs(val)<eps) {
@@ -523,55 +523,55 @@ double GaussianShell::range(double eps) const {
 }
 
 bool GaussianShell::lm_in_use() const {
-  return uselm;
+  return uselm_;
 }
 
 void GaussianShell::set_lm(bool lm) {
-  uselm=lm;
+  uselm_=lm;
 
-  if(uselm)
-    transmat=Ylm_transmat(am);
+  if(uselm_)
+    transmat_=Ylm_transmat(am_);
   else
-    transmat=arma::mat();
+    transmat_=arma::mat();
 }
 
-arma::mat GaussianShell::get_trans() const {
-  return transmat;
+arma::mat GaussianShell::transmat() const {
+  return transmat_;
 }
 
-size_t GaussianShell::get_Ncart() const {
-  return cart.size();
+size_t GaussianShell::Ncart() const {
+  return cart_.size();
 }
 
-size_t GaussianShell::get_Ncontr() const {
-  return c.size();
+size_t GaussianShell::Ncontr() const {
+  return c_.size();
 }
 
-int GaussianShell::get_am() const {
-  return am;
+int GaussianShell::am() const {
+  return am_;
 }
 
-size_t GaussianShell::get_center_ind() const {
+size_t GaussianShell::center_ind() const {
   //  return cen->ind;
-  return cenind;
+  return cenind_;
 }
 
-coords_t GaussianShell::get_center() const {
-  return cen;
+coords_t GaussianShell::center() const {
+  return cen_;
 }
 
 bool GaussianShell::operator<(const GaussianShell & rhs) const {
   // Sort first by nucleus
-  if(cenind < rhs.cenind)
+  if(cenind_ < rhs.cenind_)
     return true;
-  else if(cenind == rhs.cenind) {
+  else if(cenind_ == rhs.cenind_) {
     // Then by angular momentum
-    if(am<rhs.am)
+    if(am_<rhs.am_)
       return true;
-    else if(am==rhs.am) {
+    else if(am_==rhs.am_) {
       // Then by decreasing order of exponents
-      if(c.size() && rhs.c.size())
-	return c[0].z>rhs.c[0].z;
+      if(c_.size() && rhs.c_.size())
+	return c_[0].z>rhs.c_[0].z;
     }
   }
 
@@ -581,75 +581,75 @@ bool GaussianShell::operator<(const GaussianShell & rhs) const {
 
 bool GaussianShell::operator==(const GaussianShell & rhs) const {
   // Check first nucleus
-  if(cenind != rhs.cenind) {
+  if(cenind_ != rhs.cenind_) {
     //    fprintf(stderr,"Center indices differ!\n");
     return false;
   }
 
   // Then, angular momentum
-  if(am!=rhs.am) {
+  if(am_!=rhs.am_) {
     //    fprintf(stderr,"Angular momentum differs!\n");
     return false;
   }
 
   // Then, by number of primitives and of contractions
-  if(c.size() != rhs.c.size())
+  if(c_.size() != rhs.c_.size())
     return false;
-  if(cf.n_cols != rhs.cf.n_cols)
+  if(cf_.n_cols != rhs.cf_.n_cols)
     return false;
 
   // The exponents and the first contraction (contr_t carries a tolerance)
-  for(size_t i=0;i<c.size();i++)
-    if(!(c[i]==rhs.c[i]))
+  for(size_t i=0;i<c_.size();i++)
+    if(!(c_[i]==rhs.c_[i]))
       return false;
 
   // The remaining contraction columns
   const double tol=sqrt(DBL_EPSILON);
-  for(size_t j=1;j<cf.n_cols;j++)
-    for(size_t i=0;i<cf.n_rows;i++)
-      if(std::fabs(cf(i,j)-rhs.cf(i,j)) > tol*std::max(1.0,std::fabs(cf(i,j))))
+  for(size_t j=1;j<cf_.n_cols;j++)
+    for(size_t i=0;i<cf_.n_rows;i++)
+      if(std::fabs(cf_(i,j)-rhs.cf_(i,j)) > tol*std::max(1.0,std::fabs(cf_(i,j))))
         return false;
 
   return true;
 }
 
-size_t GaussianShell::get_first_ind() const {
-  return indstart;
+size_t GaussianShell::first_ind() const {
+  return indstart_;
 }
 
-size_t GaussianShell::get_last_ind() const {
-  return indstart+get_Nbf()-1;
+size_t GaussianShell::last_ind() const {
+  return indstart_+Nbf()-1;
 }
 
 void GaussianShell::print() const {
 
-  printf("\t%c shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[am],(int) (get_center_ind()+1),(int) get_first_ind()+1,(int) get_last_ind()+1);
-  printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR);
+  printf("\t%c shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[am_],(int) (center_ind()+1),(int) first_ind()+1,(int) last_ind()+1);
+  printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen_.x/ANGSTROMINBOHR,cen_.y/ANGSTROMINBOHR,cen_.z/ANGSTROMINBOHR);
 
   // Get contraction of normalized primitives
-  std::vector<contr_t> cn(get_contr_normalized());
+  std::vector<contr_t> cn(contr_normalized());
 
   printf("\t\tExponential contraction is\n");
   printf("\t\t\tzeta\t\tprimitive coeff\ttotal coeff\n");
-  for(size_t i=0;i<c.size();i++)
-    printf("\t\t\t%e\t% e\t% e\n",c[i].z,cn[i].c,c[i].c);
-  if(uselm) {
+  for(size_t i=0;i<c_.size();i++)
+    printf("\t\t\t%e\t% e\t% e\n",c_[i].z,cn[i].c,c_[i].c);
+  if(uselm_) {
     printf("\t\tThe functions on this shell are:\n\t\t\t");
-    for(int m=-am;m<=am;m++)
-      printf(" (%i,%i)",am,m);
+    for(int m=-am_;m<=am_;m++)
+      printf(" (%i,%i)",am_,m);
     printf("\n");
   } else {
     printf("\t\tThe functions on this shell are:\n\t\t\t");
-    for(size_t i=0;i<cart.size();i++) {
+    for(size_t i=0;i<cart_.size();i++) {
       printf(" ");
-      if(cart[i].l+cart[i].m+cart[i].n==0)
+      if(cart_[i].l+cart_[i].m+cart_[i].n==0)
 	printf("1");
       else {
-	for(int j=0;j<cart[i].l;j++)
+	for(int j=0;j<cart_[i].l;j++)
 	  printf("x");
-	for(int j=0;j<cart[i].m;j++)
+	for(int j=0;j<cart_[i].m;j++)
 	  printf("y");
-	for(int j=0;j<cart[i].n;j++)
+	for(int j=0;j<cart_[i].n;j++)
 	  printf("z");
       }
     }
@@ -706,9 +706,9 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
   // the power arrays, and the per-primitive exp(-z * rrelsq); a
   // fused pass amortises all of that across the requested outputs.
 
-  const double xrel = x - cen.x;
-  const double yrel = y - cen.y;
-  const double zrel = z - cen.z;
+  const double xrel = x - cen_.x;
+  const double yrel = y - cen_.y;
+  const double zrel = z - cen_.z;
   const double rrelsq = xrel*xrel + yrel*yrel + zrel*zrel;
 
   // Power-array degree needed:
@@ -716,10 +716,10 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
   //   grad                -> am + 1   (_der1 reads xr[l+1])
   //   lapl, hess          -> am + 2   (_der2 reads xr[l+2])
   //   laplgrad            -> am + 3   (_der3 reads xr[l+3])
-  int xpow_max = am;
-  if(do_grad) xpow_max = std::max(xpow_max, am + 1);
-  if(do_lapl || do_hess) xpow_max = std::max(xpow_max, am + 2);
-  if(do_lgrad) xpow_max = std::max(xpow_max, am + 3);
+  int xpow_max = am_;
+  if(do_grad) xpow_max = std::max(xpow_max, am_ + 1);
+  if(do_lapl || do_hess) xpow_max = std::max(xpow_max, am_ + 2);
+  if(do_lgrad) xpow_max = std::max(xpow_max, am_ + 3);
   double xr[xpow_max+1], yr[xpow_max+1], zr[xpow_max+1];
   xr[0] = 1.0; yr[0] = 1.0; zr[0] = 1.0;
   if(xpow_max >= 1) {
@@ -737,23 +737,23 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
   // primitive exp() and the derivative factors are computed once (they
   // do not depend on the contraction); only the multiply-accumulate
   // into the columns scales with the number of contractions.
-  const size_t nctr = cf.n_cols;
-  const size_t Ncart = cart.size();
+  const size_t nctr = cf_.n_cols;
+  const size_t Ncart = cart_.size();
   arma::mat fbuf;  fbuf.zeros(Ncart, nctr);
   arma::mat gbuf;  if(do_grad) gbuf.zeros(Ncart, 3*nctr);
   arma::mat lbuf;  if(do_lapl) lbuf.zeros(Ncart, nctr);
   arma::mat hbuf;  if(do_hess) hbuf.zeros(Ncart, 9*nctr);
   arma::mat lgbuf; if(do_lgrad) lgbuf.zeros(Ncart, 3*nctr);
 
-  for(size_t iexp=0; iexp<c.size(); iexp++) {
-    const double z_i = c[iexp].z;
+  for(size_t iexp=0; iexp<c_.size(); iexp++) {
+    const double z_i = c_[iexp].z;
     // Bare Gaussian: no contraction coefficient (one exp per primitive)
     const double e_i = std::exp(-z_i * rrelsq);
 
     for(size_t icart=0; icart<Ncart; icart++) {
-      const int l = cart[icart].l;
-      const int m = cart[icart].m;
-      const int n = cart[icart].n;
+      const int l = cart_[icart].l;
+      const int m = cart_[icart].m;
+      const int n = cart_[icart].n;
       const double xl = xr[l];
       const double ym = yr[m];
       const double zn = zr[n];
@@ -761,7 +761,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
       // Value term, bare
       const double v = xl * ym * zn * e_i;
       for(size_t ic=0; ic<nctr; ic++)
-        fbuf(icart, ic) += cf(iexp, ic) * v;
+        fbuf(icart, ic) += cf_(iexp, ic) * v;
 
       // Derivative factors, computed once (independent of contraction)
       const bool need_d1 = do_grad || do_hess || do_lgrad;
@@ -782,7 +782,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
         const double gy = xl  * d1y * zn * e_i;
         const double gz = xl  * ym * d1z * e_i;
         for(size_t ic=0; ic<nctr; ic++) {
-          const double w = cf(iexp, ic);
+          const double w = cf_(iexp, ic);
           gbuf(icart, 3*ic+0) += w * gx;
           gbuf(icart, 3*ic+1) += w * gy;
           gbuf(icart, 3*ic+2) += w * gz;
@@ -792,7 +792,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
       if(do_lapl) {
         const double lp = (d2x * ym * zn + xl * d2y * zn + xl * ym * d2z) * e_i;
         for(size_t ic=0; ic<nctr; ic++)
-          lbuf(icart, ic) += cf(iexp, ic) * lp;
+          lbuf(icart, ic) += cf_(iexp, ic) * lp;
       }
 
       if(do_hess) {
@@ -803,7 +803,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
         const double hxz = d1x * ym  * d1z * e_i;
         const double hyz = xl  * d1y * d1z * e_i;
         for(size_t ic=0; ic<nctr; ic++) {
-          const double w = cf(iexp, ic);
+          const double w = cf_(iexp, ic);
           hbuf(icart, 9*ic+0) += w * hxx;
           hbuf(icart, 9*ic+4) += w * hyy;
           hbuf(icart, 9*ic+8) += w * hzz;
@@ -821,7 +821,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
         const double lg1 = (d2x * d1y * zn + xl * d3y * zn + xl * d1y * d2z) * e_i;
         const double lg2 = (d2x * ym * d1z + xl * d2y * d1z + xl * ym * d3z) * e_i;
         for(size_t ic=0; ic<nctr; ic++) {
-          const double w = cf(iexp, ic);
+          const double w = cf_(iexp, ic);
           lgbuf(icart, 3*ic+0) += w * lg0;
           lgbuf(icart, 3*ic+1) += w * lg1;
           lgbuf(icart, 3*ic+2) += w * lg2;
@@ -832,7 +832,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
 
   // Plug in the per-cartesian normalisation constant (shared across contractions)
   for(size_t icart=0; icart<Ncart; icart++) {
-    const double rn = cart[icart].relnorm;
+    const double rn = cart_[icart].relnorm;
     fbuf.row(icart) *= rn;
     if(do_grad)  gbuf.row(icart)  *= rn;
     if(do_lapl)  lbuf.row(icart)  *= rn;
@@ -843,7 +843,7 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
   // Project each contraction's cartesian block to the output, stacking
   // the contractions along the function (row) dimension: contraction
   // ictr occupies output rows [ictr*Nout, (ictr+1)*Nout).
-  const size_t Nout = uselm ? get_Nlm() : Ncart;
+  const size_t Nout = uselm_ ? Nlm() : Ncart;
   fval.set_size(nctr*Nout);
   if(do_grad)  gval.set_size(nctr*Nout, 3);
   if(do_lapl)  lval.set_size(nctr*Nout);
@@ -852,12 +852,12 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
 
   for(size_t ic=0; ic<nctr; ic++) {
     const size_t r0=ic*Nout, r1=r0+Nout-1;
-    if(uselm) {
-      fval.subvec(r0,r1) = transmat * fbuf.col(ic);
-      if(do_grad)  gval.rows(r0,r1)  = transmat * gbuf.cols(3*ic,3*ic+2);
-      if(do_lapl)  lval.subvec(r0,r1) = transmat * lbuf.col(ic);
-      if(do_hess)  hval.rows(r0,r1)  = transmat * hbuf.cols(9*ic,9*ic+8);
-      if(do_lgrad) lgval.rows(r0,r1) = transmat * lgbuf.cols(3*ic,3*ic+2);
+    if(uselm_) {
+      fval.subvec(r0,r1) = transmat_ * fbuf.col(ic);
+      if(do_grad)  gval.rows(r0,r1)  = transmat_ * gbuf.cols(3*ic,3*ic+2);
+      if(do_lapl)  lval.subvec(r0,r1) = transmat_ * lbuf.col(ic);
+      if(do_hess)  hval.rows(r0,r1)  = transmat_ * hbuf.cols(9*ic,9*ic+8);
+      if(do_lgrad) lgval.rows(r0,r1) = transmat_ * lgbuf.cols(3*ic,3*ic+2);
     } else {
       fval.subvec(r0,r1) = fbuf.col(ic);
       if(do_grad)  gval.rows(r0,r1)  = gbuf.cols(3*ic,3*ic+2);
@@ -980,31 +980,31 @@ arma::vec GaussianShell::function_norms() const {
   // unless every direction has an even total power. Precompute the
   // per-primitive-pair, per-cartesian-pair angular factor once and
   // weight it by each contraction's coefficients.
-  const size_t Nout = uselm ? get_Nlm() : cart.size();
-  arma::vec norms(get_Nctr()*Nout);
+  const size_t Nout = uselm_ ? Nlm() : cart_.size();
+  arma::vec norms(Nctr()*Nout);
 
-  for(size_t ictr=0;ictr<get_Nctr();ictr++) {
-    arma::mat S(cart.size(),cart.size(),arma::fill::zeros);
-    for(size_t ic=0;ic<cart.size();ic++)
-      for(size_t jc=0;jc<cart.size();jc++) {
-        const int L[3]={cart[ic].l+cart[jc].l, cart[ic].m+cart[jc].m, cart[ic].n+cart[jc].n};
+  for(size_t ictr=0;ictr<Nctr();ictr++) {
+    arma::mat S(cart_.size(),cart_.size(),arma::fill::zeros);
+    for(size_t ic=0;ic<cart_.size();ic++)
+      for(size_t jc=0;jc<cart_.size();jc++) {
+        const int L[3]={cart_[ic].l+cart_[jc].l, cart_[ic].m+cart_[jc].m, cart_[ic].n+cart_[jc].n};
         if(L[0]%2 || L[1]%2 || L[2]%2)
           continue;
 
         double val=0.0;
-        for(size_t ip=0;ip<c.size();ip++)
-          for(size_t jp=0;jp<c.size();jp++) {
-            const double zeta=c[ip].z+c[jp].z;
-            double term=cf(ip,ictr)*cf(jp,ictr)*pow(M_PI/zeta,1.5);
+        for(size_t ip=0;ip<c_.size();ip++)
+          for(size_t jp=0;jp<c_.size();jp++) {
+            const double zeta=c_[ip].z+c_[jp].z;
+            double term=cf_(ip,ictr)*cf_(jp,ictr)*pow(M_PI/zeta,1.5);
             for(int ix=0;ix<3;ix++)
               term*=doublefact(L[ix]-1)/pow(2.0*zeta,L[ix]/2);
             val+=term;
           }
-        S(ic,jc)=cart[ic].relnorm*cart[jc].relnorm*val;
+        S(ic,jc)=cart_[ic].relnorm*cart_[jc].relnorm*val;
       }
 
-    if(uselm)
-      S=transmat*S*arma::trans(transmat);
+    if(uselm_)
+      S=transmat_*S*arma::trans(transmat_);
 
     norms.subvec(ictr*Nout, ictr*Nout+Nout-1)=S.diag();
   }
@@ -1015,8 +1015,8 @@ arma::vec GaussianShell::function_norms() const {
 // Calculate overlaps between basis functions
 arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
   // Number of functions on the shells
-  size_t Ni=get_Nbf();
-  size_t Nj=rhs.get_Nbf();
+  size_t Ni=Nbf();
+  size_t Nj=rhs.Nbf();
 
   // Two-center Coulomb integrals over the shell pair
   std::vector<GaussianShell> shpair;
@@ -1048,35 +1048,35 @@ arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
 arma::vec GaussianShell::integral() const {
   // Integral over each function of the shell, one contraction after the
   // other.
-  const size_t Nout = uselm ? get_Nlm() : cart.size();
-  arma::vec out(get_Nctr()*Nout);
+  const size_t Nout = uselm_ ? Nlm() : cart_.size();
+  arma::vec out(Nctr()*Nout);
 
-  for(size_t ictr=0;ictr<get_Nctr();ictr++) {
-    arma::vec ints(cart.size());
+  for(size_t ictr=0;ictr<Nctr();ictr++) {
+    arma::vec ints(cart_.size());
     ints.zeros();
 
-    for(size_t ic=0;ic<cart.size();ic++) {
-      int l=cart[ic].l;
-      int m=cart[ic].m;
-      int n=cart[ic].n;
+    for(size_t ic=0;ic<cart_.size();ic++) {
+      int l=cart_[ic].l;
+      int m=cart_[ic].m;
+      int n=cart_[ic].n;
 
       if(l%2 || m%2 || n%2)
         // Odd function - zero integral
         continue;
 
-      for(size_t ix=0;ix<c.size();ix++) {
-        double zeta=c[ix].z;
+      for(size_t ix=0;ix<c_.size();ix++) {
+        double zeta=c_[ix].z;
         double intx=2.0*pow(0.5/sqrt(zeta),l+1)*sqrt(M_PI);
         double inty=2.0*pow(0.5/sqrt(zeta),m+1)*sqrt(M_PI);
         double intz=2.0*pow(0.5/sqrt(zeta),n+1)*sqrt(M_PI);
-        ints(ic)+=cf(ix,ictr)*intx*inty*intz;
+        ints(ic)+=cf_(ix,ictr)*intx*inty*intz;
       }
 
-      ints(ic)*=cart[ic].relnorm;
+      ints(ic)*=cart_[ic].relnorm;
     }
 
-    if(uselm)
-      ints=transmat*ints;
+    if(uselm_)
+      ints=transmat_*ints;
 
     out.subvec(ictr*Nout, ictr*Nout+Nout-1)=ints;
   }
@@ -1087,42 +1087,42 @@ arma::vec GaussianShell::integral() const {
 
 BasisSet::BasisSet() {
   // Use spherical harmonics and cartesian functions by default.
-  uselm=true;
-  optlm=true;
+  uselm_=true;
+  optlm_=true;
 }
 
 extern Settings settings;
 
 BasisSet::BasisSet(size_t Nat) {
   // Use spherical harmonics?
-  uselm=settings.get_bool("UseLM");
-  optlm=settings.get_bool("OptLM");
+  uselm_=settings.get_bool("UseLM");
+  optlm_=settings.get_bool("OptLM");
 
-  shells.reserve(Nat);
-  nuclei.reserve(Nat);
+  shells_.reserve(Nat);
+  nuclei_.reserve(Nat);
 }
 
 BasisSet::~BasisSet() {
 }
 
 void BasisSet::add_nucleus(const nucleus_t & nuc) {
-  nuclei.push_back(nuc);
+  nuclei_.push_back(nuc);
   // Clear list of functions
-  nuclei[nuclei.size()-1].shells.clear();
+  nuclei_[nuclei_.size()-1].shells.clear();
   // Set nuclear index
-  nuclei[nuclei.size()-1].ind=nuclei.size()-1;
+  nuclei_[nuclei_.size()-1].ind=nuclei_.size()-1;
 }
 
 void BasisSet::add_shell(size_t nucind, const GaussianShell & sh, bool dosort) {
-  if(nucind>=nuclei.size()) {
+  if(nucind>=nuclei_.size()) {
     ERROR_INFO();
     throw std::runtime_error("Cannot add functions to nonexisting nucleus!\n");
   }
 
   // Add shell
-  shells.push_back(sh);
+  shells_.push_back(sh);
   // Set pointer to nucleus
-  shells[shells.size()-1].set_center(nuclei[nucind].r,nucind);
+  shells_[shells_.size()-1].set_center(nuclei_[nucind].r,nucind);
 
   // Sort the basis set, updating the nuclear list and basis function indices as well
   if(dosort)
@@ -1150,7 +1150,7 @@ void BasisSet::add_shells(size_t nucind, ElementBasisSet el, bool dosort) {
   // Loop over shells in element basis
   for(size_t i=0;i<bf.size();i++) {
     // Spherical harmonics for this shell?
-    const bool lm = (!optlm || bf[i].get_am()>=2) ? uselm : false;
+    const bool lm = (!optlm_ || bf[i].get_am()>=2) ? uselm_ : false;
 
     // A library shell may be generally contracted: add one GaussianShell
     // per contraction. They share the exponents, so finalize's
@@ -1165,30 +1165,30 @@ void BasisSet::add_shells(size_t nucind, ElementBasisSet el, bool dosort) {
 void BasisSet::check_numbering() {
   // Renumber basis functions
   size_t ind=0;
-  for(size_t i=0;i<shells.size();i++) {
-    shells[i].set_first_ind(ind);
-    ind=shells[i].get_last_ind()+1;
+  for(size_t i=0;i<shells_.size();i++) {
+    shells_[i].first_ind(ind);
+    ind=shells_[i].last_ind()+1;
   }
 }
 
 void BasisSet::update_nuclear_shell_list() {
   // First, clear the list on all nuclei.
-  for(size_t inuc=0;inuc<nuclei.size();inuc++)
-    nuclei[inuc].shells.clear();
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++)
+    nuclei_[inuc].shells.clear();
 
   // Then, update the lists. Loop over shells
-  for(size_t ish=0;ish<shells.size();ish++) {
+  for(size_t ish=0;ish<shells_.size();ish++) {
     // Find out nuclear index
-    size_t inuc=shells[ish].get_center_ind();
+    size_t inuc=shells_[ish].center_ind();
     // Add pointer to the nucleus
-    nuclei[inuc].shells.push_back(&shells[ish]);
+    nuclei_[inuc].shells.push_back(&shells_[ish]);
   }
 }
 
 void BasisSet::sort() {
   // Sort the shells first by increasing index of center, then by
   // increasing angular momentum and last by decreasing exponent.
-  std::stable_sort(shells.begin(),shells.end());
+  std::stable_sort(shells_.begin(),shells_.end());
 
   // Check the numbering of the basis functions
   check_numbering();
@@ -1207,19 +1207,19 @@ void BasisSet::merge_generally_contracted() {
   // contraction without disturbing the basis function order (the merged
   // shell emits [ctr0][ctr1]... in the same span the segmented shells
   // occupied).
-  if(shells.empty())
+  if(shells_.empty())
     return;
 
   std::vector<GaussianShell> merged;
-  merged.reserve(shells.size());
-  merged.push_back(shells[0]);
-  for(size_t i=1;i<shells.size();i++) {
-    if(merged.back().same_primitives(shells[i]))
-      merged.back().merge_contraction(shells[i]);
+  merged.reserve(shells_.size());
+  merged.push_back(shells_[0]);
+  for(size_t i=1;i<shells_.size();i++) {
+    if(merged.back().same_primitives(shells_[i]))
+      merged.back().merge_contraction(shells_[i]);
     else
-      merged.push_back(shells[i]);
+      merged.push_back(shells_[i]);
   }
-  shells=std::move(merged);
+  shells_=std::move(merged);
 
   // Renumber the basis functions and rebuild the per-nucleus shell lists.
   check_numbering();
@@ -1228,29 +1228,29 @@ void BasisSet::merge_generally_contracted() {
 
 void BasisSet::compute_nuclear_distances() {
   // Amount of nuclei
-  size_t N=nuclei.size();
+  size_t N=nuclei_.size();
 
   // Reserve memory
-  nucleardist=arma::mat(N,N);
+  nucleardist_=arma::mat(N,N);
 
   double d;
 
   // Fill table
   for(size_t i=0;i<N;i++)
     for(size_t j=0;j<=i;j++) {
-      d=dist(nuclei[i].r.x,nuclei[i].r.y,nuclei[i].r.z,nuclei[j].r.x,nuclei[j].r.y,nuclei[j].r.z);
+      d=dist(nuclei_[i].r.x,nuclei_[i].r.y,nuclei_[i].r.z,nuclei_[j].r.x,nuclei_[j].r.y,nuclei_[j].r.z);
 
-      nucleardist(i,j)=d;
-      nucleardist(j,i)=d;
+      nucleardist_(i,j)=d;
+      nucleardist_(j,i)=d;
     }
 }
 
 double BasisSet::nuclear_distance(size_t i, size_t j) const {
-  return nucleardist(i,j);
+  return nucleardist_(i,j);
 }
 
 arma::mat BasisSet::nuclear_distances() const {
-  return nucleardist;
+  return nucleardist_;
 }
 
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs) {
@@ -1260,32 +1260,32 @@ bool operator<(const shellpair_t & lhs, const shellpair_t & rhs) {
 
 void BasisSet::form_unique_shellpairs() {
   // Drop list of existing pairs.
-  shellpairs.clear();
+  shellpairs_.clear();
 
   // Form list of unique shell pairs.
   shellpair_t tmp;
 
   // Now, form list of unique shell pairs
-  for(size_t i=0;i<shells.size();i++) {
+  for(size_t i=0;i<shells_.size();i++) {
     for(size_t j=0;j<=i;j++) {
       // Have to set these in every iteration due to swap below
       tmp.is=i;
       tmp.js=j;
 
       // Order the pair with the higher angular momentum first
-      if(shells[j].get_am()>shells[i].get_am())
+      if(shells_[j].am()>shells_[i].am())
 	std::swap(tmp.is,tmp.js);
 
       // Set angular momenta
-      tmp.li=shells[tmp.is].get_am();
-      tmp.lj=shells[tmp.js].get_am();
+      tmp.li=shells_[tmp.is].am();
+      tmp.lj=shells_[tmp.js].am();
 
-      shellpairs.push_back(tmp);
+      shellpairs_.push_back(tmp);
     }
   }
 
   // Sort list of unique shell pairs
-  stable_sort(shellpairs.begin(),shellpairs.end());
+  stable_sort(shellpairs_.begin(),shellpairs_.end());
 
   /*
   // Print list
@@ -1302,12 +1302,12 @@ void BasisSet::form_unique_shellpairs() {
   */
 }
 
-std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
-  if(shells.size() && !shellpairs.size()) {
+std::vector<shellpair_t> BasisSet::unique_shellpairs() const {
+  if(shells_.size() && !shellpairs_.size()) {
     throw std::runtime_error("shellpairs not initialized! Maybe you forgot to finalize?\n");
   }
 
-  return shellpairs;
+  return shellpairs_;
 }
 
 ScreeningData BasisSet::compute_screening(double tol, double omega, double alpha, double beta, bool verbose) const {
@@ -1317,15 +1317,15 @@ ScreeningData BasisSet::compute_screening(double tol, double omega, double alpha
   eri_screening(s.Q,s.M,omega,alpha,beta);
 
   // Fill out list
-  s.shpairs.resize(shellpairs.size());
-  for(size_t i=0;i<shellpairs.size();i++) {
-    s.shpairs[i].is=shellpairs[i].is;
-    s.shpairs[i].i0=shells[shellpairs[i].is].get_first_ind();
-    s.shpairs[i].Ni=shells[shellpairs[i].is].get_Nbf();
+  s.shpairs.resize(shellpairs_.size());
+  for(size_t i=0;i<shellpairs_.size();i++) {
+    s.shpairs[i].is=shellpairs_[i].is;
+    s.shpairs[i].i0=shells_[shellpairs_[i].is].first_ind();
+    s.shpairs[i].Ni=shells_[shellpairs_[i].is].Nbf();
 
-    s.shpairs[i].js=shellpairs[i].js;
-    s.shpairs[i].j0=shells[shellpairs[i].js].get_first_ind();
-    s.shpairs[i].Nj=shells[shellpairs[i].js].get_Nbf();
+    s.shpairs[i].js=shellpairs_[i].js;
+    s.shpairs[i].j0=shells_[shellpairs_[i].js].first_ind();
+    s.shpairs[i].Nj=shells_[shellpairs_[i].js].Nbf();
 
     s.shpairs[i].eri=s.Q(s.shpairs[i].is,s.shpairs[i].js);
   }
@@ -1384,33 +1384,33 @@ void BasisSet::finalize(bool convert, bool donorm) {
   update_nuclear_shell_list();
 }
 
-int BasisSet::get_am(size_t ind) const {
-  return shells[ind].get_am();
+int BasisSet::am(size_t ind) const {
+  return shells_[ind].am();
 }
 
-int BasisSet::get_max_am() const {
-  if(shells.size()==0) {
+int BasisSet::max_am() const {
+  if(shells_.size()==0) {
     return -1;
   }
 
-  int maxam=shells[0].get_am();
-  for(size_t i=1;i<shells.size();i++)
-    if(shells[i].get_am()>maxam)
-      maxam=shells[i].get_am();
+  int maxam=shells_[0].am();
+  for(size_t i=1;i<shells_.size();i++)
+    if(shells_[i].am()>maxam)
+      maxam=shells_[i].am();
   return maxam;
 }
 
-size_t BasisSet::get_max_Ncontr() const {
-  size_t maxc=shells[0].get_Ncontr();
-  for(size_t i=1;i<shells.size();i++)
-    if(shells[i].get_Ncontr()>maxc)
-      maxc=shells[i].get_Ncontr();
+size_t BasisSet::max_Ncontr() const {
+  size_t maxc=shells_[0].Ncontr();
+  for(size_t i=1;i<shells_.size();i++)
+    if(shells_[i].Ncontr()>maxc)
+      maxc=shells_[i].Ncontr();
   return maxc;
 }
 
-size_t BasisSet::get_Nbf() const {
-  if(shells.size())
-    return shells[shells.size()-1].get_last_ind()+1;
+size_t BasisSet::Nbf() const {
+  if(shells_.size())
+    return shells_[shells_.size()-1].last_ind()+1;
   else
     return 0;
 }
@@ -1421,56 +1421,56 @@ void BasisSet::compute_shell_ranges() {
 }
 
 void BasisSet::compute_shell_ranges(double eps) {
-  shell_ranges=get_shell_ranges(eps);
+  shell_ranges_=shell_ranges(eps);
 }
 
-std::vector<double> BasisSet::get_shell_ranges() const {
-  return shell_ranges;
+std::vector<double> BasisSet::shell_ranges() const {
+  return shell_ranges_;
 }
 
-std::vector<double> BasisSet::get_shell_ranges(double eps) const {
-  std::vector<double> shran(shells.size());
+std::vector<double> BasisSet::shell_ranges(double eps) const {
+  std::vector<double> shran(shells_.size());
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t i=0;i<shells.size();i++)
-    shran[i]=shells[i].range(eps);
+  for(size_t i=0;i<shells_.size();i++)
+    shran[i]=shells_[i].range(eps);
 
   return shran;
 }
 
-std::vector<double> BasisSet::get_nuclear_distances(size_t inuc) const {
-  std::vector<double> d(nucleardist.n_cols);
-  for(size_t i=0;i<nucleardist.n_cols;i++)
-    d[i]=nucleardist(inuc,i);
+std::vector<double> BasisSet::nuclear_distances(size_t inuc) const {
+  std::vector<double> d(nucleardist_.n_cols);
+  for(size_t i=0;i<nucleardist_.n_cols;i++)
+    d[i]=nucleardist_(inuc,i);
   return d;
 }
 
-size_t BasisSet::get_Ncart() const {
+size_t BasisSet::Ncart() const {
   size_t n=0;
-  for(size_t i=0;i<shells.size();i++)
-    n+=shells[i].get_Ncart();
+  for(size_t i=0;i<shells_.size();i++)
+    n+=shells_[i].Ncart();
   return n;
 }
 
-size_t BasisSet::get_Nlm() const {
+size_t BasisSet::Nlm() const {
   size_t n=0;
-  for(size_t i=0;i<shells.size();i++)
-    n+=shells[i].get_Nlm();
+  for(size_t i=0;i<shells_.size();i++)
+    n+=shells_[i].Nlm();
   return n;
 }
 
-size_t BasisSet::get_Nbf(size_t ind) const {
-  return shells[ind].get_Nbf();
+size_t BasisSet::Nbf(size_t ind) const {
+  return shells_[ind].Nbf();
 }
 
-size_t BasisSet::get_Ncart(size_t ind) const {
-  return shells[ind].get_Ncart();
+size_t BasisSet::Ncart(size_t ind) const {
+  return shells_[ind].Ncart();
 }
 
-size_t BasisSet::get_last_ind() const {
-  if(shells.size())
-    return shells[shells.size()-1].get_last_ind();
+size_t BasisSet::last_ind() const {
+  if(shells_.size())
+    return shells_[shells_.size()-1].last_ind();
   else {
     std::ostringstream oss;
     oss << "\nError in function " << __FUNCTION__ << "(file " << __FILE__ << ", near line " << __LINE__ << "\nCannot get number of last basis function of an empty basis set!\n";
@@ -1478,28 +1478,28 @@ size_t BasisSet::get_last_ind() const {
   }
 }
 
-size_t BasisSet::get_first_ind(size_t num) const {
-  return shells[num].get_first_ind();
+size_t BasisSet::first_ind(size_t num) const {
+  return shells_[num].first_ind();
 }
 
-size_t BasisSet::get_last_ind(size_t num) const {
-  return shells[num].get_last_ind();
+size_t BasisSet::last_ind(size_t num) const {
+  return shells_[num].last_ind();
 }
 
-arma::vec BasisSet::get_bf_Rsquared() const {
-  arma::vec Rsq(get_Nbf());
+arma::vec BasisSet::bf_Rsquared() const {
+  arma::vec Rsq(Nbf());
 
   CintEnv cenv(*this,false);
   Int1eWorker w(cenv);
 
-  for(size_t i=0;i<shells.size();i++) {
+  for(size_t i=0;i<shells_.size();i++) {
     // First function on shell
-    size_t i0=shells[i].get_first_ind();
+    size_t i0=shells_[i].first_ind();
     // Number of functions
-    size_t nbf=shells[i].get_Nbf();
+    size_t nbf=shells_[i].Nbf();
 
     // Calculate second moments around the center of the shell
-    coords_t cen=shells[i].get_center();
+    coords_t cen=shells_[i].center();
     const double orig[3]={cen.x, cen.y, cen.z};
     std::vector<arma::mat> mom2=moment_pair(w,2,i,i,orig);
     // Compute spatial extents
@@ -1511,16 +1511,16 @@ arma::vec BasisSet::get_bf_Rsquared() const {
 }
 
 arma::uvec BasisSet::shell_indices() const {
-  arma::uvec idx(get_Nbf());
-  for(size_t i=0;i<shells.size();i++)
-    idx.subvec(shells[i].get_first_ind(),shells[i].get_last_ind())=i*arma::ones<arma::uvec>(shells[i].get_Nbf());
+  arma::uvec idx(Nbf());
+  for(size_t i=0;i<shells_.size();i++)
+    idx.subvec(shells_[i].first_ind(),shells_[i].last_ind())=i*arma::ones<arma::uvec>(shells_[i].Nbf());
   return idx;
 }
 
 size_t BasisSet::find_shell_ind(size_t find) const {
   // Find shell the function belongs to
-  for(size_t i=0;i<shells.size();i++)
-    if(find>=shells[i].get_first_ind() && find<=shells[i].get_last_ind())
+  for(size_t i=0;i<shells_.size();i++)
+    if(find>=shells_[i].first_ind() && find<=shells_[i].last_ind())
       return i;
 
   std::ostringstream oss;
@@ -1528,62 +1528,62 @@ size_t BasisSet::find_shell_ind(size_t find) const {
   throw std::runtime_error(oss.str());
 }
 
-size_t BasisSet::get_shell_center_ind(size_t num) const {
-  return shells[num].get_center_ind();
+size_t BasisSet::shell_center_ind(size_t num) const {
+  return shells_[num].center_ind();
 }
 
-std::vector<GaussianShell> BasisSet::get_shells() const {
-  return shells;
+std::vector<GaussianShell> BasisSet::shells() const {
+  return shells_;
 }
 
-const std::vector<GaussianShell> & BasisSet::get_shells_ref() const {
-  return shells;
+const std::vector<GaussianShell> & BasisSet::shells_ref() const {
+  return shells_;
 }
 
-GaussianShell BasisSet::get_shell(size_t ind) const {
-  return shells[ind];
+GaussianShell BasisSet::shell(size_t ind) const {
+  return shells_[ind];
 }
 
-coords_t BasisSet::get_shell_center(size_t num) const {
-  return shells[num].get_center();
+coords_t BasisSet::shell_center(size_t num) const {
+  return shells_[num].center();
 }
 
-std::vector<contr_t> BasisSet::get_contr(size_t ind) const {
-  return shells[ind].get_contr();
+std::vector<contr_t> BasisSet::contr(size_t ind) const {
+  return shells_[ind].contr();
 }
 
-std::vector<contr_t> BasisSet::get_contr_normalized(size_t ind) const {
-  return shells[ind].get_contr_normalized();
+std::vector<contr_t> BasisSet::contr_normalized(size_t ind) const {
+  return shells_[ind].contr_normalized();
 }
 
-std::vector<shellf_t> BasisSet::get_cart(size_t ind) const {
-  return shells[ind].get_cart();
+std::vector<shellf_t> BasisSet::cart(size_t ind) const {
+  return shells_[ind].cart();
 }
 
 
 bool BasisSet::is_lm_default() const {
-  return uselm;
+  return uselm_;
 }
 
 bool BasisSet::lm_in_use(size_t num) const {
-  return shells[num].lm_in_use();
+  return shells_[num].lm_in_use();
 }
 
 void BasisSet::set_lm(size_t num, bool lm) {
   // Set use of spherical harmonics
-  shells[num].set_lm(lm);
+  shells_[num].set_lm(lm);
   // Check numbering of basis functions which may have changed
   check_numbering();
 }
 
-arma::ivec BasisSet::get_m_values() const {
-  arma::ivec ret(get_Nbf());
-  for(size_t is=0;is<get_Nshells();is++) {
+arma::ivec BasisSet::m_values() const {
+  arma::ivec ret(Nbf());
+  for(size_t is=0;is<Nshells();is++) {
     // Angular momentum is
-    int am(get_am(is));
+    int am(this->am(is));
 
     // First function on shell
-    size_t i0(get_first_ind(is));
+    size_t i0(first_ind(is));
 
     // Functions are -m, -m+1, ..., m-1, m
     if(lm_in_use(is)) {
@@ -1606,7 +1606,7 @@ arma::ivec BasisSet::get_m_values() const {
 
 arma::ivec BasisSet::unique_m_values() const {
   // Find unique m values
-  arma::ivec mval(get_m_values());
+  arma::ivec mval(m_values());
   arma::sword mmin=0;
   arma::sword mmax=arma::max(arma::abs(mval));
 
@@ -1629,7 +1629,7 @@ std::map<int, arma::uword> BasisSet::unique_m_map() const {
 }
 
 arma::imat BasisSet::count_m_occupied(const arma::mat & C) const {
-  arma::ivec mc(m_classify(C,get_m_values()));
+  arma::ivec mc(m_classify(C,m_values()));
 
   std::map<int, arma::uword> mlook(unique_m_map());
 
@@ -1643,8 +1643,8 @@ arma::imat BasisSet::count_m_occupied(const arma::mat & C) const {
 }
 
 arma::imat BasisSet::count_m_occupied(const arma::mat & Ca, const arma::mat & Cb) const {
-  arma::ivec mca(m_classify(Ca,get_m_values()));
-  arma::ivec mcb(m_classify(Cb,get_m_values()));
+  arma::ivec mca(m_classify(Ca,m_values()));
+  arma::ivec mcb(m_classify(Cb,m_values()));
 
   std::map<int, arma::uword> mlook(unique_m_map());
 
@@ -1659,85 +1659,85 @@ arma::imat BasisSet::count_m_occupied(const arma::mat & Ca, const arma::mat & Cb
 }
 
 arma::uvec BasisSet::m_indices(int mwant) const {
-  arma::ivec midx(get_m_values());
+  arma::ivec midx(m_values());
   return arma::find(midx==mwant);
 }
 
-arma::mat BasisSet::get_trans(size_t ind) const {
-  return shells[ind].get_trans();
+arma::mat BasisSet::transmat(size_t ind) const {
+  return shells_[ind].transmat();
 }
 
-size_t BasisSet::get_Nshells() const {
-  return shells.size();
+size_t BasisSet::Nshells() const {
+  return shells_.size();
 }
 
-size_t BasisSet::get_Nnuc() const {
-  return nuclei.size();
+size_t BasisSet::Nnuc() const {
+  return nuclei_.size();
 }
 
-nucleus_t BasisSet::get_nucleus(size_t inuc) const {
-  return nuclei[inuc];
+nucleus_t BasisSet::nucleus(size_t inuc) const {
+  return nuclei_[inuc];
 }
 
-std::vector<nucleus_t> BasisSet::get_nuclei() const {
-  return nuclei;
+std::vector<nucleus_t> BasisSet::nuclei() const {
+  return nuclei_;
 }
 
-arma::mat BasisSet::get_nuclear_coords() const {
-  arma::mat coords(nuclei.size(),3);
-  for(size_t i=0;i<nuclei.size();i++)
-    coords.row(i)=arma::trans(coords_to_vec(nuclei[i].r));
+arma::mat BasisSet::nuclear_coords() const {
+  arma::mat coords(nuclei_.size(),3);
+  for(size_t i=0;i<nuclei_.size();i++)
+    coords.row(i)=arma::trans(coords_to_vec(nuclei_[i].r));
 
   return coords;
 }
 
 void BasisSet::set_nuclear_coords(const arma::mat & c) {
-  if(c.n_rows != nuclei.size() || c.n_cols != 3)
+  if(c.n_rows != nuclei_.size() || c.n_cols != 3)
     throw std::logic_error("Coordinates matrix does not match nuclei!\n");
 
-  for(size_t i=0;i<nuclei.size();i++)
-    nuclei[i].r=vec_to_coords(arma::trans(c.row(i)));
+  for(size_t i=0;i<nuclei_.size();i++)
+    nuclei_[i].r=vec_to_coords(arma::trans(c.row(i)));
 
   // Update shell centers
-  for(size_t i=0;i<shells.size();i++) {
-    size_t icen=shells[i].get_center_ind();
-    shells[i].set_center(nuclei[icen].r,icen);
+  for(size_t i=0;i<shells_.size();i++) {
+    size_t icen=shells_[i].center_ind();
+    shells_[i].set_center(nuclei_[icen].r,icen);
   }
   // Update listings
   finalize(false,false);
 }
 
-coords_t BasisSet::get_nuclear_coords(size_t inuc) const {
-  return nuclei[inuc].r;
+coords_t BasisSet::nuclear_coords(size_t inuc) const {
+  return nuclei_[inuc].r;
 }
 
-int BasisSet::get_Z(size_t inuc) const {
-  return nuclei[inuc].Z;
+int BasisSet::Z(size_t inuc) const {
+  return nuclei_[inuc].Z;
 }
 
-std::string BasisSet::get_symbol(size_t inuc) const {
-  return nuclei[inuc].symbol;
+std::string BasisSet::symbol(size_t inuc) const {
+  return nuclei_[inuc].symbol;
 }
 
-std::string BasisSet::get_symbol_hr(size_t inuc) const {
-  if(nuclei[inuc].bsse)
-    return nuclei[inuc].symbol+"-Bq";
+std::string BasisSet::symbol_hr(size_t inuc) const {
+  if(nuclei_[inuc].bsse)
+    return nuclei_[inuc].symbol+"-Bq";
   else
-    return nuclei[inuc].symbol;
+    return nuclei_[inuc].symbol;
 }
 
-std::vector<GaussianShell> BasisSet::get_funcs(size_t inuc) const {
+std::vector<GaussianShell> BasisSet::funcs(size_t inuc) const {
   std::vector<GaussianShell> ret;
-  for(size_t i=0;i<nuclei[inuc].shells.size();i++)
-    ret.push_back(*(nuclei[inuc].shells[i]));
+  for(size_t i=0;i<nuclei_[inuc].shells.size();i++)
+    ret.push_back(*(nuclei_[inuc].shells[i]));
 
   return ret;
 }
 
-std::vector<size_t> BasisSet::get_shell_inds(size_t inuc) const {
+std::vector<size_t> BasisSet::shell_inds(size_t inuc) const {
   std::vector<size_t> ret;
-  for(size_t i=0;i<shells.size();i++)
-    if(shells[i].get_center_ind()==inuc)
+  for(size_t i=0;i<shells_.size();i++)
+    if(shells_[i].center_ind()==inuc)
       ret.push_back(i);
   return ret;
 }
@@ -1751,21 +1751,21 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
 
   // Determine which shells might contribute
   std::vector<size_t> compute_shells;
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
     // Determine distance to nucleus
-    double dist=norm(r-nuclei[inuc].r);
+    double dist=norm(r-nuclei_[inuc].r);
     // Get indices of shells centered on nucleus
-    std::vector<size_t> shellinds=get_shell_inds(inuc);
+    std::vector<size_t> shellinds=shell_inds(inuc);
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++)
       // Shell is relevant if range is larger than distance
-      if(dist < shell_ranges[shellinds[ish]])
+      if(dist < shell_ranges_[shellinds[ish]])
 	compute_shells.push_back(shellinds[ish]);
   }
 
   // Returned values
-  arma::vec ret(get_Nbf());
+  arma::vec ret(Nbf());
   ret.zeros();
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -1774,12 +1774,12 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
     size_t ish=compute_shells[i];
 
     // Evalute shell. Function values
-    arma::vec shf=shells[ish].eval_func(x,y,z);
+    arma::vec shf=shells_[ish].eval_func(x,y,z);
     // First function on shell
-    size_t f0=shells[ish].get_first_ind();
+    size_t f0=shells_[ish].first_ind();
 
     // and store the functions
-    for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
+    for(size_t fi=0;fi<shells_[ish].Nbf();fi++) {
       ret(f0+fi)=shf(fi);
     }
   }
@@ -1796,21 +1796,21 @@ arma::mat BasisSet::eval_grad(double x, double y, double z) const {
 
   // Determine which shells might contribute
   std::vector<size_t> compute_shells;
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
     // Determine distance to nucleus
-    double dist=norm(r-nuclei[inuc].r);
+    double dist=norm(r-nuclei_[inuc].r);
     // Get indices of shells centered on nucleus
-    std::vector<size_t> shellinds=get_shell_inds(inuc);
+    std::vector<size_t> shellinds=shell_inds(inuc);
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++)
       // Shell is relevant if range is larger than distance
-      if(dist < shell_ranges[shellinds[ish]])
+      if(dist < shell_ranges_[shellinds[ish]])
 	compute_shells.push_back(shellinds[ish]);
   }
 
   // Returned values
-  arma::mat ret(get_Nbf(),3);
+  arma::mat ret(Nbf(),3);
   ret.zeros();
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -1819,12 +1819,12 @@ arma::mat BasisSet::eval_grad(double x, double y, double z) const {
     size_t ish=compute_shells[i];
 
     // Evalute shell. Gradient values
-    arma::mat gf=shells[ish].eval_grad(x,y,z);
+    arma::mat gf=shells_[ish].eval_grad(x,y,z);
     // First function on shell
-    size_t f0=shells[ish].get_first_ind();
+    size_t f0=shells_[ish].first_ind();
 
     // and store the functions
-    for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
+    for(size_t fi=0;fi<shells_[ish].Nbf();fi++) {
       ret.row(f0+fi)=gf.row(fi);
     }
   }
@@ -1841,21 +1841,21 @@ arma::mat BasisSet::eval_hess(double x, double y, double z) const {
 
   // Determine which shells might contribute
   std::vector<size_t> compute_shells;
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
     // Determine distance to nucleus
-    double dist=norm(r-nuclei[inuc].r);
+    double dist=norm(r-nuclei_[inuc].r);
     // Get indices of shells centered on nucleus
-    std::vector<size_t> shellinds=get_shell_inds(inuc);
+    std::vector<size_t> shellinds=shell_inds(inuc);
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++)
       // Shell is relevant if range is larger than distance
-      if(dist < shell_ranges[shellinds[ish]])
+      if(dist < shell_ranges_[shellinds[ish]])
 	compute_shells.push_back(shellinds[ish]);
   }
 
   // Returned values
-  arma::mat ret(get_Nbf(),9);
+  arma::mat ret(Nbf(),9);
   ret.zeros();
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -1864,12 +1864,12 @@ arma::mat BasisSet::eval_hess(double x, double y, double z) const {
     size_t ish=compute_shells[i];
 
     // Evalute shell. Gradient values
-    arma::mat gf=shells[ish].eval_hess(x,y,z);
+    arma::mat gf=shells_[ish].eval_hess(x,y,z);
     // First function on shell
-    size_t f0=shells[ish].get_first_ind();
+    size_t f0=shells_[ish].first_ind();
 
     // and store the functions
-    for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
+    for(size_t fi=0;fi<shells_[ish].Nbf();fi++) {
       ret.row(f0+fi)=gf.row(fi);
     }
   }
@@ -1878,23 +1878,23 @@ arma::mat BasisSet::eval_hess(double x, double y, double z) const {
 }
 
 arma::vec BasisSet::eval_func(size_t ish, double x, double y, double z) const {
-  return shells[ish].eval_func(x,y,z);
+  return shells_[ish].eval_func(x,y,z);
 }
 
 arma::mat BasisSet::eval_grad(size_t ish, double x, double y, double z) const {
-  return shells[ish].eval_grad(x,y,z);
+  return shells_[ish].eval_grad(x,y,z);
 }
 
 arma::vec BasisSet::eval_lapl(size_t ish, double x, double y, double z) const {
-  return shells[ish].eval_lapl(x,y,z);
+  return shells_[ish].eval_lapl(x,y,z);
 }
 
 arma::mat BasisSet::eval_hess(size_t ish, double x, double y, double z) const {
-  return shells[ish].eval_hess(x,y,z);
+  return shells_[ish].eval_hess(x,y,z);
 }
 
 arma::mat BasisSet::eval_laplgrad(size_t ish, double x, double y, double z) const {
-  return shells[ish].eval_laplgrad(x,y,z);
+  return shells_[ish].eval_laplgrad(x,y,z);
 }
 
 void BasisSet::eval_bf_derivs(size_t ish, double x, double y, double z,
@@ -1905,56 +1905,56 @@ void BasisSet::eval_bf_derivs(size_t ish, double x, double y, double z,
                               arma::mat & lgval,
                               bool do_grad, bool do_lapl,
                               bool do_hess, bool do_lgrad) const {
-  shells[ish].eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval,
+  shells_[ish].eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval,
                              do_grad, do_lapl, do_hess, do_lgrad);
 }
 
 void BasisSet::convert_contractions() {
-  for(size_t i=0;i<shells.size();i++)
-    shells[i].convert_contraction();
+  for(size_t i=0;i<shells_.size();i++)
+    shells_[i].convert_contraction();
 }
 
 void BasisSet::convert_contraction(size_t ind) {
-  shells[ind].convert_contraction();
+  shells_[ind].convert_contraction();
 }
 
 void BasisSet::normalize(bool coeffs) {
-  for(size_t i=0;i<shells.size();i++)
-    shells[i].normalize(coeffs);
+  for(size_t i=0;i<shells_.size();i++)
+    shells_[i].normalize(coeffs);
 }
 
 void BasisSet::coulomb_normalize() {
-  for(size_t i=0;i<shells.size();i++)
-    shells[i].coulomb_normalize();
+  for(size_t i=0;i<shells_.size();i++)
+    shells_[i].coulomb_normalize();
 }
 
 void BasisSet::print(bool verbose) const {
-  printf("There are %i shells and %i nuclei in the basis set.\n\n",(int) shells.size(),(int) nuclei.size());
+  printf("There are %i shells and %i nuclei in the basis set.\n\n",(int) shells_.size(),(int) nuclei_.size());
 
   printf("List of nuclei, geometry in Ångström with three decimal places:\n");
 
   printf("\t\t Z\t    x\t    y\t    z\n");
-  for(size_t i=0;i<nuclei.size();i++) {
-    if(nuclei[i].bsse)
-      printf("%i\t%s\t*%i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei[i].symbol.c_str(),nuclei[i].Z,nuclei[i].r.x/ANGSTROMINBOHR,nuclei[i].r.y/ANGSTROMINBOHR,nuclei[i].r.z/ANGSTROMINBOHR);
+  for(size_t i=0;i<nuclei_.size();i++) {
+    if(nuclei_[i].bsse)
+      printf("%i\t%s\t*%i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei_[i].symbol.c_str(),nuclei_[i].Z,nuclei_[i].r.x/ANGSTROMINBOHR,nuclei_[i].r.y/ANGSTROMINBOHR,nuclei_[i].r.z/ANGSTROMINBOHR);
     else
-      printf("%i\t%s\t %i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei[i].symbol.c_str(),nuclei[i].Z,nuclei[i].r.x/ANGSTROMINBOHR,nuclei[i].r.y/ANGSTROMINBOHR,nuclei[i].r.z/ANGSTROMINBOHR);
+      printf("%i\t%s\t %i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei_[i].symbol.c_str(),nuclei_[i].Z,nuclei_[i].r.x/ANGSTROMINBOHR,nuclei_[i].r.y/ANGSTROMINBOHR,nuclei_[i].r.z/ANGSTROMINBOHR);
   }
 
-  if(nuclei.size()>1 && nuclei.size()<=13) {
+  if(nuclei_.size()>1 && nuclei_.size()<=13) {
     // Legend length is 7 + 6*(N-1) chars
 
     // Print legend
     printf("\nInteratomic distance matrix:\n%7s","");
-    for(size_t i=0;i<nuclei.size()-1;i++)
-      printf(" %3i%-2s",(int) i+1,nuclei[i].symbol.c_str());
+    for(size_t i=0;i<nuclei_.size()-1;i++)
+      printf(" %3i%-2s",(int) i+1,nuclei_[i].symbol.c_str());
     printf("\n");
 
     // Print atomic entries
-    for(size_t i=1;i<nuclei.size();i++) {
-      printf(" %3i%-2s",(int) i+1,nuclei[i].symbol.c_str());
+    for(size_t i=1;i<nuclei_.size();i++) {
+      printf(" %3i%-2s",(int) i+1,nuclei_[i].symbol.c_str());
       for(size_t j=0;j<i;j++)
-	printf(" %5.3f",norm(nuclei[i].r-nuclei[j].r)/ANGSTROMINBOHR);
+	printf(" %5.3f",norm(nuclei_[i].r-nuclei_[j].r)/ANGSTROMINBOHR);
       printf("\n");
     }
   }
@@ -1962,30 +1962,30 @@ void BasisSet::print(bool verbose) const {
   printf("\nList of basis functions:\n");
 
   if(verbose) {
-    for(size_t i=0;i<shells.size();i++) {
+    for(size_t i=0;i<shells_.size();i++) {
       printf("Shell %4i",(int) i);
-      shells[i].print();
+      shells_[i].print();
     }
   } else {
-    for(size_t i=0;i<shells.size();i++) {
+    for(size_t i=0;i<shells_.size();i++) {
       // Type of shell - spherical harmonics or cartesians
       std::string type;
-      if(shells[i].lm_in_use())
+      if(shells_[i].lm_in_use())
 	type="sph";
       else
 	type="cart";
 
 
       printf("Shell %4i",(int) i+1);
-      printf("\t%c %4s shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
+      printf("\t%c %4s shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[shells_[i].am()],type.c_str(),(int) (shells_[i].center_ind()+1),(int) shells_[i].first_ind()+1,(int) shells_[i].last_ind()+1);
     }
   }
 
 
   printf("\nBasis set contains %i functions, maximum angular momentum is %i.\\
-n",(int) get_Nbf(),get_max_am());
+n",(int) Nbf(),max_am());
   if(is_lm_default())
-    printf("Spherical harmonic Gaussians are used by default, there are %i cartesians.\n",(int) get_Ncart());
+    printf("Spherical harmonic Gaussians are used by default, there are %i cartesians.\n",(int) Ncart());
   else
     printf("Cartesian Gaussians are used by default.\n");
 }
@@ -1993,8 +1993,8 @@ n",(int) get_Nbf(),get_max_am());
 arma::mat BasisSet::cart_to_sph_trans() const {
   // Form transformation matrix to spherical harmonics
 
-  const size_t Nlm=get_Nlm();
-  const size_t Ncart=get_Ncart();
+  const size_t Nlm=this->Nlm();
+  const size_t Ncart=this->Ncart();
 
   // Returned matrix
   arma::mat trans(Nlm,Ncart);
@@ -2006,9 +2006,9 @@ arma::mat BasisSet::cart_to_sph_trans() const {
   // Helper matrix
   arma::mat tmp;
 
-  for(size_t i=0;i<shells.size();i++) {
+  for(size_t i=0;i<shells_.size();i++) {
     // Get angular momentum of shell
-    int am=shells[i].get_am();
+    int am=shells_[i].am();
 
     // Number of cartesians and harmonics on shell
     int Nc=(am+1)*(am+2)/2;
@@ -2035,7 +2035,7 @@ arma::mat BasisSet::sph_to_cart_trans() const {
 
 arma::mat BasisSet::overlap() const {
   // Form overlap matrix
-  const size_t N=get_Nbf();
+  const size_t N=Nbf();
   arma::mat S(N,N);
   S.zeros();
 
@@ -2050,15 +2050,15 @@ arma::mat BasisSet::overlap() const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++) {
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+    for(size_t ip=0;ip<shellpairs_.size();ip++) {
+      size_t i=shellpairs_[ip].is;
+      size_t j=shellpairs_[ip].js;
 
       w.compute(CINT1E_OVLP,i,j);
       arma::mat tmp=w.get_mat(0,i,j);
 
-      S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-      S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      S.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())=tmp;
+      S.submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())=arma::trans(tmp);
     }
   }
 
@@ -2069,7 +2069,7 @@ arma::mat BasisSet::coulomb_overlap() const {
   // Form overlap matrix
 
   // Size of basis set
-  const size_t N=get_Nbf();
+  const size_t N=Nbf();
 
   // Initialize matrix
   arma::mat S(N,N);
@@ -2079,16 +2079,16 @@ arma::mat BasisSet::coulomb_overlap() const {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++) {
+  for(size_t ip=0;ip<shellpairs_.size();ip++) {
     // Shells in pair
-    size_t i=shellpairs[ip].is;
-    size_t j=shellpairs[ip].js;
+    size_t i=shellpairs_[ip].is;
+    size_t j=shellpairs_[ip].js;
 
-    arma::mat tmp=shells[i].coulomb_overlap(shells[j]);
+    arma::mat tmp=shells_[i].coulomb_overlap(shells_[j]);
 
     // Store overlap
-    S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-    S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+    S.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())=tmp;
+    S.submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())=arma::trans(tmp);
   }
 
   return S;
@@ -2098,9 +2098,9 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
   // Form overlap wrt to other basis set
 
   // Size of this basis set
-  const size_t Nl=get_Nbf();
+  const size_t Nl=Nbf();
   // Size of rhs basis
-  const size_t Nr=rhs.get_Nbf();
+  const size_t Nr=rhs.Nbf();
 
   // Initialize matrix
   arma::mat S12(Nl,Nr);
@@ -2108,7 +2108,7 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
 
   // The shells of the other basis follow ours in the environment
   CintEnv cenv(*this,rhs,false);
-  const size_t Nsh=shells.size();
+  const size_t Nsh=shells_.size();
 
   // Loop over shells
 #ifdef _OPENMP
@@ -2120,11 +2120,11 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t i=0;i<shells.size();i++) {
-      for(size_t j=0;j<rhs.shells.size();j++) {
+    for(size_t i=0;i<shells_.size();i++) {
+      for(size_t j=0;j<rhs.shells_.size();j++) {
         w.compute(CINT1E_OVLP,i,Nsh+j);
-        S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
-                   shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=w.get_mat(0,i,Nsh+j);
+        S12.submat(shells_[i].first_ind(),rhs.shells_[j].first_ind(),
+                   shells_[i].last_ind() ,rhs.shells_[j].last_ind() )=w.get_mat(0,i,Nsh+j);
       }
     }
   }
@@ -2135,9 +2135,9 @@ arma::mat BasisSet::coulomb_overlap(const BasisSet & rhs) const {
   // Form overlap wrt to other basis set
 
   // Size of this basis set
-  const size_t Nl=get_Nbf();
+  const size_t Nl=Nbf();
   // Size of rhs basis
-  const size_t Nr=rhs.get_Nbf();
+  const size_t Nr=rhs.Nbf();
 
   // Initialize matrix
   arma::mat S12(Nl,Nr);
@@ -2147,10 +2147,10 @@ arma::mat BasisSet::coulomb_overlap(const BasisSet & rhs) const {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t i=0;i<shells.size();i++) {
-    for(size_t j=0;j<rhs.shells.size();j++) {
-      S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
-		 shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=shells[i].coulomb_overlap(rhs.shells[j]);;
+  for(size_t i=0;i<shells_.size();i++) {
+    for(size_t j=0;j<rhs.shells_.size();j++) {
+      S12.submat(shells_[i].first_ind(),rhs.shells_[j].first_ind(),
+		 shells_[i].last_ind() ,rhs.shells_[j].last_ind() )=shells_[i].coulomb_overlap(rhs.shells_[j]);;
     }
   }
   return S12;
@@ -2159,7 +2159,7 @@ arma::mat BasisSet::coulomb_overlap(const BasisSet & rhs) const {
 
 arma::mat BasisSet::kinetic() const {
   // Form kinetic energy matrix
-  size_t N=get_Nbf();
+  size_t N=Nbf();
   arma::mat T(N,N);
   T.zeros();
 
@@ -2174,15 +2174,15 @@ arma::mat BasisSet::kinetic() const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++) {
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+    for(size_t ip=0;ip<shellpairs_.size();ip++) {
+      size_t i=shellpairs_[ip].is;
+      size_t j=shellpairs_[ip].js;
 
       w.compute(CINT1E_KIN,i,j);
       arma::mat tmp=w.get_mat(0,i,j);
 
-      T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-      T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      T.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())=tmp;
+      T.submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())=arma::trans(tmp);
     }
   }
 
@@ -2191,7 +2191,7 @@ arma::mat BasisSet::kinetic() const {
 
 std::vector<arma::mat> BasisSet::gradient_integral() const {
   // Form the <mu|nabla|nu> matrix
-  size_t N=get_Nbf();
+  size_t N=Nbf();
   std::vector<arma::mat> T(3);
   for(size_t ic=0; ic<3;ic++)
     T[ic].zeros(N,N);
@@ -2207,9 +2207,9 @@ std::vector<arma::mat> BasisSet::gradient_integral() const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++) {
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+    for(size_t ip=0;ip<shellpairs_.size();ip++) {
+      size_t i=shellpairs_[ip].is;
+      size_t j=shellpairs_[ip].js;
 
       // The derivative acts on the ket
       w.compute(CINT1E_OVLPIP,i,j);
@@ -2217,9 +2217,9 @@ std::vector<arma::mat> BasisSet::gradient_integral() const {
       // The operator is antisymmetric
       for(size_t ic=0;ic<3;ic++) {
         arma::mat tmp=w.get_mat(ic,i,j);
-        T[ic].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+        T[ic].submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())=tmp;
         if(i!=j)
-          T[ic].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=-arma::trans(tmp);
+          T[ic].submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())=-arma::trans(tmp);
       }
     }
   }
@@ -2229,16 +2229,16 @@ std::vector<arma::mat> BasisSet::gradient_integral() const {
 
 arma::mat BasisSet::nuclear() const {
   std::vector<std::tuple<int,double,double,double>> nuclear_data;
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-    if(nuclei[inuc].bsse)
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
+    if(nuclei_[inuc].bsse)
       continue;
     // Nuclear charge
-    int Z=nuclei[inuc].Z;
+    int Z=nuclei_[inuc].Z;
 
     // Coordinates of nucleus
-    double cx=nuclei[inuc].r.x;
-    double cy=nuclei[inuc].r.y;
-    double cz=nuclei[inuc].r.z;
+    double cx=nuclei_[inuc].r.x;
+    double cy=nuclei_[inuc].r.y;
+    double cz=nuclei_[inuc].r.z;
     nuclear_data.push_back(std::make_tuple(Z,cx,cy,cz));
   }
   return nuclear(nuclear_data);
@@ -2247,7 +2247,7 @@ arma::mat BasisSet::nuclear() const {
 arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,double>> & nuclear_data) const {
 
   // Size of basis set
-  size_t N=get_Nbf();
+  size_t N=Nbf();
 
   // Initialize matrix
   arma::mat Vnuc(N,N);
@@ -2265,14 +2265,14 @@ arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,doubl
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++)
+  for(size_t ip=0;ip<shellpairs_.size();ip++)
     for(size_t inuc=0;inuc<nuclear_data.size();inuc++) {
 
       auto [Z, cx, cy, cz] = nuclear_data[inuc];
 
       // Shells in pair
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+      size_t i=shellpairs_[ip].is;
+      size_t j=shellpairs_[ip].js;
 
       // Get subblock. The attraction operator is -Z/|r-C|.
       const double orig[3]={cx, cy, cz};
@@ -2281,11 +2281,11 @@ arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,doubl
 
       // On the off diagonal we fill out both sides of the matrix
       if(i!=j) {
-	Vnuc.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())+=tmp;
-	Vnuc.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
+	Vnuc.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())+=tmp;
+	Vnuc.submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())+=arma::trans(tmp);
       } else
 	// On the diagonal we just get it once
-	Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
+	Vnuc.submat(shells_[i].first_ind(),shells_[i].first_ind(),shells_[i].last_ind(),shells_[i].last_ind())+=arma::trans(tmp);
     }
   }
 
@@ -2296,7 +2296,7 @@ arma::mat BasisSet::potential(coords_t r) const {
   // Form nuclear attraction matrix
 
   // Size of basis set
-  size_t N=get_Nbf();
+  size_t N=Nbf();
 
   // Initialize matrix
   arma::mat V(N,N);
@@ -2315,10 +2315,10 @@ arma::mat BasisSet::potential(coords_t r) const {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++) {
+  for(size_t ip=0;ip<shellpairs_.size();ip++) {
     // Shells in pair
-    size_t i=shellpairs[ip].is;
-    size_t j=shellpairs[ip].js;
+    size_t i=shellpairs_[ip].is;
+    size_t j=shellpairs_[ip].js;
 
     // Get subblock. The operator is -1/|r-C|.
     w.compute(CINT1E_RINV,i,j,orig);
@@ -2326,11 +2326,11 @@ arma::mat BasisSet::potential(coords_t r) const {
 
     // On the off diagonal we fill out both sides of the matrix
     if(i!=j) {
-      V.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-      V.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      V.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())=tmp;
+      V.submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())=arma::trans(tmp);
     } else
       // On the diagonal we just get it once
-      V.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      V.submat(shells_[i].first_ind(),shells_[i].first_ind(),shells_[i].last_ind(),shells_[i].last_ind())=arma::trans(tmp);
   }
   }
 
@@ -2344,7 +2344,7 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
   Timer t;
 
   // Get shells in orbital basis
-  std::vector<GaussianShell> shells=get_shells();
+  std::vector<GaussianShell> shells=this->shells();
   // Get list of shell pairs
   double omega=0.0;
   double alpha=1.0;
@@ -2353,7 +2353,7 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
   const arma::mat & Q = scr.Q;
   const std::vector<eripair_t> & shpairs = scr.shpairs;
   // and nuclei
-  std::vector<nucleus_t> nuclei=get_nuclei();
+  std::vector<nucleus_t> nuclei=this->nuclei();
   if(verbose) {
     printf("%i shell pairs and %i nuclei\n",(int) shpairs.size(), (int) nuclei.size());
     fflush(stdout);
@@ -2411,7 +2411,7 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
   const size_t Nsh=shells.size();
 
   // Construct repulsive potential
-  arma::mat Jx(get_Nbf(),get_Nbf());
+  arma::mat Jx(Nbf(),Nbf());
   Jx.zeros();
 #ifdef _OPENMP
 #pragma omp parallel
@@ -2440,10 +2440,10 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
         erip=eri.getp();
 
         // and store them
-        size_t Ni(shells[is].get_Nbf());
-        size_t Nj(shells[js].get_Nbf());
-        size_t i0(shells[is].get_first_ind());
-        size_t j0(shells[js].get_first_ind());
+        size_t Ni(shells[is].Nbf());
+        size_t Nj(shells[js].Nbf());
+        size_t i0(shells[is].first_ind());
+        size_t j0(shells[js].first_ind());
 
         // Remember minus sign from V(r)=-Z(r)/r
         for(size_t ii=0;ii<Ni;ii++)
@@ -2475,10 +2475,10 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
 
 void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double alpha, double beta) const {
   // Get unique pairs
-  std::vector<shellpair_t> pairs=get_unique_shellpairs();
+  std::vector<shellpair_t> pairs=unique_shellpairs();
 
-  Q.zeros(shells.size(),shells.size());
-  M.zeros(shells.size(),shells.size());
+  Q.zeros(shells_.size(),shells_.size());
+  M.zeros(shells_.size(),shells_.size());
 
   // libcint description of the basis
   CintEnv cenv(*this);
@@ -2527,7 +2527,7 @@ void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double 
 }
 
 arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
-  arma::vec f(3*nuclei.size());
+  arma::vec f(3*nuclei_.size());
   f.zeros();
 
   CintEnv cenv(*this,false);
@@ -2539,31 +2539,31 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
     Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
-    arma::vec fwrk(3*nuclei.size());
+    arma::vec fwrk(3*nuclei_.size());
     fwrk.zeros();
 
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++)
-      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    for(size_t ip=0;ip<shellpairs_.size();ip++)
+      for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
 	// If BSSE nucleus, do nothing
-	if(nuclei[inuc].bsse)
+	if(nuclei_[inuc].bsse)
 	  continue;
 
 	// Shells in pair
-	size_t i=shellpairs[ip].is;
-	size_t j=shellpairs[ip].js;
+	size_t i=shellpairs_[ip].is;
+	size_t j=shellpairs_[ip].js;
 
 	// Nuclear charge
-	int Z=nuclei[inuc].Z;
+	int Z=nuclei_[inuc].Z;
 
 	// Coordinates of nucleus
-	double cx=nuclei[inuc].r.x;
-	double cy=nuclei[inuc].r.y;
-	double cz=nuclei[inuc].r.z;
+	double cx=nuclei_[inuc].r.x;
+	double cy=nuclei_[inuc].r.y;
+	double cz=nuclei_[inuc].r.z;
 
 	// Density matrix for the pair
-	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+	arma::mat Pmat=P.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind());
 
 	// Get the forces
 	const double orig[3]={cx, cy, cz};
@@ -2575,8 +2575,8 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
 
 	// and increment the nuclear force.
 #ifdef _OPENMP
-	fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
-	fwrk.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+	fwrk.subvec(3*shells_[i].center_ind(),3*shells_[i].center_ind()+2)+=tmp.subvec(0,2);
+	fwrk.subvec(3*shells_[j].center_ind(),3*shells_[j].center_ind()+2)+=tmp.subvec(3,5);
 #else
 	f.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
 	f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
@@ -2593,7 +2593,7 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
 }
 
 arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
-  arma::vec f(3*nuclei.size());
+  arma::vec f(3*nuclei_.size());
   f.zeros();
 
   CintEnv cenv(*this,false);
@@ -2605,31 +2605,31 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
     Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
-    arma::vec fwrk(3*nuclei.size());
+    arma::vec fwrk(3*nuclei_.size());
     fwrk.zeros();
 
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++)
-      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    for(size_t ip=0;ip<shellpairs_.size();ip++)
+      for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
 	// If BSSE nucleus, do nothing
-	if(nuclei[inuc].bsse)
+	if(nuclei_[inuc].bsse)
 	  continue;
 
 	// Shells in pair
-	size_t i=shellpairs[ip].is;
-	size_t j=shellpairs[ip].js;
+	size_t i=shellpairs_[ip].is;
+	size_t j=shellpairs_[ip].js;
 
 	// Nuclear charge
-	int Z=nuclei[inuc].Z;
+	int Z=nuclei_[inuc].Z;
 
 	// Coordinates of nucleus
-	double cx=nuclei[inuc].r.x;
-	double cy=nuclei[inuc].r.y;
-	double cz=nuclei[inuc].r.z;
+	double cx=nuclei_[inuc].r.x;
+	double cy=nuclei_[inuc].r.y;
+	double cz=nuclei_[inuc].r.z;
 
 	// Density matrix for the pair
-	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+	arma::mat Pmat=P.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind());
 
 	// Get the forces
 	const double orig[3]={cx, cy, cz};
@@ -2657,7 +2657,7 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
 }
 
 arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
-  arma::vec f(3*nuclei.size());
+  arma::vec f(3*nuclei_.size());
   f.zeros();
 
   CintEnv cenv(*this,false);
@@ -2669,18 +2669,18 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
     Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
-    arma::vec fwrk(3*nuclei.size());
+    arma::vec fwrk(3*nuclei_.size());
     fwrk.zeros();
 
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++) {
+    for(size_t ip=0;ip<shellpairs_.size();ip++) {
       // Shells in pair
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+      size_t i=shellpairs_[ip].is;
+      size_t j=shellpairs_[ip].js;
 
       // Density matrix for the pair
-      arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+      arma::mat Pmat=P.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind());
 
       // Get the forces
       arma::vec tmp=pulay_pair(w,CINT1E_IPKIN,CINT1E_KINIP,i,j,Pmat,1.0);
@@ -2691,8 +2691,8 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
 
       // and increment the nuclear force.
 #ifdef _OPENMP
-      fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
-      fwrk.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+      fwrk.subvec(3*shells_[i].center_ind(),3*shells_[i].center_ind()+2)+=tmp.subvec(0,2);
+      fwrk.subvec(3*shells_[j].center_ind(),3*shells_[j].center_ind()+2)+=tmp.subvec(3,5);
 #else
       f.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
       f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
@@ -2709,7 +2709,7 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
 }
 
 arma::vec BasisSet::overlap_der(const arma::mat & P) const {
-  arma::vec f(3*nuclei.size());
+  arma::vec f(3*nuclei_.size());
   f.zeros();
 
   CintEnv cenv(*this,false);
@@ -2721,19 +2721,19 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
     Int1eWorker w(cenv);
     // Loop over shells
 #ifdef _OPENMP
-    arma::vec fwrk(3*nuclei.size());
+    arma::vec fwrk(3*nuclei_.size());
     fwrk.zeros();
 
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<shellpairs.size();ip++) {
+    for(size_t ip=0;ip<shellpairs_.size();ip++) {
 
       // Shells in pair
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+      size_t i=shellpairs_[ip].is;
+      size_t j=shellpairs_[ip].js;
 
       // Density matrix for the pair
-      arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+      arma::mat Pmat=P.submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind());
 
       // Get the forces
       arma::vec tmp=pulay_pair(w,CINT1E_IPOVLP,CINT1E_OVLPIP,i,j,Pmat,-1.0);
@@ -2744,8 +2744,8 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
 
       // and increment the nuclear force.
 #ifdef _OPENMP
-      fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
-      fwrk.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+      fwrk.subvec(3*shells_[i].center_ind(),3*shells_[i].center_ind()+2)+=tmp.subvec(0,2);
+      fwrk.subvec(3*shells_[j].center_ind(),3*shells_[j].center_ind()+2)+=tmp.subvec(3,5);
 #else
       f.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
       f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
@@ -2762,27 +2762,27 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
 }
 
 arma::vec BasisSet::nuclear_force() const {
-  arma::vec f(3*nuclei.size());
+  arma::vec f(3*nuclei_.size());
   f.zeros();
 
-  for(size_t i=0;i<nuclei.size();i++) {
-    if(nuclei[i].bsse)
+  for(size_t i=0;i<nuclei_.size();i++) {
+    if(nuclei_[i].bsse)
       continue;
 
     for(size_t j=0;j<i;j++) {
-      if(nuclei[j].bsse)
+      if(nuclei_[j].bsse)
 	continue;
 
       // Calculate distance
-      coords_t rij=nuclei[i].r-nuclei[j].r;
+      coords_t rij=nuclei_[i].r-nuclei_[j].r;
       // and its third power
       double rcb=pow(norm(rij),3);
 
       // Force is
       arma::vec F(3);
-      F(0)=nuclei[i].Z*nuclei[j].Z/rcb*rij.x;
-      F(1)=nuclei[i].Z*nuclei[j].Z/rcb*rij.y;
-      F(2)=nuclei[i].Z*nuclei[j].Z/rcb*rij.z;
+      F(0)=nuclei_[i].Z*nuclei_[j].Z/rcb*rij.x;
+      F(1)=nuclei_[i].Z*nuclei_[j].Z/rcb*rij.y;
+      F(2)=nuclei_[i].Z*nuclei_[j].Z/rcb*rij.z;
 
       f.subvec(3*i,3*i+2)+=F;
       f.subvec(3*j,3*j+2)-=F;
@@ -2798,7 +2798,7 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
   // Number of moments to compute is
   size_t Nmom=(mom+1)*(mom+2)/2;
   // Amount of basis functions is
-  size_t Nbf=get_Nbf();
+  size_t Nbf=this->Nbf();
 
   // Returned array, holding the moment integrals
   std::vector<arma::mat> ret;
@@ -2823,10 +2823,10 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<shellpairs.size();ip++) {
+  for(size_t ip=0;ip<shellpairs_.size();ip++) {
     // Shells in pair
-    size_t i=shellpairs[ip].is;
-    size_t j=shellpairs[ip].js;
+    size_t i=shellpairs_[ip].is;
+    size_t j=shellpairs_[ip].js;
 
     // Compute moment integral over shells
     std::vector<arma::mat> ints=moment_pair(w,mom,i,j,orig);
@@ -2834,12 +2834,12 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
     // Store moments
     if(i!=j) {
       for(size_t m=0;m<Nmom;m++) {
-	ret[m].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=ints[m];
-	ret[m].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(ints[m]);
+	ret[m].submat(shells_[i].first_ind(),shells_[j].first_ind(),shells_[i].last_ind(),shells_[j].last_ind())=ints[m];
+	ret[m].submat(shells_[j].first_ind(),shells_[i].first_ind(),shells_[j].last_ind(),shells_[i].last_ind())=arma::trans(ints[m]);
       }
     } else {
       for(size_t m=0;m<Nmom;m++)
-	ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
+	ret[m].submat(shells_[i].first_ind(),shells_[i].first_ind(),shells_[i].last_ind(),shells_[i].last_ind())=ints[m];
     }
   }
   }
@@ -2848,12 +2848,12 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
 }
 
 arma::vec BasisSet::integral() const {
-  arma::vec ints(get_Nbf());
+  arma::vec ints(Nbf());
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t is=0;is<shells.size();is++)
-    ints.subvec(shells[is].get_first_ind(),shells[is].get_last_ind())=shells[is].integral();
+  for(size_t is=0;is<shells_.size();is++)
+    ints.subvec(shells_[is].first_ind(),shells_[is].last_ind())=shells_[is].integral();
 
   return ints;
 }
@@ -2862,10 +2862,10 @@ arma::vec BasisSet::integral() const {
 
 int BasisSet::Ztot() const {
   int Zt=0;
-  for(size_t i=0;i<nuclei.size();i++) {
-    if(nuclei[i].bsse)
+  for(size_t i=0;i<nuclei_.size();i++) {
+    if(nuclei_[i].bsse)
       continue;
-    Zt+=nuclei[i].Z;
+    Zt+=nuclei_[i].Z;
   }
   return Zt;
 }
@@ -2873,18 +2873,18 @@ int BasisSet::Ztot() const {
 double BasisSet::Enuc() const {
   double En=0.0;
 
-  for(size_t i=0;i<nuclei.size();i++) {
-    if(nuclei[i].bsse)
+  for(size_t i=0;i<nuclei_.size();i++) {
+    if(nuclei_[i].bsse)
       continue;
 
-    int Zi=nuclei[i].Z;
+    int Zi=nuclei_[i].Z;
 
     for(size_t j=0;j<i;j++) {
-      if(nuclei[j].bsse)
+      if(nuclei_[j].bsse)
 	continue;
-      int Zj=nuclei[j].Z;
+      int Zj=nuclei_[j].Z;
 
-      En+=Zi*Zj/nucleardist(i,j);
+      En+=Zi*Zj/nucleardist_(i,j);
     }
   }
 
@@ -2903,18 +2903,18 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
     fflush(stdout);
 
     std::ostringstream oss;
-    oss << "Old basis doesn't have enough occupied orbitals: " << oldbas.get_Nbf() << " basis functions but " << nocc << " orbitals wanted!\n";
+    oss << "Old basis doesn't have enough occupied orbitals: " << oldbas.Nbf() << " basis functions but " << nocc << " orbitals wanted!\n";
     throw std::runtime_error(oss.str());
   }
 
   BasisSet transbas(oldbas);
-  transbas.nuclei=nuclei;
+  transbas.nuclei_=nuclei_;
   // Store new geometries
-  for(size_t i=0;i<oldbas.shells.size();i++) {
+  for(size_t i=0;i<oldbas.shells_.size();i++) {
     // Index of center in the old basis is
-    size_t idx=oldbas.shells[i].get_center_ind();
+    size_t idx=oldbas.shells_[i].center_ind();
     // Set new coordinates
-    transbas.shells[i].set_center(nuclei[idx].r,idx);
+    transbas.shells_[i].set_center(nuclei_[idx].r,idx);
   }
   transbas.finalize(false,false);
 
@@ -2929,7 +2929,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
   eig_sym_ordered(Sval,Svec,S11);
 
   // Get number of basis functions
-  const size_t Nbf=get_Nbf();
+  const size_t Nbf=this->Nbf();
 
   // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
@@ -3037,18 +3037,18 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
     fflush(stdout);
 
     std::ostringstream oss;
-    oss << "Old basis doesn't have enough occupied orbitals: " << oldbas.get_Nbf() << " basis functions but " << nocc << " orbitals wanted!\n";
+    oss << "Old basis doesn't have enough occupied orbitals: " << oldbas.Nbf() << " basis functions but " << nocc << " orbitals wanted!\n";
     throw std::runtime_error(oss.str());
   }
 
   BasisSet transbas(oldbas);
-  transbas.nuclei=nuclei;
+  transbas.nuclei_=nuclei_;
   // Store new geometries
-  for(size_t i=0;i<oldbas.shells.size();i++) {
+  for(size_t i=0;i<oldbas.shells_.size();i++) {
     // Index of center in the old basis is
-    size_t idx=oldbas.shells[i].get_center_ind();
+    size_t idx=oldbas.shells_[i].center_ind();
     // Set new coordinates
-    transbas.shells[i].set_center(nuclei[idx].r,idx);
+    transbas.shells_[i].set_center(nuclei_[idx].r,idx);
   }
   transbas.finalize(false,false);
 
@@ -3063,7 +3063,7 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   eig_sym_ordered(Sval,Svec,S11);
 
   // Get number of basis functions
-  const size_t Nbf=get_Nbf();
+  const size_t Nbf=this->Nbf();
 
   // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
@@ -3154,7 +3154,7 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
 }
 
 bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs) {
-  return lhs.get_contr()[0].z>rhs.get_contr()[0].z;
+  return lhs.contr()[0].z>rhs.contr()[0].z;
 }
 
 BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
@@ -3171,33 +3171,33 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   settings.set_bool("UseLM",uselm0);
 
   // Loop over nuclei
-  for(size_t in=0;in<nuclei.size();in++) {
+  for(size_t in=0;in<nuclei_.size();in++) {
     // Add nucleus to fitting set
-    dfit.add_nucleus(nuclei[in]);
+    dfit.add_nucleus(nuclei_[in]);
     // Dummy nucleus
-    nucleus_t nuc=nuclei[in];
+    nucleus_t nuc=nuclei_[in];
 
     // Define lval - (1) in YRF
     int lval;
-    if(nuclei[in].Z<3)
+    if(nuclei_[in].Z<3)
       lval=0;
-    else if(nuclei[in].Z<19)
+    else if(nuclei_[in].Z<19)
       lval=1;
-    else if(nuclei[in].Z<55)
+    else if(nuclei_[in].Z<55)
       lval=2;
     else
       lval=3;
 
     // Get shells corresponding to this nucleus
-    std::vector<GaussianShell> shs=get_funcs(in);
+    std::vector<GaussianShell> shs=funcs(in);
 
     // Form candidate set - (2), (3) and (6) in YRF
     std::vector<GaussianShell> cand;
     for(size_t i=0;i<shs.size();i++) {
       // Get angular momentum
-      int am=2*shs[i].get_am();
+      int am=2*shs[i].am();
       // Get exponents
-      std::vector<contr_t> contr=shs[i].get_contr();
+      std::vector<contr_t> contr=shs[i].contr();
 
       // Dummy contraction
       std::vector<contr_t> C(1);
@@ -3210,7 +3210,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	// Check that candidate set doesn't already contain the same function
 	bool found=0;
 	for(size_t k=0;k<cand.size();k++)
-	  if((cand[k].get_am()==am) && (cand[k].get_contr()[0]==C[0])) {
+	  if((cand[k].am()==am) && (cand[k].contr()[0]==C[0])) {
 	    found=1;
 	    break;
 	  }
@@ -3231,8 +3231,8 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
     // density fitting - (5) in YRF
     int lmax_obs=0;
     for(size_t i=0;i<shs.size();i++)
-      if(shs[i].get_am()>lmax_obs)
-	lmax_obs=shs[i].get_am();
+      if(shs[i].am()>lmax_obs)
+	lmax_obs=shs[i].am();
     int lmax_abs=std::max(lmax_obs+lmaxinc,2*lval);
 
     // (6) was already above.
@@ -3243,7 +3243,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 
       // Function with largest exponent is moved to the trial set and
       // its exponent is set as the reference value - (7) in YRF
-      double ref=(cand[0].get_contr())[0].z;
+      double ref=(cand[0].contr())[0].z;
       trial.push_back(cand[0]);
       cand.erase(cand.begin());
 
@@ -3251,7 +3251,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	// More functions remaining, move all for which ratio of
 	// reference to exponent is smaller than fsam - (8) in YRF
 	for(size_t i=cand.size()-1;i<cand.size();i--)
-	  if(ref/((cand[i].get_contr())[0].z)<fsam) {
+	  if(ref/((cand[i].contr())[0].z)<fsam) {
 	    trial.push_back(cand[i]);
 	    cand.erase(cand.begin()+i);
 	  }
@@ -3259,7 +3259,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	// Compute geometric average of exponents - (9) in YRF
 	double geomav=1.0;
 	for(size_t i=0;i<trial.size();i++)
-	  geomav*=trial[i].get_contr()[0].z;
+	  geomav*=trial[i].contr()[0].z;
 	geomav=pow(geomav,1.0/trial.size());
 
 	//	printf("Geometric average of %i functions is %e.\n",(int) trial.size(),geomav);
@@ -3268,24 +3268,24 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	// Compute maximum angular moment of current trial set
 	int ltrial=0;
 	for(size_t i=0;i<trial.size();i++)
-	  if(trial[i].get_am()>ltrial)
-	    ltrial=trial[i].get_am();
+	  if(trial[i].am()>ltrial)
+	    ltrial=trial[i].am();
 
 	// If this is larger than allowed, renormalize
 	if(ltrial>lmax_abs)
 	  ltrial=lmax_abs;
 
 	// Form list of angular momentum already used in ABS
-	std::vector<int> lvals(max_am+1);
-	for(int i=0;i<=max_am;i++)
+	std::vector<int> lvals(::max_am+1);
+	for(int i=0;i<=::max_am;i++)
 	  lvals[i]=0;
 
 	// Maximum angular momentum of trial functions is
 	lvals[ltrial]++;
 	// Get shells on current center
-	std::vector<GaussianShell> cur_shells=dfit.get_funcs(in);
+	std::vector<GaussianShell> cur_shells=dfit.funcs(in);
 	for(size_t i=0;i<cur_shells.size();i++)
-	  lvals[cur_shells[i].get_am()]++;
+	  lvals[cur_shells[i].am()]++;
 
 	// Check that there are no gaps in lvals
 	bool fill=0;
@@ -3301,7 +3301,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	std::vector<contr_t> C(1);
 	C[0].c=1.0;
 	C[0].z=geomav;
-	for(int l=0;l<=max_am;l++)
+	for(int l=0;l<=::max_am;l++)
 	  if(lvals[l]>0) {
 	    // Pure spherical functions used
 	    dfit.add_shell(in,l,true,C);
@@ -3325,15 +3325,15 @@ BasisSet BasisSet::exchange_fitting() const {
   bool uselm0(settings.get_bool("UseLM"));
   settings.set_bool("UseLM",true);
   // Density fitting basis set
-  BasisSet fit(nuclei.size());
+  BasisSet fit(nuclei_.size());
   settings.set_bool("UseLM",uselm0);
 
-  const int maxam=get_max_am();
+  const int maxam=max_am();
 
   // Loop over nuclei
-  for(size_t in=0;in<nuclei.size();in++) {
+  for(size_t in=0;in<nuclei_.size();in++) {
     // Get shells corresponding to this nucleus
-    std::vector<GaussianShell> shs=get_funcs(in);
+    std::vector<GaussianShell> shs=funcs(in);
 
     // Sort shells in increasing angular momentum
     std::sort(shs.begin(),shs.end());
@@ -3357,7 +3357,7 @@ BasisSet BasisSet::exchange_fitting() const {
       for(size_t jsh=0;jsh<shs.size();jsh++) {
 
 	// Current angular momentum
-	int l=shs[ish].get_am()+shs[jsh].get_am();
+	int l=shs[ish].am()+shs[jsh].am();
 
 	// Update maximum value
 	if(l>lmax)
@@ -3367,8 +3367,8 @@ BasisSet BasisSet::exchange_fitting() const {
 	nfunc[l]++;
 
 	// Get exponential contractions
-	std::vector<contr_t> icontr=shs[ish].get_contr();
-	std::vector<contr_t> jcontr=shs[jsh].get_contr();
+	std::vector<contr_t> icontr=shs[ish].contr();
+	std::vector<contr_t> jcontr=shs[jsh].contr();
 
 	// Minimum exponent
 	double mi=icontr[icontr.size()-1].z+jcontr[jcontr.size()-1].z;
@@ -3421,12 +3421,12 @@ BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
   // num+1) at line 3798.
 
   BasisSetLibrary aux_lib;
-  for(size_t inuc=0; inuc<nuclei.size(); inuc++) {
+  for(size_t inuc=0; inuc<nuclei_.size(); inuc++) {
     // Build the orbital ElementBasisSet for this nucleus
-    ElementBasisSet el(nuclei[inuc].symbol);
-    std::vector<GaussianShell> shs(get_funcs(inuc));
+    ElementBasisSet el(nuclei_[inuc].symbol);
+    std::vector<GaussianShell> shs(funcs(inuc));
     for(size_t ish=0; ish<shs.size(); ish++)
-      el.add_function(FunctionShell(shs[ish].get_am(), shs[ish].get_contr()));
+      el.add_function(FunctionShell(shs[ish].am(), shs[ish].contr()));
 
     // metric=0  -> Coulomb metric (the right one for ERI fitting)
     // full=false -> use one-step ERIchol pivoting per atom to skip
@@ -3443,7 +3443,7 @@ BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
     // Tag with atom number so construct_basis routes the right aux
     // basis to the right center even when atoms of the same element
     // carry different orbital primitives.
-    aux_el.set_number(nuclei[inuc].ind + 1);
+    aux_el.set_number(nuclei_[inuc].ind + 1);
     aux_lib.add_element(aux_el);
   }
 
@@ -3451,7 +3451,7 @@ BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
   bool uselm0 = settings.get_bool("UseLM");
   settings.set_bool("UseLM", true);
   BasisSet aux(1);
-  construct_basis(aux, nuclei, aux_lib);
+  construct_basis(aux, nuclei_, aux_lib);
   aux.coulomb_normalize();
   settings.set_bool("UseLM", uselm0);
 
@@ -3459,11 +3459,11 @@ BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
 }
 
 bool BasisSet::same_geometry(const BasisSet & rhs) const {
-  if(nuclei.size() != rhs.nuclei.size())
+  if(nuclei_.size() != rhs.nuclei_.size())
     return false;
 
-  for(size_t i=0;i<nuclei.size();i++)
-    if(!(nuclei[i]==rhs.nuclei[i])) {
+  for(size_t i=0;i<nuclei_.size();i++)
+    if(!(nuclei_[i]==rhs.nuclei_[i])) {
       //      fprintf(stderr,"Nuclei %i differ!\n",(int) i);
       return false;
     }
@@ -3472,11 +3472,11 @@ bool BasisSet::same_geometry(const BasisSet & rhs) const {
 }
 
 bool BasisSet::same_shells(const BasisSet & rhs) const {
-  if(shells.size() != rhs.shells.size())
+  if(shells_.size() != rhs.shells_.size())
     return false;
 
-  for(size_t i=0;i<shells.size();i++)
-    if(!(shells[i]==rhs.shells[i])) {
+  for(size_t i=0;i<shells_.size();i++)
+    if(!(shells_[i]==rhs.shells_[i])) {
       //      fprintf(stderr,"Shells %i differ!\n",(int) i);
       return false;
     }
@@ -3492,28 +3492,28 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
   // Decontract basis set. m maps old basis functions to new ones
 
   // Contraction schemes for the nuclei
-  std::vector< std::vector<arma::mat> > coeffs(nuclei.size());
-  std::vector< std::vector<arma::vec> > exps(nuclei.size());
+  std::vector< std::vector<arma::mat> > coeffs(nuclei_.size());
+  std::vector< std::vector<arma::vec> > exps(nuclei_.size());
   // Is puream used on the shell?
-  std::vector< std::vector<bool> > puream(nuclei.size());
+  std::vector< std::vector<bool> > puream(nuclei_.size());
 
   // Amount of new basis functions
   size_t Nbfnew=0;
 
   // Collect the schemes. Loop over the nuclei.
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
     // Construct an elemental basis set for the nucleus
-    ElementBasisSet elbas(get_symbol(inuc));
+    ElementBasisSet elbas(symbol(inuc));
 
     // Get the shells belonging to this nucleus
-    std::vector<GaussianShell> shs=get_funcs(inuc);
+    std::vector<GaussianShell> shs=funcs(inuc);
 
     // and add the contractions to the elemental basis set
     for(size_t ish=0;ish<shs.size();ish++) {
       // Angular momentum is
-      int am=shs[ish].get_am();
+      int am=shs[ish].am();
       // Normalized contraction coefficients
-      std::vector<contr_t> c=shs[ish].get_contr_normalized();
+      std::vector<contr_t> c=shs[ish].contr_normalized();
       FunctionShell fsh(am,c);
       elbas.add_function(fsh);
     }
@@ -3527,7 +3527,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
 
 	for(size_t ish=0;ish<shs.size();ish++) {
 	  // Skip if am is not the same
-	  if(shs[ish].get_am()!=am)
+	  if(shs[ish].am()!=am)
 	    continue;
 
 	  // Is this the first shell of the type?
@@ -3562,16 +3562,16 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
   // Now form the new, decontracted basis set.
   BasisSet dec;
   // Initialize transformation matrix
-  m.zeros(Nbfnew,get_Nbf());
+  m.zeros(Nbfnew,Nbf());
 
   // Add the nuclei
-  for(size_t i=0;i<nuclei.size();i++)
-    dec.add_nucleus(nuclei[i]);
+  for(size_t i=0;i<nuclei_.size();i++)
+    dec.add_nucleus(nuclei_[i]);
 
   // and the shells.
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+  for(size_t inuc=0;inuc<nuclei_.size();inuc++) {
     // Get the shells belonging to this nucleus
-    std::vector<GaussianShell> shs=get_funcs(inuc);
+    std::vector<GaussianShell> shs=funcs(inuc);
 
     // Generate the new basis functions. Loop over am
     for(int am=0;am<(int) coeffs[inuc].size();am++) {
@@ -3581,7 +3581,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
       // Add the new shells
       for(size_t iz=0;iz<exps[inuc][am].size();iz++) {
 	// Index of first function is
-	ind0.push_back(dec.get_Nbf());
+	ind0.push_back(dec.Nbf());
 	// Add the shell
 	std::vector<contr_t> hlp(1);
 	hlp[0].c=1.0;
@@ -3591,9 +3591,9 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
 
       // and store the coefficients
       for(size_t ish=0;ish<shs.size();ish++)
-	if(shs[ish].get_am()==am) {
+	if(shs[ish].am()==am) {
 	  // Get the normalized contraction on the shell
-	  std::vector<contr_t> ct=shs[ish].get_contr_normalized();
+	  std::vector<contr_t> ct=shs[ish].contr_normalized();
 	  // and loop over the exponents
 	  for(size_t ic=0;ic<ct.size();ic++) {
 
@@ -3607,8 +3607,8 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
 	    // Now that we know where the exponent is in the new basis
 	    // set, we can just store the coefficients. So, loop over
 	    // the functions on the shell
-	    for(size_t ibf=0;ibf<shs[ish].get_Nbf();ibf++)
-	      m(ind0[ix]+ibf,shs[ish].get_first_ind()+ibf)=ct[ic].c;
+	    for(size_t ibf=0;ibf<shs[ish].Nbf();ibf++)
+	      m(ind0[ix]+ibf,shs[ish].first_ind()+ibf)=ct[ic].c;
 	  }
 	}
     }
@@ -3772,11 +3772,11 @@ arma::mat fermi_lowdin_orbitals(const arma::mat & C, const BasisSet & bas, const
     throw std::logic_error("r should have three columns for x, y, z!\n");
   if(r.n_rows != C.n_cols)
     throw std::logic_error("r should have as many rows as there are orbitals to localize!\n");
-  if(C.n_rows != bas.get_Nbf())
+  if(C.n_rows != bas.Nbf())
     throw std::logic_error("C does not correspond to basis set!\n");
 
   // Evaluate basis function matrix: Nbf x nFOD
-  arma::mat bf(bas.get_Nbf(), r.n_rows);
+  arma::mat bf(bas.Nbf(), r.n_rows);
   for(size_t i=0;i<r.n_rows;i++)
     bf.col(i)=bas.eval_func(r(i,0),r(i,1),r(i,2));
   // Compute the values of the orbitals at the FODs
@@ -3854,7 +3854,7 @@ void compute_density_gradient_hessian(const arma::mat & P, const BasisSet & bas,
 
 double compute_potential(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
   // Compute nuclear contribution
-  std::vector<nucleus_t> nucs=bas.get_nuclei();
+  std::vector<nucleus_t> nucs=bas.nuclei();
   double nucphi=0.0;
   for(size_t i=0;i<nucs.size();i++)
     if(!nucs[i].bsse)
@@ -3899,17 +3899,17 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
   std::vector< std::vector<size_t> > ret;
 
   // Loop over shells
-  for(size_t ish=0;ish<shells.size();ish++) {
+  for(size_t ish=0;ish<shells_.size();ish++) {
     // Get exponents, contractions and cartesian functions on shell
-    std::vector<contr_t> shell_contr=shells[ish].get_contr();
-    std::vector<shellf_t> shell_cart=shells[ish].get_cart();
+    std::vector<contr_t> shell_contr=shells_[ish].contr();
+    std::vector<shellf_t> shell_cart=shells_[ish].cart();
 
     // Try to find the shell on the current list of identicals
     bool found=false;
     for(size_t iident=0;iident<ret.size();iident++) {
 
       // Check first cartesian part.
-      std::vector<shellf_t> cmp_cart=shells[ret[iident][0]].get_cart();
+      std::vector<shellf_t> cmp_cart=shells_[ret[iident][0]].cart();
 
       if(shell_cart.size()==cmp_cart.size()) {
 	// Default value
@@ -3920,13 +3920,13 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
 	    found=false;
 
 	// Check that usage of spherical harmonics matches, too
-	if(shells[ish].lm_in_use() != shells[ret[iident][0]].lm_in_use())
+	if(shells_[ish].lm_in_use() != shells_[ret[iident][0]].lm_in_use())
 	  found=false;
 
 	// If cartesian parts match, check also exponents and contraction coefficients
 	if(found) {
 	  // Get exponents
-	  std::vector<contr_t> cmp_contr=shells[ret[iident][0]].get_contr();
+	  std::vector<contr_t> cmp_contr=shells_[ret[iident][0]].contr();
 
 	  // Check exponents
 	  if(shell_contr.size()==cmp_contr.size()) {
@@ -4050,18 +4050,18 @@ template<typename T> static arma::Mat<T> construct_IAO_wrk(const BasisSet & basi
 
   // Construct minimal basis set
   BasisSet minbas;
-  construct_basis(minbas,basis.get_nuclei(),minao);
+  construct_basis(minbas,basis.nuclei(),minao);
 
   // Get indices
   idx.clear();
-  idx.resize(minbas.get_Nnuc());
-  for(size_t inuc=0;inuc<minbas.get_Nnuc();inuc++) {
+  idx.resize(minbas.Nnuc());
+  for(size_t inuc=0;inuc<minbas.Nnuc();inuc++) {
     // Get shells on nucleus
-    std::vector<GaussianShell> sh=minbas.get_funcs(inuc);
+    std::vector<GaussianShell> sh=minbas.funcs(inuc);
     // Store indices
     for(size_t si=0;si<sh.size();si++)
-      for(size_t fi=0;fi<sh[si].get_Nbf();fi++)
-	idx[inuc].push_back(sh[si].get_first_ind()+fi);
+      for(size_t fi=0;fi<sh[si].Nbf();fi++)
+	idx[inuc].push_back(sh[si].first_ind()+fi);
   }
 
   // Calculate S1, S12, S2, and S21
@@ -4176,25 +4176,25 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_nuclei() const {
   std::vector< std::vector<size_t> > ret;
 
   // Loop over nuclei
-  for(size_t i=0;i<get_Nnuc();i++) {
+  for(size_t i=0;i<Nnuc();i++) {
     // Check that nucleus isn't BSSE
-    nucleus_t nuc=get_nucleus(i);
+    nucleus_t nuc=nucleus(i);
     if(nuc.bsse)
       continue;
 
     // Get the shells on the nucleus
-    std::vector<GaussianShell> shi=get_funcs(i);
+    std::vector<GaussianShell> shi=funcs(i);
 
     // Check if there something already on the list
     bool found=false;
     for(size_t j=0;j<ret.size();j++) {
-      std::vector<GaussianShell> shj=get_funcs(ret[j][0]);
+      std::vector<GaussianShell> shj=funcs(ret[j][0]);
 
       // Check nuclear type
-      if(get_symbol(i).compare(get_symbol(ret[j][0]))!=0)
+      if(symbol(i).compare(symbol(ret[j][0]))!=0)
 	continue;
       // Check charge status
-      if(get_nucleus(i).Q != get_nucleus(ret[j][0]).Q)
+      if(nucleus(i).Q != nucleus(ret[j][0]).Q)
 	continue;
 
       // Do comparison
@@ -4205,14 +4205,14 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_nuclei() const {
 	bool same=true;
 	for(size_t ii=0;ii<shi.size();ii++) {
 	  // Check angular momentum
-	  if(shi[ii].get_am()!=shj[ii].get_am()) {
+	  if(shi[ii].am()!=shj[ii].am()) {
 	    same=false;
 	    break;
 	  }
 
 	  // and exponents
-	  std::vector<contr_t> lhc=shi[ii].get_contr();
-	  std::vector<contr_t> rhc=shj[ii].get_contr();
+	  std::vector<contr_t> lhc=shi[ii].contr();
+	  std::vector<contr_t> rhc=shj[ii].contr();
 
 	  if(lhc.size() != rhc.size()) {
 	    same=false;

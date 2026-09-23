@@ -74,7 +74,7 @@ std::complex<double> RadialGaussian::get(double p) const {
 
 std::vector< std::vector<size_t> > find_identical_functions(const BasisSet & bas) {
   // Get shells in basis set
-  std::vector<GaussianShell> sh=bas.get_shells();
+  std::vector<GaussianShell> sh=bas.shells();
   // and the list of "identical" shells
   std::vector< std::vector<size_t> > idsh=bas.find_identical_shells();
 
@@ -87,12 +87,12 @@ std::vector< std::vector<size_t> > find_identical_functions(const BasisSet & bas
     size_t first=ret.size();
 
     // Increase the size of the return array
-    ret.resize(ret.size()+bas.get_Nbf(idsh[iidsh][0]));
+    ret.resize(ret.size()+bas.Nbf(idsh[iidsh][0]));
 
     // Add the functions on all equivalent shells
-    for(size_t ifunc=0;ifunc<bas.get_Nbf(idsh[iidsh][0]);ifunc++)
+    for(size_t ifunc=0;ifunc<bas.Nbf(idsh[iidsh][0]);ifunc++)
       for(size_t ish=0;ish<idsh[iidsh].size();ish++)
-	ret[first+ifunc].push_back(bas.get_first_ind(idsh[iidsh][ish])+ifunc);
+	ret[first+ifunc].push_back(bas.first_ind(idsh[iidsh][ish])+ifunc);
   }
 
   /*
@@ -110,7 +110,7 @@ std::vector< std::vector<size_t> > find_identical_functions(const BasisSet & bas
 
 std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
   // Get shells in basis set
-  std::vector<GaussianShell> sh=bas.get_shells();
+  std::vector<GaussianShell> sh=bas.shells();
   // and the list of "identical" shells
   std::vector< std::vector<size_t> > idsh=bas.find_identical_shells();
 
@@ -118,17 +118,17 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
   std::vector< std::vector<ylmcoeff_t> > ret;
 
   // Form cartesian expansions
-  CartesianExpansion cart(bas.get_max_am());
+  CartesianExpansion cart(bas.max_am());
 
   // Loop over shells
   for(size_t iid=0;iid<idsh.size();iid++) {
     // Angular momentum
-    int l=bas.get_am(idsh[iid][0]);
+    int l=bas.am(idsh[iid][0]);
     // Number of contractions: a generally contracted shell carries nctr
     // sets of the same angular functions (they differ only in the radial
     // part), matching find_identical_functions / form_radial which count
-    // get_Nbf = nctr*(2l+1) functions per shell.
-    const size_t nctr=bas.get_shell(idsh[iid][0]).get_Nctr();
+    // Nbf() = nctr*(2l+1) functions per shell.
+    const size_t nctr=bas.shell(idsh[iid][0]).Nctr();
 
     // The angular coefficients of one contraction's functions
     std::vector< std::vector<ylmcoeff_t> > block;
@@ -218,7 +218,7 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
 
 std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
   // Get shells in basis set
-  std::vector<GaussianShell> sh=bas.get_shells();
+  std::vector<GaussianShell> sh=bas.shells();
   // and the list of "identical" shells
   std::vector< std::vector<size_t> > idsh=bas.find_identical_shells();
 
@@ -226,25 +226,25 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
   std::vector< std::vector<RadialGaussian> > ret;
 
   // Form cartesian expansions
-  CartesianExpansion cart(bas.get_max_am());
+  CartesianExpansion cart(bas.max_am());
 
   // Loop over shells
   for(size_t iid=0;iid<idsh.size();iid++) {
     // Angular momentum
-    int am=bas.get_am(idsh[iid][0]);
+    int am=bas.am(idsh[iid][0]);
 
     // The shell may be generally contracted: each contraction has its own
     // radial part, shared by that contraction's angular functions. The
     // contractions are stacked slowest, matching find_identical_functions
-    // / form_clm (get_Nbf = nctr*Nlm functions per shell).
-    const GaussianShell shell=bas.get_shell(idsh[iid][0]);
-    const size_t nctr=shell.get_Nctr();
+    // / form_clm (Nbf() = nctr*Nlm functions per shell).
+    const GaussianShell shell=bas.shell(idsh[iid][0]);
+    const size_t nctr=shell.Nctr();
     // Functions per contraction (2l+1 spherical, or the cartesian count)
-    const size_t Nlm=bas.get_Nbf(idsh[iid][0])/nctr;
+    const size_t Nlm=bas.Nbf(idsh[iid][0])/nctr;
 
     for(size_t ictr=0;ictr<nctr;ictr++) {
       // Normalized contraction for this column
-      std::vector<contr_t> c=shell.get_contr_normalized(ictr);
+      std::vector<contr_t> c=shell.contr_normalized(ictr);
 
       // The radial part for this contraction
       std::vector<RadialGaussian> rad;
@@ -301,7 +301,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_
     ERROR_INFO();
     throw std::runtime_error("P is not square matrix!\n");
   }
-  if(Pv.n_cols!=bas.get_Nbf()) {
+  if(Pv.n_cols!=bas.Nbf()) {
     ERROR_INFO();
     throw std::runtime_error("Density matrix does not correspond to basis!\n");
   }
@@ -317,9 +317,9 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_
 
   // Form the index list of the centers of the functions
   std::vector<size_t> locv;
-  for(size_t ish=0;ish<bas.get_Nshells();ish++)
-    for(size_t ifunc=0;ifunc<bas.get_Nbf(ish);ifunc++)
-      locv.push_back(bas.get_shell_center_ind(ish));
+  for(size_t ish=0;ish<bas.Nshells();ish++)
+    for(size_t ifunc=0;ifunc<bas.Nbf(ish);ifunc++)
+      locv.push_back(bas.shell_center_ind(ish));
 
   /*
   printf("Functions centered on atoms:\n");
@@ -329,8 +329,8 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_
 
   // Form the list of atomic coordinates
   std::vector<coords_t> coord;
-  for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++)
-    coord.push_back(bas.get_nuclear_coords(inuc));
+  for(size_t inuc=0;inuc<bas.Nnuc();inuc++)
+    coord.push_back(bas.nuclear_coords(inuc));
 
   /*
   printf("Coordinates of atoms:\n");

@@ -94,7 +94,7 @@ void print(const std::string & entry, const std::vector<double> & val, FILE *out
 
 std::vector<int> form_shelltypes(const BasisSet & basis) {
   // Get the shells
-  std::vector<GaussianShell> shells=basis.get_shells();
+  std::vector<GaussianShell> shells=basis.shells();
 
   // Get shell types. Gaussian has no generally contracted shells, so a
   // shell with nctr contractions is written as nctr segmented shells of
@@ -102,11 +102,11 @@ std::vector<int> form_shelltypes(const BasisSet & basis) {
   std::vector<int> shtypes;
   for(size_t i=0;i<shells.size();i++) {
     // Get angular momentum
-    int am=shells[i].get_am();
+    int am=shells[i].am();
     // Use spherical harmonics?
     const int t = shells[i].lm_in_use() ? -am : am;
 
-    for(size_t ic=0;ic<shells[i].get_Nctr();ic++)
+    for(size_t ic=0;ic<shells[i].Nctr();ic++)
       shtypes.push_back(t);
   }
 
@@ -118,7 +118,7 @@ void write_mo(const std::string & entry, const BasisSet & basis, const arma::mat
   fprintf(out,"%-42s R   %s %11i\n",entry.c_str(),"N=",(int) (C.n_rows*C.n_cols));
 
   // Get amount of basis functions
-  size_t Nbf=basis.get_Nbf();
+  size_t Nbf=basis.Nbf();
   if(Nbf!=C.n_rows) {
     ERROR_INFO();
     throw std::runtime_error("Orbitals do not correspond to basis set!\n");
@@ -153,7 +153,7 @@ void write_mo(const std::string & entry, const BasisSet & basis, const arma::mat
 
 void write_density(const std::string & entry, const BasisSet & basis, const arma::mat & P, FILE *out) {
   // Get amount of basis functions
-  size_t Nbf=basis.get_Nbf();
+  size_t Nbf=basis.Nbf();
   if(Nbf!=P.n_rows || Nbf!=P.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Density matrix does not correspond to basis set!\n");
@@ -204,14 +204,14 @@ void write_density(const std::string & entry, const BasisSet & basis, const arma
 
 void write_basis(const BasisSet & basis, FILE *out) {
   // Print number of atoms.
-  print("Number of atoms", (int) basis.get_Nnuc(), out);
+  print("Number of atoms", (int) basis.Nnuc(), out);
   // Print number of basis functions.
-  print("Number of basis functions", (int) basis.get_Nbf(), out);
+  print("Number of basis functions", (int) basis.Nbf(), out);
 
   /* Nuclei */
 
   // Get the nuclei.
-  std::vector<nucleus_t> nucs=basis.get_nuclei();
+  std::vector<nucleus_t> nucs=basis.nuclei();
 
   // Print atomic numbers.
   std::vector<int> atnum(nucs.size());
@@ -231,7 +231,7 @@ void write_basis(const BasisSet & basis, FILE *out) {
   /* Basis set */
 
   // Get the shells
-  std::vector<GaussianShell> shells=basis.get_shells();
+  std::vector<GaussianShell> shells=basis.shells();
 
   // Print shell types (one Gaussian shell per contraction).
   std::vector<int> shtypes=form_shelltypes(basis);
@@ -246,16 +246,16 @@ void write_basis(const BasisSet & basis, FILE *out) {
   std::vector<double> exps;
   std::vector<double> contr;
   for(size_t i=0;i<shells.size();i++) {
-    const coords_t r=shells[i].get_center();
-    for(size_t ic=0;ic<shells[i].get_Nctr();ic++) {
+    const coords_t r=shells[i].center();
+    for(size_t ic=0;ic<shells[i].Nctr();ic++) {
       // Shell to atom map and shell coordinates
-      shmap.push_back((int) shells[i].get_center_ind()+1);
+      shmap.push_back((int) shells[i].center_ind()+1);
       shcoords.push_back(r.x);
       shcoords.push_back(r.y);
       shcoords.push_back(r.z);
 
       // Contraction of *normalized* primitives for this contraction
-      std::vector<contr_t> c=shells[i].get_contr_normalized(ic);
+      std::vector<contr_t> c=shells[i].contr_normalized(ic);
       nprim.push_back((int) c.size());
       for(size_t j=0;j<c.size();j++) {
         exps.push_back(c[j].z);

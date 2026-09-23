@@ -388,7 +388,7 @@ int main_guarded(int argc, char **argv) {
       construct_basis(auxbasis, atoms, auxbas);
       auxbasis.coulomb_normalize();
 
-      size_t Naux = auxbasis.get_Nbf();
+      size_t Naux = auxbasis.Nbf();
 
       // Initialize density fitting code
       DensityFit dfit;
@@ -406,14 +406,14 @@ int main_guarded(int argc, char **argv) {
       arma::mat Wno(arma::trans(I3c)*I3c);
 
       // Get the shells in the auxiliary basis set
-      std::vector<GaussianShell> auxshells(auxbasis.get_shells());
+      std::vector<GaussianShell> auxshells(auxbasis.shells());
       // List of shells with the wanted angular momentum
-      std::vector<arma::uvec> am_shells(auxbasis.get_max_am()+1);
-      for(int am=0;am<=auxbasis.get_max_am();am++) {
+      std::vector<arma::uvec> am_shells(auxbasis.max_am()+1);
+      for(int am=0;am<=auxbasis.max_am();am++) {
         std::vector<size_t> shellidx;
         for(size_t is=0; is<auxshells.size(); is++) {
           // Check we have right angular momentum
-          if(auxshells[is].get_am() != am) continue;
+          if(auxshells[is].am() != am) continue;
           // Check for pure angular momentum
           if(!auxshells[is].lm_in_use()) {
             throw std::logic_error("Must use spherical auxiliary basis!\n");
@@ -428,7 +428,7 @@ int main_guarded(int argc, char **argv) {
         std::vector<size_t> iidx;
         for(auto is: am_shells[l]) {
           for(int m=-l;m<=l;m++) {
-            iidx.push_back(auxshells[is].get_first_ind() + l+m);
+            iidx.push_back(auxshells[is].first_ind() + l+m);
           }
         }
         return arma::conv_to<arma::uvec>::from(iidx);
@@ -436,7 +436,7 @@ int main_guarded(int argc, char **argv) {
       auto lm_functions = [am_shells, auxshells](int l, int m) {
         std::vector<size_t> iidx;
         for(auto is: am_shells[l]) {
-          size_t iind(auxshells[is].get_first_ind() + l+m);
+          size_t iind(auxshells[is].first_ind() + l+m);
           iidx.push_back(iind);
         }
         return arma::conv_to<arma::uvec>::from(iidx);
@@ -473,10 +473,10 @@ int main_guarded(int argc, char **argv) {
       arma::mat ab = dfit.ab();
 
       // Form contractions
-      std::vector<arma::vec> exps(auxbasis.get_max_am()+1);
-      std::vector<arma::mat> coeffs(auxbasis.get_max_am()+1);
-      std::vector<arma::vec> evals(auxbasis.get_max_am()+1);
-      for(int am=0;am<=auxbasis.get_max_am();am++) {
+      std::vector<arma::vec> exps(auxbasis.max_am()+1);
+      std::vector<arma::mat> coeffs(auxbasis.max_am()+1);
+      std::vector<arma::vec> evals(auxbasis.max_am()+1);
+      for(int am=0;am<=auxbasis.max_am();am++) {
         size_t Nprim = am_shells[am].n_elem;
 
         // Extract W submatrix
@@ -508,7 +508,7 @@ int main_guarded(int argc, char **argv) {
         // Collect exponents
         exps[am].zeros(Nprim);
         for(size_t ix=0;ix < Wvec.n_rows; ix++) {
-          exps[am][ix] = auxshells[am_shells[am][ix]].get_contr()[0].z;
+          exps[am][ix] = auxshells[am_shells[am][ix]].contr()[0].z;
         }
         coeffs[am] = Wvec;
         evals[am] = Wval;
@@ -528,7 +528,7 @@ int main_guarded(int argc, char **argv) {
       size_t norig=0, ncontr=0;
 
       std::ostringstream ucomp, ccomp;
-      for(int am=0;am<=auxbasis.get_max_am();am++) {
+      for(int am=0;am<=auxbasis.max_am();am++) {
         // Keep the vectors above the threshold
         arma::uvec keep_idx(arma::find(evals[am] >= elthresh));
         keep_idx = arma::reverse(keep_idx); // print largest eigenvalue first

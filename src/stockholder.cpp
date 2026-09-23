@@ -37,7 +37,7 @@ void StockholderAtom::compute(const BasisSet & basis, const arma::mat & P, const
   std::vector<lebedev_point_t> leb=lebedev_sphere(lmax);
 
   // Nuclear coordinate
-  coords_t nuc=basis.get_nucleus(atind).r;
+  coords_t nuc=basis.nucleus(atind).r;
 
   // Allocate memory
   rho[irad].resize(leb.size());
@@ -63,14 +63,14 @@ void StockholderAtom::compute(const BasisSet & basis, const arma::mat & P, const
       size_t ish=compute_shells[i];
 
       // Center of shell is
-      coords_t shell_center=basis.get_shell_center(ish);
+      coords_t shell_center=basis.shell_center(ish);
       // Compute distance of point to center of shell
       double shell_dist=norm(shell_center-grid[irad][ip]);
 
       // Add shell to point if it is within the range of the shell
       if(shell_dist<shran[ish]) {
 	// Index of first function on shell is
-	size_t ind0=basis.get_first_ind(ish);
+	size_t ind0=basis.first_ind(ish);
 
 	// Compute values of basis functions
 	arma::vec fval=basis.eval_func(ish,grid[irad][ip].x,grid[irad][ip].y,grid[irad][ip].z);
@@ -116,10 +116,10 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
   atind=atindv;
 
   // Nuclear distances
-  std::vector<double> nucdist=basis.get_nuclear_distances(atind);
+  std::vector<double> nucdist=basis.nuclear_distances(atind);
   // Shell ranges
-  std::vector<double> shran=basis.get_shell_ranges();
-  if(shran.size() != basis.get_Nshells())
+  std::vector<double> shran=basis.shell_ranges();
+  if(shran.size() != basis.Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
 
   // Add points
@@ -131,11 +131,11 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
     std::vector<size_t> compute_shells;
 
     // Determine which shells might contribute to this radial shell
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
       // Determine closest distance of nucleus
       double dist=fabs(nucdist[inuc]-rad);
       // Get indices of shells centered on nucleus
-      std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
+      std::vector<size_t> shellinds=basis.shell_inds(inuc);
 
       // Loop over shells on nucleus
       for(size_t ish=0;ish<shellinds.size();ish++) {
@@ -217,10 +217,10 @@ void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, s
   atind=atindv;
 
   // Nuclear distances
-  std::vector<double> nucdist=basis.get_nuclear_distances(atind);
+  std::vector<double> nucdist=basis.nuclear_distances(atind);
   // Shell ranges
-  std::vector<double> shran=basis.get_shell_ranges();
-  if(shran.size() != basis.get_Nshells())
+  std::vector<double> shran=basis.shell_ranges();
+  if(shran.size() != basis.Nshells())
     throw std::logic_error("Shell ranges not initialized\n");
 
   // Add points
@@ -232,11 +232,11 @@ void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, s
     std::vector<size_t> compute_shells;
 
     // Determine which shells might contribute to this radial shell
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    for(size_t inuc=0;inuc<basis.Nnuc();inuc++) {
       // Determine closest distance of nucleus
       double dist=fabs(nucdist[inuc]-rad);
       // Get indices of shells centered on nucleus
-      std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
+      std::vector<size_t> shellinds=basis.shell_inds(inuc);
 
       // Loop over shells on nucleus
       for(size_t ish=0;ish<shellinds.size();ish++) {
@@ -300,12 +300,12 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
   Timer t, ttot;
 
   // Allocate atomic grids
-  atoms.resize(basis.get_Nnuc());
+  atoms.resize(basis.Nnuc());
 
   // Get centers
-  cen.resize(basis.get_Nnuc());
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    cen[i]=basis.get_nuclear_coords(i);
+  cen.resize(basis.Nnuc());
+  for(size_t i=0;i<basis.Nnuc();i++)
+    cen[i]=basis.nuclear_coords(i);
 
   // Initial weight.
   std::vector<double> w0(nrad,1.0);
@@ -327,7 +327,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     printf("%4s %7s\n","atom","Npoints");
     fflush(stdout);
   }
-  for(size_t i=0;i<basis.get_Nnuc();i++)
+  for(size_t i=0;i<basis.Nnuc();i++)
     atoms[i].fill_static(basis,P,i,dr,nrad,l0,verbose);
   if(verbose) {
     printf("Initial fill done in %s.\n",t.elapsed().c_str());
@@ -374,7 +374,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     }
 
     // Adaptive generation of grid
-    for(size_t i=0;i<basis.get_Nnuc();i++)
+    for(size_t i=0;i<basis.Nnuc();i++)
       atoms[i].fill_adaptive(basis,P,ISA,i,dr,nrad,lmax,tol,verbose);
 
     if(verbose) {

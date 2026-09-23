@@ -212,7 +212,7 @@ BasisSetLibrary pivoted_cholesky_basis(const std::vector<atom_t> & atoms, const 
   arma::mat oc;
   arma::eig_sym(oe,oc,S);
   arma::mat oX(canonical_orth(oe,oc));
-  printf("Original basis has %i shells and %i functions, smallest overlap eigenvalue % e yielding %i linearly independent\n",(int) basis.get_shells().size(),(int) basis.get_Nbf(),arma::min(oe),(int) oX.n_cols);
+  printf("Original basis has %i shells and %i functions, smallest overlap eigenvalue % e yielding %i linearly independent\n",(int) basis.shells().size(),(int) basis.Nbf(),arma::min(oe),(int) oX.n_cols);
   printf("Reciprocal condition number of original basis is %e\n",arma::rcond(S));
 
   // Perform pivoted Cholesky decomposition
@@ -243,7 +243,7 @@ BasisSetLibrary pivoted_cholesky_basis(const std::vector<atom_t> & atoms, const 
   arma::mat rc;
   arma::eig_sym(re,rc,redS);
   arma::mat rX(canonical_orth(re,rc));
-  printf("Reduced basis has %i shells and %i functions, smallest overlap eigenvalue % e yielding %i linearly independent\n",(int) redbasis.get_shells().size(),(int) redbasis.get_Nbf(),arma::min(re),(int) rX.n_cols);
+  printf("Reduced basis has %i shells and %i functions, smallest overlap eigenvalue % e yielding %i linearly independent\n",(int) redbasis.shells().size(),(int) redbasis.Nbf(),arma::min(re),(int) rX.n_cols);
   printf("Reciprocal condition number of reduced basis is %e\n",arma::rcond(redS));
 
   return redlib;

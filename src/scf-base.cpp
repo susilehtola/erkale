@@ -72,7 +72,7 @@ extern Settings settings;
 
 SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   // Amount of basis functions
-  Nbf=basis.get_Nbf();
+  Nbf=basis.Nbf();
 
   basisp=&basis;
   chkptp=&chkpt;
@@ -203,8 +203,8 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
     coords_t cen;
     cen.x=cen.y=cen.z=0.0;
     int Ztot=0;
-    for(size_t i=0;i<basis.get_Nnuc();i++) {
-      nucleus_t nuc=basis.get_nucleus(i);
+    for(size_t i=0;i<basis.Nnuc();i++) {
+      nucleus_t nuc=basis.nucleus(i);
       if(!nuc.bsse) {
 	cen=cen+nuc.r*nuc.Z;
 	Ztot+=nuc.Z;
@@ -250,7 +250,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
 
   if(lincalc) {
     // Basis set m values
-    arma::ivec mval(basisp->get_m_values());
+    arma::ivec mval(basisp->m_values());
 
     // Find unique m values
     arma::uvec muni_idx(arma::find_unique(mval));
@@ -728,7 +728,7 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
     throw std::runtime_error("Not enough virtuals given!\n");
   if(Co.n_rows != Cv0.n_rows)
     throw std::runtime_error("Orbital matrices not consistent!\n");
-  if(Co.n_rows != basisp->get_Nbf())
+  if(Co.n_rows != basisp->Nbf())
     throw std::runtime_error("Orbital matrix does not match basis set!\n");
 
   // Returned orbitals
@@ -1220,9 +1220,9 @@ arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis) {
   // Compute center of nuclear charge
   arma::vec nc(3);
   nc.zeros();
-  for(size_t i=0;i<basis.get_Nnuc();i++) {
+  for(size_t i=0;i<basis.Nnuc();i++) {
     // Get nucleus
-    nucleus_t nuc=basis.get_nucleus(i);
+    nucleus_t nuc=basis.nucleus(i);
     // Increment
     nc(0)+=nuc.Z*nuc.r.x;
     nc(1)+=nuc.Z*nuc.r.y;
@@ -2465,13 +2465,13 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   Timer t;
 
   // Total number of functions in augmented set is
-  const size_t Ntot=augbas.get_Nbf();
+  const size_t Ntot=augbas.Nbf();
   // Amount of old orbitals is
   const size_t Nold=Cold.n_cols;
 
   // Mapping from original shell to augmented basis
-  std::vector<GaussianShell> augshells(augbas.get_shells());
-  std::vector<GaussianShell> origshells(minbas.get_shells());
+  std::vector<GaussianShell> augshells(augbas.shells());
+  std::vector<GaussianShell> origshells(minbas.shells());
   std::vector<size_t> mapping(origshells.size());
 
   // Loop over shells in original set
@@ -2533,11 +2533,11 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
       // Augmented shell index
       size_t aidx(mapping[ish]);
       // First and last augmented function
-      size_t a_first(augshells[aidx].get_first_ind());
-      size_t a_last(augshells[aidx].get_last_ind());
+      size_t a_first(augshells[aidx].first_ind());
+      size_t a_last(augshells[aidx].last_ind());
       // First and last input function
-      size_t i_first(origshells[ish].get_first_ind());
-      size_t i_last(origshells[ish].get_last_ind());
+      size_t i_first(origshells[ish].first_ind());
+      size_t i_last(origshells[ish].last_ind());
 
       // Copy data
       C.submat(a_first, i, a_last, i) = Cold.submat(i_first, i, i_last, i);
@@ -2652,12 +2652,12 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   const int Nmagic=(int) (sizeof(magicno)/sizeof(magicno[0]));
 
   // First, figure out how many orbitals to localize on each center
-  std::vector<size_t> locno(basis.get_Nnuc(),0);
+  std::vector<size_t> locno(basis.Nnuc(),0);
   // Localize on all the atoms of the same type than the excited atom
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    if(!basis.get_nucleus(i).bsse) {
+  for(size_t i=0;i<basis.Nnuc();i++)
+    if(!basis.nucleus(i).bsse) {
       // Charge of nucleus is
-      int Z=basis.get_nucleus(i).Z;
+      int Z=basis.nucleus(i).Z;
 
       // Get the number of closed shells
       int ncl=0;
@@ -2680,7 +2680,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
       continue;
 
     // The nucleus is located at
-    coords_t cen=basis.get_nuclear_coords(inuc);
+    coords_t cen=basis.nuclear_coords(inuc);
 
     // Compute moment integrals around the nucleus
     std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);

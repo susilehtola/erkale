@@ -57,7 +57,7 @@ void BaderGrid::set(const BasisSet & basis, bool ver, bool lobatto) {
 
 void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp->get_Nnuc());
+  std::vector<size_t> nrad(basp->Nnuc());
 
   Timer t;
 
@@ -65,14 +65,14 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 
   // Form radial shells
   std::vector<angshell_t> grids;
-  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp->get_nuclear_coords(iat);
+    sh.cen=basp->nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
+    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->Z(iat)])));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -93,8 +93,8 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
   // Initialize list of maxima
   maxima.clear();
   reggrid.clear();
-  for(size_t i=0;i<basp->get_Nnuc();i++) {
-    nucleus_t nuc(basp->get_nucleus(i));
+  for(size_t i=0;i<basp->Nnuc();i++) {
+    nucleus_t nuc(basp->nucleus(i));
     if(!nuc.bsse) {
       // Add to list
       maxima.push_back(nuc.r);
@@ -123,13 +123,13 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 
     // Are we inside an established trust radius, or are we close enough to a real nucleus?
     bool inside=false;
-    if(grids[ig].R<=TRUSTRAD && !(basp->get_nucleus(grids[ig].atind).bsse))
+    if(grids[ig].R<=TRUSTRAD && !(basp->nucleus(grids[ig].atind).bsse))
       inside=true;
 
     else if(!block[grids[ig].atind] && oldatom==grids[ig].atind) {
       // Compute projection of density gradient of points on shell
       arma::vec proj(shellpoints.size());
-      coords_t nuccoord(basp->get_nuclear_coords(grids[ig].atind));
+      coords_t nuccoord(basp->nuclear_coords(grids[ig].atind));
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -217,10 +217,10 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     print_maxima();
 
     // Amount of integration points
-    arma::uvec np(basp->get_Nnuc());
+    arma::uvec np(basp->Nnuc());
     np.zeros();
     // Amount of function values
-    arma::uvec nf(basp->get_Nnuc());
+    arma::uvec nf(basp->Nnuc());
     nf.zeros();
 
     for(size_t i=0;i<grids.size();i++) {
@@ -228,8 +228,8 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
       nf(grids[i].atind)+=grids[i].nfunc;
     }
     printf("Composition of atomic integration grid:\n %7s %7s %10s\n","atom","Npoints","Nfuncs");
-    for(size_t i=0;i<basp->get_Nnuc();i++)
-      printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+    for(size_t i=0;i<basp->Nnuc();i++)
+      printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->symbol(i).c_str(), (int) np(i), (int) nf(i));
     printf("\nAmount of grid points in the regions:\n %7s %7s\n","region","Npoints");
     for(size_t i=0;i<reggrid.size();i++)
       printf(" %4i %7i\n",(int) i+1, (int) reggrid[i].size());
@@ -239,20 +239,20 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 
 void BaderGrid::construct_voronoi(double otoler) {
   // Amount of radial shells on the atoms
-  std::vector<size_t> nrad(basp->get_Nnuc());
+  std::vector<size_t> nrad(basp->Nnuc());
 
   Timer t;
 
   // Form radial shells
   std::vector<angshell_t> grids;
-  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+  for(size_t iat=0;iat<basp->Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
-    sh.cen=basp->get_nuclear_coords(iat);
+    sh.cen=basp->nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
+    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->Z(iat)])));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -273,8 +273,8 @@ void BaderGrid::construct_voronoi(double otoler) {
   // Initialize list of maxima
   maxima.clear();
   reggrid.clear();
-  for(size_t i=0;i<basp->get_Nnuc();i++) {
-    nucleus_t nuc(basp->get_nucleus(i));
+  for(size_t i=0;i<basp->Nnuc();i++) {
+    nucleus_t nuc(basp->nucleus(i));
     if(!nuc.bsse) {
       // Add to list
       maxima.push_back(nuc.r);
@@ -311,10 +311,10 @@ void BaderGrid::construct_voronoi(double otoler) {
   if(verbose) {
     printf("Voronoi grid constructed in %s.\n",t.elapsed().c_str());
     // Amount of integration points
-    arma::uvec np(basp->get_Nnuc());
+    arma::uvec np(basp->Nnuc());
     np.zeros();
     // Amount of function values
-    arma::uvec nf(basp->get_Nnuc());
+    arma::uvec nf(basp->Nnuc());
     nf.zeros();
 
     for(size_t i=0;i<grids.size();i++) {
@@ -322,8 +322,8 @@ void BaderGrid::construct_voronoi(double otoler) {
       nf(grids[i].atind)+=grids[i].nfunc;
     }
     printf("Composition of atomic integration grid:\n %7s %7s %10s\n","atom","Npoints","Nfuncs");
-    for(size_t i=0;i<basp->get_Nnuc();i++)
-      printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+    for(size_t i=0;i<basp->Nnuc();i++)
+      printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->symbol(i).c_str(), (int) np(i), (int) nf(i));
     printf("\nAmount of grid points in the atomic regions:\n %7s %7s\n","region","Npoints");
     for(size_t i=0;i<reggrid.size();i++)
       printf(" %4i %7i\n",(int) i+1, (int) reggrid[i].size());
@@ -342,8 +342,8 @@ void BaderGrid::print_maxima() const {
   for(size_t i=0;i<maxima.size();i++) {
     // Check if it's a nuclear maximum
     bool nuc=false;
-    for(size_t j=0;j<basp->get_Nnuc();j++)
-      if(norm(basp->get_nuclear_coords(j)-maxima[i])<=SAMEMAXIMUM) {
+    for(size_t j=0;j<basp->Nnuc();j++)
+      if(norm(basp->nuclear_coords(j)-maxima[i])<=SAMEMAXIMUM) {
 	nuclear.push_back(maxima[i]);
 	nuci.push_back(j);
 	nuc=true;
@@ -356,7 +356,7 @@ void BaderGrid::print_maxima() const {
 
   printf("Found %i nuclear maxima.\n",(int) nuclear.size());
   for(size_t i=0;i<nuclear.size();i++)
-    printf("%4i %4i %-2s % f % f % f\n",(int) i+1,(int) nuci[i]+1,basp->get_symbol(nuci[i]).c_str(),nuclear[i].x,nuclear[i].y,nuclear[i].z);
+    printf("%4i %4i %-2s % f % f % f\n",(int) i+1,(int) nuci[i]+1,basp->symbol(nuci[i]).c_str(),nuclear[i].x,nuclear[i].y,nuclear[i].z);
   if(nonnuc.size()) {
     printf("Found %i non-nuclear maxima.\n",(int) nonnuc.size());
     for(size_t i=0;i<nonnuc.size();i++)
@@ -371,7 +371,7 @@ arma::mat BaderGrid::regional_overlap(size_t ireg) {
   }
 
   // Function values in grid points
-  arma::mat bf(basp->get_Nbf(),reggrid[ireg].size());
+  arma::mat bf(basp->Nbf(),reggrid[ireg].size());
   arma::rowvec w(reggrid[ireg].size());
   for(size_t ip=0;ip<reggrid[ireg].size();ip++) {
     // Weight is
@@ -381,7 +381,7 @@ arma::mat BaderGrid::regional_overlap(size_t ireg) {
   }
 
   // Overlap matrix is
-  arma::mat Sreg(basp->get_Nbf(),basp->get_Nbf());
+  arma::mat Sreg(basp->Nbf(),basp->Nbf());
   Sreg.zeros();
   increment_lda<double>(Sreg,w,bf);
 
@@ -434,7 +434,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
   size_t ngrad=0;
 
   // Nuclear coordinates
-  arma::mat nuccoord=basis.get_nuclear_coords();
+  arma::mat nuccoord=basis.nuclear_coords();
 
   // Initial step size to use
   const double steplen=0.1;

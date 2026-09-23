@@ -316,7 +316,7 @@ void drop_virtuals(const std::string & dropvirt, const BasisSet & basis, arma::m
   else throw std::runtime_error("Incorrect axis in DropVirt statement \"" + dropvirt + "\".\n");
 
   // Get coordinate matrix
-  arma::mat coords=basis.get_nuclear_coords();
+  arma::mat coords=basis.nuclear_coords();
   // Buffer to put in each side
   double extra=2.0;
   // Minimum and maximum
