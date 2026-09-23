@@ -103,8 +103,8 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   // basis: auxiliary shell ia is shell Nsh_orb + ia. Built here, after
   // the auxiliary basis has been Coulomb normalized, since the
   // environment measures the normalization of the shells.
-  cenv=CintEnv(orbbas,auxbas);
-  const size_t Nsh_orb=cenv.Nsh_orb();
+  cenv_=CintEnv(orbbas,auxbas);
+  const size_t Nsh_orb=cenv_.Nsh_orb();
 
   // First, compute the two-center integrals
   ab_.zeros(Naux_,Naux_);
@@ -116,7 +116,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #pragma omp parallel
 #endif
   {
-    auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
+    auto eri = make_eri_worker(cenv_, omega_, alpha_, beta_);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -167,7 +167,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #pragma omp parallel
 #endif
     {
-      auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
+      auto eri = make_eri_worker(cenv_, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -185,7 +185,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
     // interface as the cached path.
     blocks_ = std::make_shared<DirectDFBlocks>(
         Nbf_, Naux_, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
-        orbshells_, auxshells_, cenv, omega_, alpha_, beta_);
+        orbshells_, auxshells_, cenv_, omega_, alpha_, beta_);
   }
 
   return orbpairs_.size();
@@ -589,7 +589,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // libcint description of the basis. In two-step CD the auxiliary
   // functions are orbital products, so the orbital shells are all the
   // environment needs.
-  cenv=CintEnv(basis);
+  cenv_=CintEnv(basis);
 
   Timer ttot;
 
@@ -618,7 +618,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // CD analog of the (alpha | beta) two-center metric DensityFit::fill
   // builds for a Gaussian aux basis.
   const std::vector<GaussianShell> & shells = basis.shells_ref();
-  const CintEnv & lcenv = cenv;
+  const CintEnv & lcenv = cenv_;
   Timer t;
   arma::mat M_metric(Nselected, Nselected, arma::fill::zeros);
 #ifdef _OPENMP
@@ -747,7 +747,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   auto builder = std::make_shared<DirectCDBlocks>(
       Nbf_, Naux_, sp_pairs, sp_firsts, sp_sizes,
       orbshells_, cd_pivot_shellpairs_vec_, cd_pivot_index_, cd_pivot_sentinel_,
-      cd_X_, cenv, omega_, alpha_, beta_);
+      cd_X_, cenv_, omega_, alpha_, beta_);
   if(direct_) {
     blocks_ = builder;
   } else {
@@ -794,7 +794,7 @@ size_t DensityFit::fill_cholesky_shared(const BasisSet & orbbas,
     // The pivot shells follow the orbital shells: they are addressed as
     // Norb + is, which is what DirectCDBlocks expects of a shared pivot
     // basis
-    cenv=CintEnv(allsh,Norb);
+    cenv_=CintEnv(allsh,Norb);
   }
 
   // Same object as fill_cholesky produces -- L = X^T (piv|mu nu) with the
@@ -833,7 +833,7 @@ size_t DensityFit::fill_cholesky_shared(const BasisSet & orbbas,
   auto builder = std::make_shared<DirectCDBlocks>(
       Nbf_, Naux_, sp_pairs, sp_firsts, sp_sizes,
       orbshells_, piv_shells, cd_pivot_shellpairs_vec_, cd_pivot_index_, cd_pivot_sentinel_,
-      cd_X_, cenv, omega_, alpha_, beta_);
+      cd_X_, cenv_, omega_, alpha_, beta_);
   if(dir) {
     blocks_ = builder;
   } else {
@@ -909,7 +909,7 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
     // is skipped. run_force_loop owns the per-thread dERIWorker + fwrk
     // reduction; we iterate over the outer aux shell here and run the
     // inner jas <= ias loop in the body.
-    run_force_loop(auxshells_.size(), f, cenv, omega_, alpha_, beta_,
+    run_force_loop(auxshells_.size(), f, cenv_, omega_, alpha_, beta_,
                    [&](size_t ias, dERIWorker * deri, arma::vec & fout) {
       for(size_t jas=0; jas<=ias; jas++) {
         // Off-diagonal aux-shellpair pair contributes both (ias, jas)
@@ -924,7 +924,7 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
 
         // The two-center derivatives give six components: the three
         // cartesian components of each of the two centers.
-        deri->compute_2c(cenv.Nsh_orb()+ias, cenv.Nsh_orb()+jas);
+        deri->compute_2c(cenv_.Nsh_orb()+ias, cenv_.Nsh_orb()+jas);
         double ders[6] = {0,0,0,0,0,0};
         for(size_t iid=0; iid<6; iid++) {
           const std::vector<double> * erip = deri->getp((int) iid);
@@ -948,7 +948,7 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
     // dERIWorker gives 12 derivative components mapped to 4 centers.
     // M is looked up via cd_pivot_index_(orb_idx_1, orb_idx_2).
     const std::vector<GaussianShell> & shells = orbshells_;
-    run_force_loop(cd_pivot_shellpairs_vec_.size(), f, cenv, omega_, alpha_, beta_,
+    run_force_loop(cd_pivot_shellpairs_vec_.size(), f, cenv_, omega_, alpha_, beta_,
                    [&](size_t ip, dERIWorker * deri, arma::vec & fout) {
       const size_t is = cd_pivot_shellpairs_vec_[ip].first;
       const size_t js = cd_pivot_shellpairs_vec_[ip].second;
@@ -1011,7 +1011,7 @@ void DensityFit::accumulate_3c_force_DF(arma::vec & f, double sign, BuildQ && bu
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
   DirectDFPerturbedBlocks pblocks(Nbf_, Naux_, Nnuc_,
                                   std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
-                                  orbshells_, auxshells_, cenv, omega_, alpha_, beta_);
+                                  orbshells_, auxshells_, cenv_, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -1057,7 +1057,7 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
     basis.compute_screening(/*tol*/0.0, omega_, alpha_, beta_, false).shpairs;
   const std::vector<GaussianShell> & shells = basis.shells_ref();
 
-  run_force_loop(orb_shps.size(), f, cenv, omega_, alpha_, beta_,
+  run_force_loop(orb_shps.size(), f, cenv_, omega_, alpha_, beta_,
                  [&](size_t ipair, dERIWorker * deri, arma::vec & fout) {
     const size_t is = orb_shps[ipair].is;
     const size_t js = orb_shps[ipair].js;
@@ -1341,7 +1341,7 @@ double DensityFit::fitting_error() const {
   {
     arma::mat wrk_error(error_matrix);
 
-    auto eri = make_eri_worker(cenv, omega_, alpha_, beta_);
+    auto eri = make_eri_worker(cenv_, omega_, alpha_, beta_);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -1423,7 +1423,7 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip, double *memptr) 
     // Compute (mu nu|a). The three-center integrals run the auxiliary
     // index fastest, which is Armadillo's column-major ordering for the
     // (Naux_ x Nmu*Nnu) block, with the column index nu*Nmu + mu.
-    eri->compute_3c(imus,inus,cenv.Nsh_orb()+ia);
+    eri->compute_3c(imus,inus,cenv_.Nsh_orb()+ia);
     const std::vector<double> * erip(eri->getp());
 
     // Store integrals
@@ -2182,7 +2182,7 @@ bool DensityFit::load(const BasisSet & basis, const BasisSet * auxbas, const std
   orbshells_ = basis.shells();
   auxshells_ = auxbas ? auxbas->shells() : std::vector<GaussianShell>();
   // Rebuild the libcint environment: it is not part of the checkpoint
-  cenv = auxbas ? CintEnv(basis,*auxbas) : CintEnv(basis);
+  cenv_ = auxbas ? CintEnv(basis,*auxbas) : CintEnv(basis);
 
   std::vector<hsize_t> orb_is, orb_js;
   chkpt.read(P+"orb_is", orb_is);
