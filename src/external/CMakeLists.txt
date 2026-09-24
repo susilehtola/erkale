@@ -9,8 +9,8 @@ target_link_libraries(erkale_adf_emd liberkale_emd liberkale)
 
 # Optional TREXIO (https://trex-coe.github.io/trexio/) interface.
 # A system/TREXIO_DIR libtrexio is used if found; otherwise it is fetched
-# and built from upstream (disable with ERKALE_FETCH_TREXIO=OFF).
-option(ERKALE_FETCH_TREXIO "If libtrexio is not found, fetch and build it from upstream" ON)
+# and built from the trexio-release mirror (disable with ERKALE_FETCH_TREXIO=OFF).
+option(ERKALE_FETCH_TREXIO "If libtrexio is not found, fetch and build it" ON)
 set(TREXIO_DIR "" CACHE PATH "Path to a TREXIO install (containing include/trexio.h and lib/libtrexio)")
 find_path(TREXIO_INCLUDE_DIR trexio.h HINTS ${TREXIO_DIR}/include)
 find_library(TREXIO_LIBRARY NAMES trexio HINTS ${TREXIO_DIR}/lib ${TREXIO_DIR}/lib64)
@@ -35,16 +35,16 @@ if(TREXIO_INCLUDE_DIR AND TREXIO_LIBRARY)
     set(TREXIO_HAS_HELPERS ON)
   endif()
 elseif(ERKALE_FETCH_TREXIO)
-  message(STATUS "TREXIO not found; fetching v2.6.1 from upstream (set ERKALE_FETCH_TREXIO=OFF to disable).")
+  message(STATUS "TREXIO not found; fetching v2.6.1 from trexio-release (set ERKALE_FETCH_TREXIO=OFF to disable).")
   include(FetchContent)
   # Build only the C library: no TREXIO tests in the subbuild.
   set(TREXIO_TESTS OFF CACHE BOOL "" FORCE)
-  # Use the release tarball: it ships the generated C sources, whereas a
-  # git checkout carries a .devel marker that makes TREXIO regenerate
-  # them from org-mode files and so require emacs.
+  # trexio-release mirrors the release tarballs, which ship the generated
+  # C sources. The upstream git repository only has the org-mode sources
+  # and a .devel marker that makes TREXIO regenerate them with emacs.
   FetchContent_Declare(trexio
-    URL      https://github.com/TREX-CoE/trexio/releases/download/v2.6.1/trexio-2.6.1.tar.gz
-    URL_HASH SHA256=c3694ec1528632a386a2af89199c75d70ecd45bfcc2ca1d4ccccbfa1308ad5fa)
+    GIT_REPOSITORY https://github.com/susilehtola/trexio-release.git
+    GIT_TAG        v2.6.1)
   FetchContent_MakeAvailable(trexio)
   set(ERKALE_BUILD_TREXIO ON)
   add_library(erkale_trexio_lib INTERFACE)
