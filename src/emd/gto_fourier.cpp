@@ -52,14 +52,14 @@ FourierPoly_1D FourierPoly_1D::formpoly(int l, double zeta) {
     term.c=1.0;
     term.l=0;
 
-    ret.poly.push_back(term);
+    ret.poly_.push_back(term);
   } else if(l==1) {
     // R_1 (p_i, zeta) = - i p_i
 
     term.c=std::complex<double>(0.0,-1.0);
     term.l=1;
 
-    ret.poly.push_back(term);
+    ret.poly_.push_back(term);
   } else {
     // Use recursion to formulate.
 
@@ -74,9 +74,9 @@ FourierPoly_1D FourierPoly_1D::formpoly(int l, double zeta) {
 
     // We add the first term separately, since it conserves the value of angular momentum.
     fac=std::complex<double>(0.0,-1.0);
-    for(size_t i=0;i<lm1.getN();i++) {
-      term.c=fac*lm1.getc(i);
-      term.l=lm1.getl(i)+1;
+    for(size_t i=0;i<lm1.N();i++) {
+      term.c=fac*lm1.c(i);
+      term.l=lm1.l(i)+1;
       ret.addterm(term);
     }
   }
@@ -88,22 +88,22 @@ FourierPoly_1D::~FourierPoly_1D() {
 }
 
 void FourierPoly_1D::addterm(const poly1d_t & t) {
-  if(poly.size()==0) {
-    poly.push_back(t);
+  if(poly_.size()==0) {
+    poly_.push_back(t);
   } else {
     // Get upper bound
     std::vector<poly1d_t>::iterator high;
-    high=std::upper_bound(poly.begin(),poly.end(),t);
+    high=std::upper_bound(poly_.begin(),poly_.end(),t);
 
     // Corresponding index is
-    size_t ind=high-poly.begin();
+    size_t ind=high-poly_.begin();
 
-    if(ind>0 && poly[ind-1]==t)
+    if(ind>0 && poly_[ind-1]==t)
 	// Found it.
-      poly[ind-1].c+=t.c;
+      poly_[ind-1].c+=t.c;
     else {
       // Term does not exist, add it
-      poly.insert(high,t);
+      poly_.insert(high,t);
     }
   }
 }
@@ -112,28 +112,28 @@ FourierPoly_1D FourierPoly_1D::operator+(const FourierPoly_1D & rhs) const {
   FourierPoly_1D ret;
 
   ret=*this;
-  for(size_t i=0;i<rhs.poly.size();i++)
-    ret.addterm(rhs.poly[i]);
+  for(size_t i=0;i<rhs.poly_.size();i++)
+    ret.addterm(rhs.poly_[i]);
 
   return ret;
 }
 
-size_t FourierPoly_1D::getN() const {
-  return poly.size();
+size_t FourierPoly_1D::N() const {
+  return poly_.size();
 }
 
-std::complex<double> FourierPoly_1D::getc(size_t i) const {
-  return poly[i].c;
+std::complex<double> FourierPoly_1D::c(size_t i) const {
+  return poly_[i].c;
 }
 
-int FourierPoly_1D::getl(size_t i) const {
-  return poly[i].l;
+int FourierPoly_1D::l(size_t i) const {
+  return poly_[i].l;
 }
 
 void FourierPoly_1D::print() const {
-  for(size_t i=0;i<poly.size();i++) {
-    printf("(%e,%e)p^%i\n",poly[i].c.real(),poly[i].c.imag(),poly[i].l);
-    if(i<poly.size()-1)
+  for(size_t i=0;i<poly_.size();i++) {
+    printf("(%e,%e)p^%i\n",poly_[i].c.real(),poly_[i].c.imag(),poly_[i].l);
+    if(i<poly_.size()-1)
       printf(" + ");
   }
   printf("\n");
@@ -142,8 +142,8 @@ void FourierPoly_1D::print() const {
 FourierPoly_1D operator*(std::complex<double> fac, const FourierPoly_1D & rhs) {
   FourierPoly_1D ret(rhs);
 
-  for(size_t i=0;i<ret.poly.size();i++)
-    ret.poly[i].c*=fac;
+  for(size_t i=0;i<ret.poly_.size();i++)
+    ret.poly_[i].c*=fac;
 
   return ret;
 }
@@ -193,19 +193,19 @@ GTO_Fourier::GTO_Fourier(int l, int m, int n, double zeta) {
   std::complex<double> facxy;
 
   // Loop over the individual polynomials
-  for(size_t ix=0;ix<px.getN();ix++) {
-    facx=px.getc(ix);
-    lx=px.getl(ix);
+  for(size_t ix=0;ix<px.N();ix++) {
+    facx=px.c(ix);
+    lx=px.l(ix);
 
-    for(size_t iy=0;iy<py.getN();iy++) {
-      facy=py.getc(iy);
-      ly=py.getl(iy);
+    for(size_t iy=0;iy<py.N();iy++) {
+      facy=py.c(iy);
+      ly=py.l(iy);
 
       facxy=facx*facy;
 
-      for(size_t iz=0;iz<pz.getN();iz++) {
-	facz=pz.getc(iz);
-	lz=pz.getl(iz);
+      for(size_t iz=0;iz<pz.N();iz++) {
+	facz=pz.c(iz);
+	lz=pz.l(iz);
 
 	// Add the corresponding term
 	trans3d_t term;
@@ -224,22 +224,22 @@ GTO_Fourier::~GTO_Fourier() {
 }
 
 void GTO_Fourier::addterm(const trans3d_t & t) {
-  if(trans.size()==0) {
-    trans.push_back(t);
+  if(trans_.size()==0) {
+    trans_.push_back(t);
   } else {
     // Get upper bound
     std::vector<trans3d_t>::iterator high;
-    high=std::upper_bound(trans.begin(),trans.end(),t);
+    high=std::upper_bound(trans_.begin(),trans_.end(),t);
 
     // Corresponding index is
-    size_t ind=high-trans.begin();
+    size_t ind=high-trans_.begin();
 
-    if(ind>0 && trans[ind-1]==t)
+    if(ind>0 && trans_[ind-1]==t)
 	// Found it.
-      trans[ind-1].c+=t.c;
+      trans_[ind-1].c+=t.c;
     else {
       // Term does not exist, add it
-      trans.insert(high,t);
+      trans_.insert(high,t);
     }
   }
 }
@@ -247,21 +247,21 @@ void GTO_Fourier::addterm(const trans3d_t & t) {
 GTO_Fourier GTO_Fourier::operator+(const GTO_Fourier & rhs) const {
   GTO_Fourier ret=*this;
 
-  for(size_t i=0;i<rhs.trans.size();i++)
-    ret.addterm(rhs.trans[i]);
+  for(size_t i=0;i<rhs.trans_.size();i++)
+    ret.addterm(rhs.trans_[i]);
 
   return ret;
 }
 
 GTO_Fourier & GTO_Fourier::operator+=(const GTO_Fourier & rhs) {
-  for(size_t i=0;i<rhs.trans.size();i++)
-    addterm(rhs.trans[i]);
+  for(size_t i=0;i<rhs.trans_.size();i++)
+    addterm(rhs.trans_[i]);
 
   return *this;
 }
 
-std::vector<trans3d_t> GTO_Fourier::get() const {
-  return trans;
+std::vector<trans3d_t> GTO_Fourier::terms() const {
+  return trans_;
 }
 
 std::complex<double> GTO_Fourier::eval(double px, double py, double pz) const {
@@ -272,8 +272,8 @@ std::complex<double> GTO_Fourier::eval(double px, double py, double pz) const {
   double psq=px*px+py*py+pz*pz;
 
   // Evaluate
-  for(size_t i=0;i<trans.size();i++)
-    ret+=trans[i].c*pow(px,trans[i].l)*pow(py,trans[i].m)*pow(pz,trans[i].n)*exp(-trans[i].z*psq);
+  for(size_t i=0;i<trans_.size();i++)
+    ret+=trans_[i].c*pow(px,trans_[i].l)*pow(py,trans_[i].m)*pow(pz,trans_[i].n)*exp(-trans_[i].z*psq);
 
   return ret;
 }
@@ -281,8 +281,8 @@ std::complex<double> GTO_Fourier::eval(double px, double py, double pz) const {
 GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs) {
   GTO_Fourier ret=rhs;
 
-  for(size_t i=0;i<ret.trans.size();i++)
-    ret.trans[i].c*=fac;
+  for(size_t i=0;i<ret.trans_.size();i++)
+    ret.trans_[i].c*=fac;
 
   return ret;
 }
@@ -290,21 +290,21 @@ GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs) {
 GTO_Fourier operator*(double fac, const GTO_Fourier & rhs) {
   GTO_Fourier ret=rhs;
 
-  for(size_t i=0;i<ret.trans.size();i++)
-    ret.trans[i].c*=fac;
+  for(size_t i=0;i<ret.trans_.size();i++)
+    ret.trans_[i].c*=fac;
 
   return ret;
 }
 
 void GTO_Fourier::print() const {
-  for(size_t i=0;i<trans.size();i++)
-    printf("(%e,%e) px^%i py^%i pz^%i exp(-%e p^2)\n",trans[i].c.real(),trans[i].c.imag(),trans[i].l,trans[i].m,trans[i].n,trans[i].z);
+  for(size_t i=0;i<trans_.size();i++)
+    printf("(%e,%e) px^%i py^%i pz^%i exp(-%e p^2)\n",trans_[i].c.real(),trans_[i].c.imag(),trans_[i].l,trans_[i].m,trans_[i].n,trans_[i].z);
 }
 
 void GTO_Fourier::clean() {
-  for(size_t i=trans.size()-1;i<trans.size();i--)
-    if(norm(trans[i].c) == 0.0)
-      trans.erase(trans.begin()+i);
+  for(size_t i=trans_.size()-1;i<trans_.size();i--)
+    if(norm(trans_[i].c) == 0.0)
+      trans_.erase(trans_.begin()+i);
 }
 
 std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std::vector< std::vector<size_t> > & idents) {

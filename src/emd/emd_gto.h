@@ -26,9 +26,9 @@
 /// Gaussian radial function.
 class RadialGaussian: public RadialFourier {
   /// The contraction
-  std::vector<contr_t> c;
+  std::vector<contr_t> c_;
   /// The value of lambda
-  int lambda;
+  int lambda_;
  public:
   /// Constructor
   RadialGaussian(int lambda, int l);
@@ -41,7 +41,7 @@ class RadialGaussian: public RadialFourier {
   void print() const;
 
   /// Evaluate function at p
-  std::complex<double> get(double p) const;
+  std::complex<double> eval(double p) const;
 };
 
 /// Construct list of equivalent functions
@@ -56,7 +56,7 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas);
 /// EMD in Gaussian basis set
 class GaussianEMDEvaluator : public EMDEvaluator {
   /// The radial functions
-  std::vector< std::vector<RadialGaussian> > radf;
+  std::vector< std::vector<RadialGaussian> > radf_;
 
   /// Update the pointer lists
   void update_pointers();

@@ -58,7 +58,7 @@ class SphericalExpansionMultiplicationTable;
 
 class SphericalExpansion {
   /// Linear combination of spherical harmonics
-  std::vector<ylmcoeff_t> comb;
+  std::vector<ylmcoeff_t> comb_;
 
  public:
   /// Constructor
@@ -85,13 +85,13 @@ class SphericalExpansion {
   void sort();
 
   /// Get amount of terms in the expansion
-  size_t getN() const;
+  size_t N() const;
   /// Get i:th expansion coefficient
-  ylmcoeff_t getcoeff(size_t i) const;
+  ylmcoeff_t coeff(size_t i) const;
   /// Get expansion coefficients
-  std::vector<ylmcoeff_t> getcoeffs() const;
+  std::vector<ylmcoeff_t> coeffs() const;
   /// Get maximum value of l in expansion
-  int getmaxl() const;
+  int maxl() const;
 
   /// Addition operator
   SphericalExpansion operator+(const SphericalExpansion & rhs) const;
@@ -139,9 +139,9 @@ SphericalExpansion operator*(double fac, const SphericalExpansion & func);
 
 class SphericalExpansionMultiplicationTable {
   /// Multiplication table of spherical harmonics
-  std::vector<SphericalExpansion> table;
+  std::vector<SphericalExpansion> table_;
   /// Maximum angular momentum supported
-  int maxam;
+  int maxam_;
  public:
   /// Construct multiplication table that supports spherical harmonics up to maxam
   SphericalExpansionMultiplicationTable(int maxam=max_am);
@@ -158,7 +158,7 @@ class SphericalExpansionMultiplicationTable {
 /// Spherical expansion of px^l py^m pz^n
 class CartesianExpansion {
   // Expansions of shells, table[l+m+n][ind(l,m,n)]
-  std::vector< std::vector<SphericalExpansion> > table;
+  std::vector< std::vector<SphericalExpansion> > table_;
 
   /// Get index of element at (l,m,n)
   size_t ind(int l, int m, int n) const;
@@ -168,7 +168,7 @@ class CartesianExpansion {
   ~CartesianExpansion();
 
   /// Get expansion of px^l py^m pz^n
-  SphericalExpansion get(int l, int m, int n) const;
+  SphericalExpansion expansion(int l, int m, int n) const;
 };
 
 #endif

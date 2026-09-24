@@ -33,7 +33,7 @@
 // Index of (l,m) in table
 #define lmind(l,m) ((l)*(l)+l+m)
 // Location in multiplication table
-#define multloc(l1,m1,l2,m2) (lmind(maxam+1,maxam+1)*lmind(l1,m1)+lmind(l2,m2))
+#define multloc(l1,m1,l2,m2) (lmind(maxam_+1,maxam_+1)*lmind(l1,m1)+lmind(l2,m2))
 
 bool operator<(const ylmcoeff_t & lhs, const ylmcoeff_t & rhs) {
   if(lhs.l<rhs.l)
@@ -55,21 +55,21 @@ SphericalExpansion::~SphericalExpansion() {
 }
 
 void SphericalExpansion::add(const ylmcoeff_t & t) {
-  if(comb.size()==0) {
-    comb.push_back(t);
+  if(comb_.size()==0) {
+    comb_.push_back(t);
   } else {
     // Get upper bound
     std::vector<ylmcoeff_t>::iterator high;
-    high=std::upper_bound(comb.begin(),comb.end(),t);
+    high=std::upper_bound(comb_.begin(),comb_.end(),t);
 
     // Corresponding index is
-    size_t ind=high-comb.begin();
+    size_t ind=high-comb_.begin();
 
-    if(ind>0 && comb[ind-1]==t)
-      comb[ind-1].c+=t.c;
+    if(ind>0 && comb_[ind-1]==t)
+      comb_[ind-1].c+=t.c;
     else {
       // Term does not exist, add it
-      comb.insert(high,t);
+      comb_.insert(high,t);
     }
   }
 }
@@ -95,9 +95,9 @@ void SphericalExpansion::clean() {
     // Default value
     ok=1;
 
-    for(size_t i=0;i<comb.size();i++)
-      if(norm(comb[i].c) == 0.0) { // If there is an element with no weight
-	comb.erase(comb.begin()+i); // Erase the element
+    for(size_t i=0;i<comb_.size();i++)
+      if(norm(comb_[i].c) == 0.0) { // If there is an element with no weight
+	comb_.erase(comb_.begin()+i); // Erase the element
 	ok=0; // Redo while loop
 	break; // Break for loop
       }
@@ -107,7 +107,7 @@ void SphericalExpansion::clean() {
 
 void SphericalExpansion::clear() {
   // Clear out everything
-  comb.clear();
+  comb_.clear();
 }
 
 
@@ -115,11 +115,11 @@ SphericalExpansion SphericalExpansion::conjugate() const {
   // Complex conjugate the expansion
   SphericalExpansion ret=*this;
 
-  for(size_t i=0;i<ret.comb.size();i++) {
+  for(size_t i=0;i<ret.comb_.size();i++) {
     // The expansion coefficient changes to (-1)^m times its complex conjugate
-    ret.comb[i].c=conj(ret.comb[i].c)*pow(-1.0,ret.comb[i].m);
+    ret.comb_[i].c=conj(ret.comb_[i].c)*pow(-1.0,ret.comb_[i].m);
     // and the sign of m changes
-    ret.comb[i].m=-ret.comb[i].m;
+    ret.comb_[i].m=-ret.comb_[i].m;
   }
 
   // Finally, re-sort the list
@@ -130,8 +130,8 @@ SphericalExpansion SphericalExpansion::conjugate() const {
 
 void SphericalExpansion::print() const {
   // Print out the list of combinations
-  for(size_t i=0;i<comb.size();i++) {
-    printf("\t%i\t%i\t(%e, %e)\n",comb[i].l,comb[i].m,comb[i].c.real(),comb[i].c.imag());
+  for(size_t i=0;i<comb_.size();i++) {
+    printf("\t%i\t%i\t(%e, %e)\n",comb_[i].l,comb_[i].m,comb_[i].c.real(),comb_[i].c.imag());
   }
 }
 
@@ -144,73 +144,73 @@ void SphericalExpansion::sort() {
   do {
     ok=1;
 
-    for(size_t i=0;i<comb.size();i++)
+    for(size_t i=0;i<comb_.size();i++)
       for(size_t j=0;j<i;j++)
-	if( (comb[j].l>comb[i].l) || (comb[j].l==comb[i].l && comb[j].m>comb[i].m) ) {
+	if( (comb_[j].l>comb_[i].l) || (comb_[j].l==comb_[i].l && comb_[j].m>comb_[i].m) ) {
 	  ok=0;
-	  temp=comb[j];
-	  comb[j]=comb[i];
-	  comb[i]=temp;
+	  temp=comb_[j];
+	  comb_[j]=comb_[i];
+	  comb_[i]=temp;
 	}
   } while(!ok);
 }
 
 
-size_t SphericalExpansion::getN() const {
-  return comb.size();
+size_t SphericalExpansion::N() const {
+  return comb_.size();
 }
 
-ylmcoeff_t SphericalExpansion::getcoeff(size_t i) const {
-  return comb[i];
+ylmcoeff_t SphericalExpansion::coeff(size_t i) const {
+  return comb_[i];
 }
 
-std::vector<ylmcoeff_t> SphericalExpansion::getcoeffs() const {
-  return comb;
+std::vector<ylmcoeff_t> SphericalExpansion::coeffs() const {
+  return comb_;
 }
 
-int SphericalExpansion::getmaxl() const {
+int SphericalExpansion::maxl() const {
   int maxl=0;
-  for(size_t i=0;i<comb.size();i++)
-    if(comb[i].l>maxl)
-      maxl=comb[i].l;
+  for(size_t i=0;i<comb_.size();i++)
+    if(comb_[i].l>maxl)
+      maxl=comb_[i].l;
   return maxl;
 }
 
 SphericalExpansion SphericalExpansion::operator+(const SphericalExpansion & rhs) const {
   // Addition of two linear combinations of spherical harmonics
   SphericalExpansion ret=*this;
-  for(size_t i=0;i<rhs.comb.size();i++)
-      ret.addylm(rhs.comb[i].l,rhs.comb[i].m,rhs.comb[i].c);
+  for(size_t i=0;i<rhs.comb_.size();i++)
+      ret.addylm(rhs.comb_[i].l,rhs.comb_[i].m,rhs.comb_[i].c);
   return ret;
 }
 
 SphericalExpansion & SphericalExpansion::operator+=(const SphericalExpansion & rhs) {
   // Addition of two linear combinations of spherical harmonics
-  for(size_t i=0;i<rhs.comb.size();i++)
-      addylm(rhs.comb[i].l,rhs.comb[i].m,rhs.comb[i].c);
+  for(size_t i=0;i<rhs.comb_.size();i++)
+      addylm(rhs.comb_[i].l,rhs.comb_[i].m,rhs.comb_[i].c);
   return *this;
 }
 
 SphericalExpansion SphericalExpansion::operator-() const {
   SphericalExpansion ret=*this;
-  for(size_t i=0;i<comb.size();i++)
-    ret.comb[i].c*=-1.0;
+  for(size_t i=0;i<comb_.size();i++)
+    ret.comb_[i].c*=-1.0;
   return ret;
 }
 
 SphericalExpansion SphericalExpansion::operator-(const SphericalExpansion & rhs) const {
   // Substraction of linear combinations of spherical harmonics
   SphericalExpansion ret=*this;
-  for(size_t i=0;i<rhs.comb.size();i++) {
-    ret.addylm(rhs.comb[i].l,rhs.comb[i].m,-rhs.comb[i].c);
+  for(size_t i=0;i<rhs.comb_.size();i++) {
+    ret.addylm(rhs.comb_[i].l,rhs.comb_[i].m,-rhs.comb_[i].c);
   }
   return ret;
 }
 
 SphericalExpansion & SphericalExpansion::operator-=(const SphericalExpansion & rhs) {
   // Substraction of linear combinations of spherical harmonics
-  for(size_t i=0;i<rhs.comb.size();i++) {
-    addylm(rhs.comb[i].l,rhs.comb[i].m,-rhs.comb[i].c);
+  for(size_t i=0;i<rhs.comb_.size();i++) {
+    addylm(rhs.comb_[i].l,rhs.comb_[i].m,-rhs.comb_[i].c);
   }
   return *this;
 }
@@ -221,7 +221,7 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
   // New combination
   SphericalExpansion newcomb;
   // Allocate enough memory
-  newcomb.comb.reserve(comb.size()+rhs.comb.size());
+  newcomb.comb_.reserve(comb_.size()+rhs.comb_.size());
 
   // Maximum and minimum l in combination
   int lmin, lmax;
@@ -231,16 +231,16 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
   std::complex<double> c;
 
   // Loop over combinations
-  for(size_t i=0;i<comb.size();i++)
-    for(size_t j=0;j<rhs.comb.size();j++) {
+  for(size_t i=0;i<comb_.size();i++)
+    for(size_t j=0;j<rhs.comb_.size();j++) {
 
       // Lower and upper limit for l in loop
-      if(comb[i].l>rhs.comb[j].l)
-	lmin=comb[i].l-rhs.comb[j].l;
+      if(comb_[i].l>rhs.comb_[j].l)
+	lmin=comb_[i].l-rhs.comb_[j].l;
       else
-	lmin=rhs.comb[j].l-comb[i].l;
+	lmin=rhs.comb_[j].l-comb_[i].l;
 
-      lmax=comb[i].l+rhs.comb[j].l;
+      lmax=comb_[i].l+rhs.comb_[j].l;
 
 
       // Loop over new angular momentum values
@@ -248,7 +248,7 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 	// Loop over z component values
 	for(int m=-l;m<=l;m++) {
 	  // Calculate new coefficient
-	  c=comb[i].c*rhs.comb[j].c;
+	  c=comb_[i].c*rhs.comb_[j].c;
 
 	  // If coefficient is zero don't do anything
 	  if(norm(c)==0.0)
@@ -257,8 +257,8 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 	  // The product of the (-1)^m phase and the two 3j factors is the
 	  // Gaunt coefficient with the third magnetic argument flipped.
 	  // libwignernj computes ∫ Y_l1^m1 Y_l2^m2 Y_l3^m3 dΩ directly.
-	  dc=pow(-1.0,m)*wignernj::gaunt<double>(2*comb[i].l,2*comb[i].m,
-						 2*rhs.comb[j].l,2*rhs.comb[j].m,
+	  dc=pow(-1.0,m)*wignernj::gaunt<double>(2*comb_[i].l,2*comb_[i].m,
+						 2*rhs.comb_[j].l,2*rhs.comb_[j].m,
 						 2*l,-2*m);
 
 	  // Add it to the list if the scaling factor is not zero
@@ -284,51 +284,51 @@ SphericalExpansion & SphericalExpansion::operator*=(const SphericalExpansion & r
 
 SphericalExpansion & SphericalExpansion::operator*=(std::complex<double> fac) {
   // Scale the combination
-  for(size_t i=0;i<comb.size();i++)
-    comb[i].c*=fac;
+  for(size_t i=0;i<comb_.size();i++)
+    comb_[i].c*=fac;
   return *this;
 }
 
 SphericalExpansion & SphericalExpansion::operator*=(double fac) {
   // Scale the combination
-  for(size_t i=0;i<comb.size();i++)
-    comb[i].c*=fac;
+  for(size_t i=0;i<comb_.size();i++)
+    comb_[i].c*=fac;
   return *this;
 }
 
 SphericalExpansion operator*(std::complex<double> fac, const SphericalExpansion & func) {
   // Scale the combination
   SphericalExpansion ret(func);
-  for(size_t i=0;i<ret.comb.size();i++)
-    ret.comb[i].c*=fac;
+  for(size_t i=0;i<ret.comb_.size();i++)
+    ret.comb_[i].c*=fac;
   return ret;
 }
 
 SphericalExpansion operator*(double fac, const SphericalExpansion & func) {
   // Scale the combination
   SphericalExpansion ret=func;
-  for(size_t i=0;i<ret.comb.size();i++)
-    ret.comb[i].c*=fac;
+  for(size_t i=0;i<ret.comb_.size();i++)
+    ret.comb_[i].c*=fac;
   return ret;
 }
 
 // Multiplication table for spherical harmonics
 SphericalExpansionMultiplicationTable::SphericalExpansionMultiplicationTable(int am) {
-  maxam=am;
-  table.resize(multloc(maxam,maxam,maxam,maxam)+1);
+  maxam_=am;
+  table_.resize(multloc(maxam_,maxam_,maxam_,maxam_)+1);
 
   // Left and right values
-  for(int lleft=0;lleft<=maxam;lleft++)
+  for(int lleft=0;lleft<=maxam_;lleft++)
     for(int mleft=-lleft;mleft<=lleft;mleft++) {
       SphericalExpansion left;
       left.addylm(lleft,mleft,1.0);
 
-      for(int lright=0;lright<=maxam;lright++)
+      for(int lright=0;lright<=maxam_;lright++)
         for(int mright=-lright;mright<=lright;mright++) {
           SphericalExpansion right;
           right.addylm(lright,mright,1.0);
 
-          table[multloc(lleft,mleft,lright,mright)]=left*right;
+          table_[multloc(lleft,mleft,lright,mright)]=left*right;
         }
     }
 }
@@ -337,12 +337,12 @@ SphericalExpansionMultiplicationTable::~SphericalExpansionMultiplicationTable() 
 }
 
 void SphericalExpansionMultiplicationTable::print() const {
-  for(int lleft=0;lleft<=maxam;lleft++)
+  for(int lleft=0;lleft<=maxam_;lleft++)
     for(int mleft=-lleft;mleft<=lleft;mleft++)
-      for(int lright=0;lright<=maxam;lright++)
+      for(int lright=0;lright<=maxam_;lright++)
         for(int mright=-lright;mright<=lright;mright++) {
           printf("The product of (%i,%i) with (%i,%i) is:\n",lleft,mleft,lright,mright);
-          table[multloc(lleft,mleft,lright,mright)].print();
+          table_[multloc(lleft,mleft,lright,mright)].print();
         }
 }
 
@@ -351,17 +351,17 @@ SphericalExpansion SphericalExpansionMultiplicationTable::mult(const SphericalEx
   SphericalExpansion ret;
 
   // Check that table is big enough
-  if(lhs.getmaxl()>maxam || rhs.getmaxl()>maxam) {
+  if(lhs.maxl()>maxam_ || rhs.maxl()>maxam_) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Table not big enough: maxam = " << maxam << " but am_lhs = " << lhs.getmaxl() << " and am_rhs = " << rhs.getmaxl() << "!\n";
+    oss << "Table not big enough: maxam = " << maxam_ << " but am_lhs = " << lhs.maxl() << " and am_rhs = " << rhs.maxl() << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   // Continue with multiplication. Loop over terms:
-  for(size_t i=0;i<lhs.comb.size();i++)
-    for(size_t j=0;j<rhs.comb.size();j++) {
-      ret+=lhs.comb[i].c*rhs.comb[j].c*table[multloc(lhs.comb[i].l,lhs.comb[i].m,rhs.comb[j].l,rhs.comb[j].m)];
+  for(size_t i=0;i<lhs.comb_.size();i++)
+    for(size_t j=0;j<rhs.comb_.size();j++) {
+      ret+=lhs.comb_[i].c*rhs.comb_[j].c*table_[multloc(lhs.comb_[i].l,lhs.comb_[i].m,rhs.comb_[j].l,rhs.comb_[j].m)];
     }
 
   return ret;
@@ -369,10 +369,10 @@ SphericalExpansion SphericalExpansionMultiplicationTable::mult(const SphericalEx
 
 CartesianExpansion::CartesianExpansion(int maxam) {
   // Reserve memory for table
-  table.resize(maxam+1);
+  table_.resize(maxam+1);
   // and for individual results
   for(int am=0;am<=maxam;am++)
-    table[am].resize((am+1)*(am+2)/2);
+    table_[am].resize((am+1)*(am+2)/2);
 
   // Compute spherical harmonics expansions of px^l, py^m and pz^n
   std::vector<SphericalExpansion> px, py, pz;
@@ -422,7 +422,7 @@ CartesianExpansion::CartesianExpansion(int maxam) {
 	int m = ii-jj;
 	int n = jj;
 
-	table[am][idx++]=px[l]*py[m]*pz[n];
+	table_[am][idx++]=px[l]*py[m]*pz[n];
       }
     }
   }
@@ -431,13 +431,13 @@ CartesianExpansion::CartesianExpansion(int maxam) {
 CartesianExpansion::~CartesianExpansion() {
 }
 
-SphericalExpansion CartesianExpansion::get(int l, int m, int n) const {
-  if(l+m+n >= (int) table.size()) {
+SphericalExpansion CartesianExpansion::expansion(int l, int m, int n) const {
+  if(l+m+n >= (int) table_.size()) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Cartesian expansion table not big enough: maxam = " << (int) table.size()-1 << " am = " << l+m+n << " requested!\n";
+    oss << "Cartesian expansion table not big enough: maxam = " << (int) table_.size()-1 << " am = " << l+m+n << " requested!\n";
     throw std::runtime_error(oss.str());
   }
 
-  return table[l+m+n][getind(l,m,n)];
+  return table_[l+m+n][getind(l,m,n)];
 }

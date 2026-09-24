@@ -156,9 +156,9 @@ std::vector< std::vector<ylmcoeff_t> > form_clm() {
   // Loop over functions
   for(size_t i=0;i<kx.size();i++) {
     // Get the transform
-    SphericalExpansion expn=cart.get(kx[i],ky[i],kz[i]);
+    SphericalExpansion expn=cart.expansion(kx[i],ky[i],kz[i]);
     // Get coefficients
-    std::vector<ylmcoeff_t> c=expn.getcoeffs();
+    std::vector<ylmcoeff_t> c=expn.coeffs();
     // and normalize them
     double n=0.0;
     for(size_t ic=0;ic<c.size();ic++)

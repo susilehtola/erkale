@@ -19,55 +19,55 @@
 #include <algorithm>
 
 RadialGaussian::RadialGaussian(int lambdav, int lv) : RadialFourier(lv) {
-  lambda=lambdav;
+  lambda_=lambdav;
 }
 
 RadialGaussian::~RadialGaussian() {
 }
 
 void RadialGaussian::add_term(const contr_t & t) {
-  if(c.size()==0) {
-    c.push_back(t);
+  if(c_.size()==0) {
+    c_.push_back(t);
   } else {
     // Get upper bound
     std::vector<contr_t>::iterator high;
-    high=std::upper_bound(c.begin(),c.end(),t);
+    high=std::upper_bound(c_.begin(),c_.end(),t);
 
     // Corresponding index is
-    size_t ind=high-c.begin();
+    size_t ind=high-c_.begin();
 
-    if(ind>0 && c[ind-1].z==t.z)
+    if(ind>0 && c_[ind-1].z==t.z)
       // Found it.
-      c[ind-1].c+=t.c;
+      c_[ind-1].c+=t.c;
     else {
       // Term does not exist, add it
-      c.insert(high,t);
+      c_.insert(high,t);
     }
   }
 }
 
 void RadialGaussian::print() const {
-  printf("l=%i, lambda=%i:",l,lambda);
-  for(size_t i=0;i<c.size();i++)
-    printf(" %+e (%e)\n",c[i].c,c[i].z);
+  printf("l=%i, lambda=%i:",l_,lambda_);
+  for(size_t i=0;i<c_.size();i++)
+    printf(" %+e (%e)\n",c_[i].c,c_[i].z);
 }
 
-std::complex<double> RadialGaussian::get(double p) const {
+std::complex<double> RadialGaussian::eval(double p) const {
   std::complex<double> ret=0.0;
 
-  if(lambda==l) {
+  if(lambda_==l_) {
     // Pure spherical harmonics.
-    for(size_t i=0;i<c.size();i++)
-      ret+=c[i].c*exp(-p*p/(4.0*c[i].z));
+    for(size_t i=0;i<c_.size();i++)
+      ret+=c_[i].c*exp(-p*p/(4.0*c_[i].z));
   } else {
     // Mixed set.
-    for(size_t i=0;i<c.size();i++)
-      ret+=c[i].c*hyperg_1F1((l+lambda)/2.0+1.5,l+1.5,-p*p/(4.0*c[i].z));
+    for(size_t i=0;i<c_.size();i++)
+      ret+=c_[i].c*hyperg_1F1((l_+lambda_)/2.0+1.5,l_+1.5,-p*p/(4.0*c_[i].z));
 
-    ret*=pow(sqrt(2.0),lambda-l)*doublefact(l+lambda+1)/doublefact(2*l+1);
+    ret*=pow(sqrt(2.0),lambda_-l_)*doublefact(l_+lambda_+1)/doublefact(2*l_+1);
   }
 
-  ret*=pow(std::complex<double>(0.0,-p),l)*pow(M_2_PI,1.0/4.0)/sqrt(doublefact(2*lambda+1));
+  ret*=pow(std::complex<double>(0.0,-p),l_)*pow(M_2_PI,1.0/4.0)/sqrt(doublefact(2*lambda_+1));
 
   return ret;
 }
@@ -180,10 +180,10 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
 	  int nz = j;
 
 	  // Get transform
-	  SphericalExpansion expn=cart.get(nx,ny,nz);
+	  SphericalExpansion expn=cart.expansion(nx,ny,nz);
 
 	  // Get coefficients
-	  std::vector<ylmcoeff_t> c=expn.getcoeffs();
+	  std::vector<ylmcoeff_t> c=expn.coeffs();
 	  // and normalize them
 	  double n=0.0;
 	  for(size_t ic=0;ic<c.size();ic++)
@@ -307,7 +307,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_
   }
 
   // Form radial functions
-  radf=form_radial(bas);
+  radf_=form_radial(bas);
 
   // Form identical functions
   std::vector< std::vector<size_t> > idf=find_identical_functions(bas);
@@ -338,7 +338,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_
     printf("%3i % f % f % f\n",(int) i+1, coord[i].x, coord[i].y, coord[i].z);
   */
 
-  *this=GaussianEMDEvaluator(radf,idf,clm,locv,coord,Pv,lp,mp);
+  *this=GaussianEMDEvaluator(radf_,idf,clm,locv,coord,Pv,lp,mp);
 
   // Check norm of radial functions
   //  check_norm();
@@ -346,7 +346,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_
 
 GaussianEMDEvaluator::GaussianEMDEvaluator(const std::vector< std::vector<RadialGaussian> > & radfv, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv, int lp, int mp) : EMDEvaluator(idfuncsv,clm,locv,coord,Pv,lp,mp) {
   // Set the radial functions
-  radf=radfv;
+  radf_=radfv;
   // and assign the necessary pointers
   update_pointers();
 }
@@ -359,7 +359,7 @@ GaussianEMDEvaluator & GaussianEMDEvaluator::operator=(const GaussianEMDEvaluato
   // Assign superclass part
   EMDEvaluator::operator=(rhs);
   // Copy radial functions
-  radf=rhs.radf;
+  radf_=rhs.radf_;
   // Update the pointers
   update_pointers();
 
@@ -367,10 +367,10 @@ GaussianEMDEvaluator & GaussianEMDEvaluator::operator=(const GaussianEMDEvaluato
 }
 
 void GaussianEMDEvaluator::update_pointers() {
-  rad.resize(radf.size());
-  for(size_t i=0;i<radf.size();i++) {
-    rad[i].resize(radf[i].size());
-    for(size_t j=0;j<radf[i].size();j++)
-      rad[i][j]=&radf[i][j];
+  rad_.resize(radf_.size());
+  for(size_t i=0;i<radf_.size();i++) {
+    rad_[i].resize(radf_[i].size());
+    for(size_t j=0;j<radf_[i].size();j++)
+      rad_[i][j]=&radf_[i][j];
   }
 }

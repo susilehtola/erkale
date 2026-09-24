@@ -41,7 +41,7 @@
 class RadialFourier {
  protected:
   /// l value
-  int l;
+  int l_;
 
  public:
   /// Constructor
@@ -50,7 +50,7 @@ class RadialFourier {
   virtual ~RadialFourier();
 
   /// Get l value
-  int getl() const;
+  int l() const;
   // Print expansion
   virtual void print() const = 0;
 
@@ -58,7 +58,7 @@ class RadialFourier {
    * Calculate radial function at p. Must be overridden in the class
    * that implements the function.
    */
-  virtual std::complex<double> get(double p) const = 0;
+  virtual std::complex<double> eval(double p) const = 0;
 };
 
 /// Coupling coefficient
@@ -124,25 +124,25 @@ class EMDEvaluator {
    * Lists of identical functions (same radial and angular parts),
    * only difference comes from phase factor (different origins)
    */
-  std::vector< std::vector<size_t> > idfuncs;
+  std::vector< std::vector<size_t> > idfuncs_;
   /// The coupling coefficients of the nonequivalent functions
-  std::vector< std::vector<coupl_coeff_t> > cc;
+  std::vector< std::vector<coupl_coeff_t> > cc_;
 
   /// The locations of the functions on the atoms (Nbas)
-  std::vector<size_t> loc;
+  std::vector<size_t> loc_;
 
   /// The number of centers
-  size_t Nat;
+  size_t Nat_;
   /// The distances between the functions' origins (Nat x Nat)
-  std::vector<double> dist;
+  std::vector<double> dist_;
   /// Spherical harmonics values, complex conjugated [Nat x Nat] [(L,M)]
-  std::vector< std::vector< std::complex<double> > > YLM;
+  std::vector< std::vector< std::complex<double> > > YLM_;
 
   /// The density matrix
-  arma::cx_mat P;
+  arma::cx_mat P_;
 
   /// Maximum value of L
-  int Lmax;
+  int Lmax_;
 
   /// Computes the distance table
   void distance_table(const std::vector<coords_t> & coord);
@@ -154,13 +154,13 @@ class EMDEvaluator {
   void add_coupling(size_t ig, size_t jg, coupl_coeff_t c);
 
   /// Get the coupling constants for L=|l-lp|, ..., l+lp.
-  void get_coupling(size_t ig, size_t jg, int l, int lp, std::vector<total_coupl_t> & c) const;
+  void coupling(size_t ig, size_t jg, int l, int lp, std::vector<total_coupl_t> & c) const;
 
   /// Computes the ig:th radial function
-  std::vector<radf_val_t> get_radial(size_t ig, double p) const;
+  std::vector<radf_val_t> radial(size_t ig, double p) const;
 
   /// Get the total coupling (incl. radial function)
-  void get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & c, std::vector<total_coupl_t> & tmp) const;
+  void total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & c, std::vector<total_coupl_t> & tmp) const;
 
  protected:
   /**
@@ -170,7 +170,7 @@ class EMDEvaluator {
    *
    * This array needs to be constructed in a basis-set specific subclass.
    */
-  std::vector< std::vector<RadialFourier *> > rad;
+  std::vector< std::vector<RadialFourier *> > rad_;
 
  public:
   /// Dummy constructor
@@ -201,7 +201,7 @@ class EMDEvaluator {
   void check_norm() const;
 
   /// Evaluate radial EMD at p
-  std::complex<double> get(double p) const;
+  std::complex<double> eval(double p) const;
 };
 
 /// Evaluate Bessel functions j_l(pr_i), return j(pr_i,l)
@@ -236,28 +236,28 @@ typedef struct {
 
 class EMD {
   /// List of radial densities
-  std::vector<emd_t> dens;
+  std::vector<emd_t> dens_;
   /// Add 4 points at ind
   void add4(size_t ind);
 
   /// l value
-  int l;
+  int l_;
   /// m value
-  int m;
+  int m_;
 
  protected:
   /// Number of electrons
-  double Nel;
+  double Nel_;
 
   /// Positive evaluator
-  const EMDEvaluator * poseval;
+  const EMDEvaluator * poseval_;
   /// Coefficient
-  std::complex<double> poscoef;
+  std::complex<double> poscoef_;
 
   /// Negative evaluator
-  const EMDEvaluator * negeval;
+  const EMDEvaluator * negeval_;
   /// Coefficient
-  std::complex<double> negcoef;
+  std::complex<double> negcoef_;
 
  public:
   /// Constructor.
@@ -292,7 +292,7 @@ class EMD {
   void fixed_fill(bool verbose=true, double h0=1e-3, double l0=3.0, double hfac=2.0, double lfac=2.0);
 
   /// Get EMD
-  std::vector<emd_t> get() const;
+  std::vector<emd_t> dens() const;
 
   /// Save values of momentum density
   void save(const std::string & fname) const;

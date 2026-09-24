@@ -27,11 +27,11 @@
 /// Slater-type radial function
 class RadialSlater: public RadialFourier {
   /// n value
-  int n;
+  int n_;
   /// l value is already in RadialFourier
 
   /// Exponent
-  double zeta;
+  double zeta_;
 
  public:
   /// Constructor
@@ -43,18 +43,18 @@ class RadialSlater: public RadialFourier {
   void print() const;
 
   /// Get n value
-  int getn() const;
+  int n() const;
   /// Get zeta
-  double getzeta() const;
+  double zeta() const;
 
   /// Evaluate function at p
-  std::complex<double> get(double p) const;
+  std::complex<double> eval(double p) const;
 };
 
 /// EMD in Slater basis set
 class SlaterEMDEvaluator : public EMDEvaluator {
   /// The radial functions
-  std::vector< std::vector<RadialSlater> > radf;
+  std::vector< std::vector<RadialSlater> > radf_;
 
   /// Update the pointer lists
   void update_pointers();
