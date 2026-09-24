@@ -368,6 +368,7 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
   arma::mat Cfull;
   std::vector<double> occ, energy;
   std::vector<int32_t> spin;
+  bool hasocc=false;
 
   try {
     int32_t nnuc=0, nsh=0, nprim=0, nao=0, nmo=0;
@@ -400,20 +401,29 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
 
     // basis -> shells
     std::vector<int32_t> nuc_index(nsh), shell_am(nsh), shell_index(nprim);
-    std::vector<double>  exponent(nprim), coefficient(nprim);
+    std::vector<double>  exponent(nprim), coefficient(nprim), prim_factor(nprim);
     TX(trexio_read_basis_nucleus_index(tf, nuc_index.data()));
     TX(trexio_read_basis_shell_ang_mom(tf, shell_am.data()));
     TX(trexio_read_basis_shell_index(tf, shell_index.data()));
     TX(trexio_read_basis_exponent(tf, exponent.data()));
     TX(trexio_read_basis_coefficient(tf, coefficient.data()));
+    TX(trexio_read_basis_prim_factor(tf, prim_factor.data()));
     for(int32_t ish=0; ish<nsh; ish++) {
+      // TREXIO scales the bare primitive exp(-z r^2) by prim_factor, so
+      // coefficient*prim_factor is the coefficient of the bare primitive,
+      // which is what ERKALE stores; finalize then normalizes the
+      // contraction (the overall shell scale does not matter).
       std::vector<contr_t> c;
       for(int32_t p=0; p<nprim; p++)
         if(shell_index[p]==ish) {
-          contr_t t; t.z=exponent[p]; t.c=coefficient[p]; c.push_back(t);
+          contr_t t; t.z=exponent[p]; t.c=coefficient[p]*prim_factor[p]; c.push_back(t);
         }
-      basis.add_shell(nuc_index[ish], shell_am[ish], true, c, false);
+      // ERKALE's OptLM default: s and p cartesian, d and higher
+      // spherical, so the AO order matches a native ERKALE run.
+      basis.add_shell(nuc_index[ish], shell_am[ish], shell_am[ish]>=2, c, false);
     }
+    // Contraction-slowest segments on the same center with the same
+    // exponents are regrouped into generally contracted shells here.
     basis.finalize();
 
     // MOs: undo the AO permutation (TREXIO order -> ERKALE order).
@@ -421,7 +431,8 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
     std::vector<double> moc(Nmo*Nbf);
     TX(trexio_read_mo_coefficient(tf, moc.data()));
     occ.resize(Nmo); energy.resize(Nmo); spin.assign(Nmo,0);
-    if(trexio_has_mo_occupation(tf)==TREXIO_SUCCESS) trexio_read_mo_occupation(tf, occ.data());
+    hasocc = (trexio_has_mo_occupation(tf)==TREXIO_SUCCESS);
+    if(hasocc) trexio_read_mo_occupation(tf, occ.data());
     if(trexio_has_mo_energy(tf)==TREXIO_SUCCESS)      trexio_read_mo_energy(tf, energy.data());
     if(trexio_has_mo_spin(tf)==TREXIO_SUCCESS)        trexio_read_mo_spin(tf, spin.data());
     Cfull.set_size(Nbf, Nmo);
@@ -444,19 +455,39 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
   chk.write("Nel-a", up);
   chk.write("Nel-b", dn);
   chk.write("Nel", (int)(up+dn));
-  auto col = [&](const std::vector<size_t> & idx) {
-    arma::mat C(Cfull.n_rows, idx.size());
-    arma::vec E(idx.size());
-    for(size_t k=0;k<idx.size();k++){ C.col(k)=Cfull.col(idx[k]); E(k)=energy[idx[k]]; }
-    return std::make_pair(C,E);
+  // Orbitals, energies and occupations of one spin block. Without
+  // mo_occupation in the file, occupy the lowest orbitals (aufbau; in a
+  // restricted file the first dn orbitals doubly, the next up-dn singly).
+  struct block_t { arma::mat C; arma::vec E, occ; };
+  auto col = [&](const std::vector<size_t> & idx, int nel, int nel2) {
+    block_t b;
+    b.C.set_size(Cfull.n_rows, idx.size());
+    b.E.set_size(idx.size());
+    b.occ.set_size(idx.size());
+    for(size_t k=0;k<idx.size();k++) {
+      b.C.col(k)=Cfull.col(idx[k]);
+      b.E(k)=energy[idx[k]];
+      if(hasocc)
+        b.occ(k)=occ[idx[k]];
+      else
+        b.occ(k)=((int) k<nel2 ? 1.0 : 0.0) + ((int) k<nel ? 1.0 : 0.0);
+    }
+    return b;
+  };
+  // Density matrix of a spin block
+  auto density = [](const block_t & b) -> arma::mat {
+    return b.C*arma::diagmat(b.occ)*b.C.t();
   };
   if(restr) {
-    auto ce=col(ia);
-    chk.write("C", ce.first); chk.write("E", ce.second);
+    const block_t r=col(ia, up, dn);
+    chk.write("C", r.C); chk.write("E", r.E);
+    chk.write("P", density(r));
   } else {
-    auto a=col(ia), b=col(ib);
-    chk.write("Ca", a.first); chk.write("Ea", a.second);
-    chk.write("Cb", b.first); chk.write("Eb", b.second);
+    const block_t a=col(ia, up, 0), b=col(ib, dn, 0);
+    chk.write("Ca", a.C); chk.write("Ea", a.E);
+    chk.write("Cb", b.C); chk.write("Eb", b.E);
+    const arma::mat Pa=density(a), Pb=density(b);
+    chk.write("Pa", Pa); chk.write("Pb", Pb); chk.write("P", Pa+Pb);
   }
   chk.write("Restricted", restr);
 
