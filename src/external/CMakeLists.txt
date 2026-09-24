@@ -39,9 +39,12 @@ elseif(ERKALE_FETCH_TREXIO)
   include(FetchContent)
   # Build only the C library: no TREXIO tests in the subbuild.
   set(TREXIO_TESTS OFF CACHE BOOL "" FORCE)
+  # Use the release tarball: it ships the generated C sources, whereas a
+  # git checkout carries a .devel marker that makes TREXIO regenerate
+  # them from org-mode files and so require emacs.
   FetchContent_Declare(trexio
-    GIT_REPOSITORY https://github.com/trex-coe/trexio.git
-    GIT_TAG        v2.6.1)
+    URL      https://github.com/TREX-CoE/trexio/releases/download/v2.6.1/trexio-2.6.1.tar.gz
+    URL_HASH SHA256=c3694ec1528632a386a2af89199c75d70ecd45bfcc2ca1d4ccccbfa1308ad5fa)
   FetchContent_MakeAvailable(trexio)
   set(ERKALE_BUILD_TREXIO ON)
   add_library(erkale_trexio_lib INTERFACE)
