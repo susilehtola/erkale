@@ -129,16 +129,16 @@ enum chgmet {
 /// Boys localization
 class Boys : public UnitaryFunction {
   /// Penalty
-  int n;
+  int n_;
 
   /// R^2 matrix
-  arma::mat rsq;
+  arma::mat rsq_;
   /// r_x matrix
-  arma::mat rx;
+  arma::mat rx_;
   /// r_y matrix
-  arma::mat ry;
+  arma::mat ry_;
   /// r_z matrix
-  arma::mat rz;
+  arma::mat rz_;
 
  public:
   /// Constructor. n gives the penalty power to use
@@ -162,18 +162,18 @@ class Boys : public UnitaryFunction {
 /// Fourth moment localization
 class FMLoc : public UnitaryFunction {
   /// Penalty
-  int n;
+  int n_;
 
   /// r^4 contributions
-  arma::mat rfour;
+  arma::mat rfour_;
   /// rr^2 matrices
-  std::vector<arma::mat> rrsq;
+  std::vector<arma::mat> rrsq_;
   /// rr matrices
-  std::vector< std::vector<arma::mat> > rr;
+  std::vector< std::vector<arma::mat> > rr_;
   /// and the r^2 matrix
-  arma::mat rsq;
+  arma::mat rsq_;
   /// r matrices
-  std::vector<arma::mat> rmat;
+  std::vector<arma::mat> rmat_;
 
  public:
   /// Constructor. n gives the penalty power to use
@@ -207,16 +207,16 @@ class Pipek : public UnitaryFunction {
   // the memory requirement is only Nocc^2
 
   /// Method
-  enum chgmet chg;
+  enum chgmet chg_;
 
   /// Number of centers
-  size_t N;
+  size_t N_;
 
   /// Penalty exponent, p=2 for conventional Pipek-Mezey
-  double p;
+  double p_;
 
   /// Get the charge matrix for the i:th region
-  arma::mat get_charge(size_t i);
+  arma::mat load_charge(size_t i);
 
  public:
   /// Constructor
@@ -241,12 +241,12 @@ class Pipek : public UnitaryFunction {
 class Edmiston : public UnitaryFunction {
   /// Coulomb-builder: holds either real DF (aux basis) or CD vectors
   /// (cholesky_mode) -- both expose the same calcJ interface.
-  DensityFit dfit;
+  DensityFit dfit_;
 
   /// Orbitals
-  arma::mat C;
+  arma::mat C_;
   /// Orbital Coulomb matrices
-  std::vector<arma::mat> Jorb;
+  std::vector<arma::mat> Jorb_;
 
  public:
   /// Constructor: density fitting
@@ -258,7 +258,7 @@ class Edmiston : public UnitaryFunction {
   /// Copy
   Edmiston * copy() const;
   /// Set transformation matrix
-  void setW(const arma::cx_mat & W);
+  void update_W(const arma::cx_mat & W);
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
