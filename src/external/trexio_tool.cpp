@@ -22,7 +22,7 @@
 #include <string>
 
 #ifdef SVNRELEASE
-#include "../version.h"
+#include "version.h"
 #endif
 
 /// Global settings object referenced by liberkale (e.g. basis.cpp).
@@ -47,9 +47,6 @@ int main_guarded(int argc, char ** argv) {
     help();
     return 1;
   }
-
-  // basis.overlap() in the export self-check needs libint.
-  init_libint_base();
 
   const std::string mode = argv[1];
   const std::string in   = argv[2];
