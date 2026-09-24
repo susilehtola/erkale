@@ -62,13 +62,13 @@ enum unitacc {
 class UnitaryFunction {
  protected:
   /// Present matrix
-  arma::cx_mat W;
+  arma::cx_mat W_;
   /// Present value
-  double f;
+  double f_;
   /// Order in W
-  int q;
+  int q_;
   /// Maximization or minimization?
-  int sign;
+  int sign_;
 
  public:
   /// Constructor
@@ -77,16 +77,16 @@ class UnitaryFunction {
   virtual ~UnitaryFunction();
 
   /// Set matrix
-  virtual void setW(const arma::cx_mat & W);
+  virtual void update_W(const arma::cx_mat & W);
   /// Get matrix
-  arma::cx_mat getW() const;
+  arma::cx_mat W() const;
 
   /// Get q
-  int getq() const;
+  int q() const;
   /// Get function value
-  double getf() const;
+  double cost() const;
   /// Get sign
-  int getsign() const;
+  int sign() const;
 
   /// Copy constructor
   virtual UnitaryFunction *copy() const=0;
@@ -109,40 +109,40 @@ class UnitaryFunction {
 class UnitaryOptimizer {
  private:
   /// Gradient
-  arma::cx_mat G;
+  arma::cx_mat G_;
   /// Search direction
-  arma::cx_mat H;
+  arma::cx_mat H_;
   /// Eigenvectors of search direction
-  arma::cx_mat Hvec;
+  arma::cx_mat Hvec_;
   /// Eigenvalues of search direction
-  arma::vec Hval;
+  arma::vec Hval_;
   /// Maximum step size
-  double Tmu;
+  double Tmu_;
 
  protected:
   /// Verbose operation?
-  bool verbose;
+  bool verbose_;
   /// Operate with real or complex matrices?
-  bool real;
+  bool real_;
 
   /// Convergence threshold wrt norm of Riemannian derivative
-  double Gthr;
+  double Gthr_;
   /// Convergence threshold wrt relative change in function
-  double Fthr;
+  double Fthr_;
 
   /// Degree of polynomial used for fit: a_0 + a_1*mu + ... + a_(d-1)*mu^(d-1)
-  int polynomial_degree;
+  int polynomial_degree_;
 
   /// Amount of quasi-periods for Fourier method (N_T = 1, 2, ...)
-  int fourier_periods;
+  int fourier_periods_;
   /// Amount of samples per one period (K = 3, 4, or 5)
-  int fourier_samples;
+  int fourier_samples_;
 
   /// Debugging mode - print out line search every iteration
-  bool debug;
+  bool debug_;
 
   /// Log file
-  FILE *log;
+  FILE *log_;
 
   /// Print legend
   virtual void print_legend(const UnitaryFunction *f) const;
@@ -164,12 +164,9 @@ class UnitaryOptimizer {
   void update_search_direction(int q);
 
   /// Get rotation matrix with wanted step size
-  arma::cx_mat get_rotation(double step) const;
+  arma::cx_mat make_rotation(double step) const;
   /// Get derivative wrt step length
   double step_der(const arma::cx_mat & W, const arma::cx_mat & der) const;
-
-  /// Set degree
-  void set_q(int q);
 
   /// Armijo step
   void armijo_step(UnitaryFunction* & f);
@@ -189,10 +186,10 @@ class UnitaryOptimizer {
   /// Open log file
   void open_log(const std::string & fname);
   /// Set debug mode
-  void set_debug(bool dbg);
+  void debug(bool dbg);
 
   /// Set polynomial search options
-  void set_poly(int deg);
+  void polynomial_degree(int deg);
   /// Set Fourier search options
   void set_fourier(int Nsamples, int Nperiods);
   /// Set convergence threshold
@@ -230,9 +227,9 @@ double smallest_positive(const arma::vec & v);
 /// Brockett
 class Brockett : public UnitaryFunction {
   /// Sigma matrix
-  arma::cx_mat sigma;
+  arma::cx_mat sigma_;
   /// N matrix
-  arma::mat Nmat;
+  arma::mat Nmat_;
 
   /// Print legend
   std::string legend() const;

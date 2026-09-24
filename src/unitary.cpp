@@ -28,32 +28,32 @@
 #include <omp.h>
 #endif
 
-UnitaryFunction::UnitaryFunction(int qv, bool max): W(arma::cx_mat()), f(0.0), q(qv) {
+UnitaryFunction::UnitaryFunction(int qv, bool max): W_(arma::cx_mat()), f_(0.0), q_(qv) {
   /// Maximize or minimize?
-  sign = max ? 1 : -1;
+  sign_ = max ? 1 : -1;
 }
 
 UnitaryFunction::~UnitaryFunction() {
 }
 
-void UnitaryFunction::setW(const arma::cx_mat & Wv) {
-  W=Wv;
+void UnitaryFunction::update_W(const arma::cx_mat & Wv) {
+  W_=Wv;
 }
 
-arma::cx_mat UnitaryFunction::getW() const {
-  return W;
+arma::cx_mat UnitaryFunction::W() const {
+  return W_;
 }
 
-int UnitaryFunction::getq() const {
-  return q;
+int UnitaryFunction::q() const {
+  return q_;
 }
 
-double UnitaryFunction::getf() const {
-  return f;
+double UnitaryFunction::cost() const {
+  return f_;
 }
 
-int UnitaryFunction::getsign() const {
-  return sign;
+int UnitaryFunction::sign() const {
+  return sign_;
 }
 
 bool UnitaryFunction::converged() {
@@ -72,72 +72,72 @@ std::string UnitaryFunction::status(bool lfmt) {
   return "";
 }
 
-UnitaryOptimizer::UnitaryOptimizer(double Gthrv, double Fthrv, bool ver, bool realv) : G(arma::cx_mat()), H(arma::cx_mat()), Hvec(arma::cx_mat()), Hval(arma::vec()), Tmu(0.0), verbose(ver), real(realv), Gthr(Gthrv), Fthr(Fthrv) {
+UnitaryOptimizer::UnitaryOptimizer(double Gthrv, double Fthrv, bool ver, bool realv) : G_(arma::cx_mat()), H_(arma::cx_mat()), Hvec_(arma::cx_mat()), Hval_(arma::vec()), Tmu_(0.0), verbose_(ver), real_(realv), Gthr_(Gthrv), Fthr_(Fthrv) {
 
   // Defaults
   // use 3rd degree polynomial to fit derivative
-  polynomial_degree=4;
+  polynomial_degree_=4;
   // and in the fourier transform use
-  fourier_periods=5; // five quasi-periods
-  fourier_samples=3; // three points per period
+  fourier_periods_=5; // five quasi-periods
+  fourier_samples_=3; // three points per period
 
-  debug=false;
+  debug_=false;
 
   // Logfile is closed
-  log=NULL;
+  log_=NULL;
 }
 
 UnitaryOptimizer::~UnitaryOptimizer() {
-  if(log!=NULL)
-    fclose(log);
+  if(log_!=NULL)
+    fclose(log_);
 }
 
-void UnitaryOptimizer::set_debug(bool d) {
-  debug=d;
+void UnitaryOptimizer::debug(bool d) {
+  debug_=d;
 }
 
 void UnitaryOptimizer::set_thr(double Geps, double Feps) {
-  Gthr=Geps;
-  Fthr=Feps;
+  Gthr_=Geps;
+  Fthr_=Feps;
 }
 
 void UnitaryOptimizer::open_log(const std::string & fname) {
-  if(log!=NULL)
-    fclose(log);
+  if(log_!=NULL)
+    fclose(log_);
 
   if(fname.length()) {
-    log=fopen(fname.c_str(),"w");
+    log_=fopen(fname.c_str(),"w");
 #ifdef _OPENMP
-    fprintf(log,"ERKALE - Localization from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+    fprintf(log_,"ERKALE - Localization from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
     fprintf(log,"ERKALE - Localization from Hel, serial version.\n");
 #endif
-    fprint_copyright(log);
-    fprint_license(log);
+    fprint_copyright(log_);
+    fprint_license(log_);
 #ifdef SVNRELEASE
-    fprintf(log,"At svn revision %s.\n\n",SVNREVISION);
+    fprintf(log_,"At svn revision %s.\n\n",SVNREVISION);
 #endif
-    fprint_hostname(log);
+    fprint_hostname(log_);
   }
 }
 
-arma::cx_mat UnitaryOptimizer::get_rotation(double step) const {
+arma::cx_mat UnitaryOptimizer::make_rotation(double step) const {
   // Rotation matrix is
-  arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(step*COMPLEXI*Hval))*arma::trans(Hvec);
-  if(real)
+  arma::cx_mat rot=Hvec_*arma::diagmat(arma::exp(step*COMPLEXI*Hval_))*arma::trans(Hvec_);
+  if(real_)
     // Zero out possible imaginary part
     rot=arma::real(rot)*COMPLEX1;
 
   return rot;
 }
 
-void UnitaryOptimizer::set_poly(int deg) {
-  polynomial_degree=deg;
+void UnitaryOptimizer::polynomial_degree(int deg) {
+  polynomial_degree_=deg;
 }
 
 void UnitaryOptimizer::set_fourier(int samples, int pers) {
-  fourier_periods=pers;
-  fourier_samples=samples;
+  fourier_periods_=pers;
+  fourier_samples_=samples;
 }
 
 void UnitaryOptimizer::update_gradient(const arma::cx_mat & W, UnitaryFunction *f) {
@@ -149,35 +149,35 @@ void UnitaryOptimizer::update_gradient(const arma::cx_mat & W, UnitaryFunction *
   //  Gammak*=f->getsign();
 
   // Riemannian gradient, Abrudan 2009 table 3 step 2
-  G=Gammak*arma::trans(W) - W*arma::trans(Gammak);
+  G_=Gammak*arma::trans(W) - W*arma::trans(Gammak);
 }
 
 void UnitaryOptimizer::update_search_direction(int q) {
   // Diagonalize -iH to find eigenvalues purely imaginary
   // eigenvalues iw_i of H; Abrudan 2009 table 3 step 1.
-  bool diagok=arma::eig_sym(Hval,Hvec,-COMPLEXI*H);
+  bool diagok=arma::eig_sym(Hval_,Hvec_,-COMPLEXI*H_);
   if(!diagok) {
     ERROR_INFO();
     throw std::runtime_error("Unitary optimization: error diagonalizing H.\n");
   }
 
   // Max step length
-  double wmax=arma::max(arma::abs(Hval));
-  Tmu=2.0*M_PI/(q*wmax);
+  double wmax=arma::max(arma::abs(Hval_));
+  Tmu_=2.0*M_PI/(q*wmax);
 }
 
 double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enum unitacc acc, size_t maxiter) {
   // Get the matrix
-  arma::cx_mat W=f->getW();
-  if(real)
+  arma::cx_mat W=f->W();
+  if(real_)
     W=arma::real(W)*COMPLEX1;
 
   // Current and old gradient
   arma::cx_mat oldG;
-  G.zeros(W.n_cols,W.n_cols);
+  G_.zeros(W.n_cols,W.n_cols);
   // Current and old search direction
   arma::cx_mat oldH;
-  H.zeros(W.n_cols,W.n_cols);
+  H_.zeros(W.n_cols,W.n_cols);
 
   if(W.n_cols<2) {
     // No optimization is necessary.
@@ -197,7 +197,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
   size_t k=0;
 
   // Print out the legend
-  if(verbose)
+  if(verbose_)
     print_legend(f);
 
   if(maxiter>0)
@@ -205,8 +205,8 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       Timer t;
 
       // Store old gradient and search direction
-      oldG=G;
-      oldH=H;
+      oldG=G_;
+      oldH=H_;
 
       // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
       update_gradient(W,f);
@@ -218,34 +218,34 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
 	gamma=0.0;
       } else if(acc==CGPR) {
 	// Compute Polak-Ribière coefficient
-	gamma=bracket(G - oldG, G) / bracket(oldG, oldG);
+	gamma=bracket(G_ - oldG, G_) / bracket(oldG, oldG);
       } else if(acc==CGFR) {
 	// Fletcher-Reeves
-	gamma=bracket(G, G) / bracket(oldG, oldG);
+	gamma=bracket(G_, G_) / bracket(oldG, oldG);
       } else if(acc==CGHS) {
 	// Hestenes-Stiefel
-	gamma=bracket(G - oldG, G) / bracket(G - oldG, oldH);
+	gamma=bracket(G_ - oldG, G_) / bracket(G_ - oldG, oldH);
       } else
 	throw std::runtime_error("Unsupported update.\n");
 
       // Perform update
       if(gamma==0.0) {
 	// Use gradient direction
-	H=G;
+	H_=G_;
       } else {
 	// Compute update
-	H=G+gamma*H;
+	H_=G_+gamma*H_;
 	// Make sure H stays skew symmetric
-	H=0.5*(H-arma::trans(H));
+	H_=0.5*(H_-arma::trans(H_));
 
 	// Check that update is OK
-	if(bracket(G,H)<0.0) {
-	  H=G;
+	if(bracket(G_,H_)<0.0) {
+	  H_=G_;
 	  printf("CG search direction reset.\n");
 	}
       }
       // Update search direction
-      update_search_direction(f->getq());
+      update_search_direction(f->q());
 
       // Save old iteration data
       if(oldf)
@@ -269,10 +269,10 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       // Increase iteration number
       k++;
       // Update matrix
-      W=f->getW();
+      W=f->W();
 
       // Print progress
-      if(verbose) {
+      if(verbose_) {
 	print_progress(k,f,oldf);
 	print_time(t);
       }
@@ -280,11 +280,11 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       // Check for convergence. Don't do the check in the first
       // iteration, because for canonical orbitals it can be a really
       // bad saddle point
-      double J=f->getf();
+      double J=f->cost();
 
-      double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
-      if( k>1 && (f->converged() || (bracket(G,G)<Gthr && fabs(J-oldJ)<Fthr))) {
-	if(verbose) {
+      double oldJ = (oldf==NULL) ? 0.0 : oldf->cost();
+      if( k>1 && (f->converged() || (bracket(G_,G_)<Gthr_ && fabs(J-oldJ)<Fthr_))) {
+	if(verbose_) {
 	  printf("Converged.\n");
 	  fflush(stdout);
 
@@ -294,7 +294,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
 
 	break;
       } else if(k==maxiter) {
-	if(verbose) {
+	if(verbose_) {
 	  printf(" %s\nNot converged.\n",t.elapsed().c_str());
 	  fflush(stdout);
 	}
@@ -302,16 +302,16 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
 	break;
       }
 
-      if(debug) {
+      if(debug_) {
 	char fname[80];
 	sprintf(fname,"unitary_%04i.dat",(int) k);
 	FILE *p=fopen(fname,"w");
 	UnitaryFunction *uf=f->copy();
 	for(int i=-80;i<=80;i++) {
 	  double x=i*0.05;
-	  double xT=x*Tmu;
+	  double xT=x*Tmu_;
 
-	  double y=uf->cost_func(get_rotation(xT)*W);
+	  double y=uf->cost_func(make_rotation(xT)*W);
 	  fprintf(p,"% e % e % e\n",x,xT,y);
 	}
 	fclose(p);
@@ -322,7 +322,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
   if(oldf)
     delete oldf;
 
-  return f->getf();
+  return f->cost();
 }
 
 void UnitaryOptimizer::print_legend(const UnitaryFunction *f) const {
@@ -330,19 +330,19 @@ void UnitaryOptimizer::print_legend(const UnitaryFunction *f) const {
 }
 
 void UnitaryOptimizer::print_progress(size_t k, UnitaryFunction *f, const UnitaryFunction *fold) const {
-  double J=f->getf();
+  double J=f->cost();
   if(fold==NULL)
     // No info on delta J
-    printf("  %4i  % e  %13s %e  %s",(int) k,J,"",bracket(G,G),f->status().c_str());
+    printf("  %4i  % e  %13s %e  %s",(int) k,J,"",bracket(G_,G_),f->status().c_str());
   else {
-    double oldJ=fold->getf();
-    printf("  %4i  % e  % e  %e  %s",(int) k,J,J-oldJ,bracket(G,G),f->status().c_str());
+    double oldJ=fold->cost();
+    printf("  %4i  % e  % e  %e  %s",(int) k,J,J-oldJ,bracket(G_,G_),f->status().c_str());
   }
   fflush(stdout);
 
-  if(log!=NULL) {
-    fprintf(log,"%4i % .16e %.16e %s",(int) k,J,bracket(G,G),f->status(true).c_str());
-    fflush(log);
+  if(log_!=NULL) {
+    fprintf(log_,"%4i % .16e %.16e %s",(int) k,J,bracket(G_,G_),f->status(true).c_str());
+    fflush(log_);
   }
 }
 
@@ -350,9 +350,9 @@ void UnitaryOptimizer::print_time(const Timer & t) const {
   printf(" %s\n",t.elapsed().c_str());
   fflush(stdout);
 
-  if(log!=NULL) {
-    fprintf(log,"%e\n",t.get());
-    fflush(log);
+  if(log_!=NULL) {
+    fprintf(log_,"%e\n",t.get());
+    fflush(log_);
   }
 }
 
@@ -374,12 +374,12 @@ void UnitaryOptimizer::print_step(enum unitmethod & met, double step) const {
 
   (void) met;
   (void) step;
-  if(log!=NULL)
-    fprintf(log,"%e\n",step);
+  if(log_!=NULL)
+    fprintf(log_,"%e\n",step);
 }
 
 void UnitaryOptimizer::classify(const arma::cx_mat & W) const {
-  if(real)
+  if(real_)
     return;
 
   // Classify matrix
@@ -400,13 +400,13 @@ void UnitaryOptimizer::classify(const arma::cx_mat & W) const {
 void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
   UnitaryFunction *fp=fp0->copy();
 
-  arma::cx_mat W0=fp0->getW();
+  arma::cx_mat W0=fp0->W();
 
   // Compute gradient
   update_gradient(W0,fp);
   // and the search direction
-  arma::cx_mat Hs=G;
-  update_search_direction(fp->getq());
+  arma::cx_mat Hs=G_;
+  update_search_direction(fp->q());
 
   // Get cost function and derivative matrix
   arma::cx_mat der;
@@ -416,8 +416,8 @@ void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
   double dfdmu=step_der(W0,der);
 
   // Compute trial value.
-  double trstep=Tmu*sqrt(DBL_EPSILON);
-  arma::cx_mat Wtr=get_rotation(trstep*fp0->getsign())*W0;
+  double trstep=Tmu_*sqrt(DBL_EPSILON);
+  arma::cx_mat Wtr=make_rotation(trstep*fp0->sign())*W0;
   double Jtr=fp->cost_func(Wtr);
 
   // Estimated change in function is
@@ -426,7 +426,7 @@ void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
   double dfreal=Jtr-Jo;
 
   // Is the difference ok? Check absolute or relative magnitude
-  if(fabs(dfest)>sqrt(DBL_EPSILON)*std::max(1.0,fabs(fp->getf())) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
+  if(fabs(dfest)>sqrt(DBL_EPSILON)*std::max(1.0,fabs(fp->cost())) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
     fprintf(stderr,"\nDerivative mismatch error!\n");
     fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,Jo);
     fprintf(stderr,"Estimated change of function % e\n",dfest);
@@ -441,12 +441,12 @@ void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
 
 void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
   // Amount of points to use is
-  int npoints=polynomial_degree;
+  int npoints=polynomial_degree_;
   // Spacing
-  double deltaTmu=Tmu/(npoints-1);
+  double deltaTmu=Tmu_/(npoints-1);
   // Step size
   double step=0.0;
-  arma::cx_mat W=fp->getW();
+  arma::cx_mat W=fp->W();
 
   UnitaryFunction* fline[npoints];
   for(int i=0;i<npoints;i++)
@@ -463,7 +463,7 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
       mu(i)=i*deltaTmu;
 
       // Trial matrix is
-      arma::cx_mat Wtr=get_rotation(mu(i)*fp->getsign())*W;
+      arma::cx_mat Wtr=make_rotation(mu(i)*fp->sign())*W;
       // and the function is
       f(i)=fline[i]->cost_func(Wtr);
     }
@@ -482,16 +482,16 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
     }
 
     // Is the step length in the allowed region?
-    if(step>0.0 && step <=Tmu) {
+    if(step>0.0 && step <=Tmu_) {
       // Yes. Calculate the new value
-      arma::cx_mat Wtr=get_rotation(step*fp->getsign())*W;
+      arma::cx_mat Wtr=make_rotation(step*fp->sign())*W;
       UnitaryFunction *newf=fp->copy();
 
-      double J=fp->getf();
+      double J=fp->cost();
       double Jtr=newf->cost_func(Wtr);
 
       // Accept the step?
-      if( fp->getsign()*(Jtr-J) > 0.0) {
+      if( fp->sign()*(Jtr-J) > 0.0) {
 	// Yes.
 	delete fp;
 	fp=newf;
@@ -505,10 +505,10 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
     }
 
     // If we are still here, then just get the minimum value
-    if(step==0.0 || step > Tmu) {
+    if(step==0.0 || step > Tmu_) {
       fprintf(stderr,"Line search interpolation failed.\n");
       fflush(stderr);
-      double minval=arma::max(fp->getsign()*f);
+      double minval=arma::max(fp->sign()*f);
       for(size_t i=0;i<mu.n_elem;i++)
 	if(minval==f(i)) {
 	  delete fp;
@@ -526,11 +526,11 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
 
 void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
   // Matrix
-  arma::cx_mat W=fp->getW();
+  arma::cx_mat W=fp->W();
   // Amount of points to use is
-  int npoints=polynomial_degree;
+  int npoints=polynomial_degree_;
   // Spacing
-  double deltaTmu=Tmu/(npoints-1);
+  double deltaTmu=Tmu_/(npoints-1);
   int halved=0;
 
   UnitaryFunction* fline[npoints];
@@ -548,7 +548,7 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
       mu(i)=i*deltaTmu;
 
       // Trial matrix is
-      arma::cx_mat Wtr=get_rotation(mu(i)*fp->getsign())*W;
+      arma::cx_mat Wtr=make_rotation(mu(i)*fp->sign())*W;
       // and the function is
       arma::cx_mat der;
       //der=fline[i]->cost_der(Wtr);
@@ -582,16 +582,16 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
     */
 
     // Is the step length in the allowed region?
-    if(step>0.0 && step <=Tmu) {
+    if(step>0.0 && step <=Tmu_) {
       // Yes. Calculate the new value
-      arma::cx_mat Wtr=get_rotation(step*fp->getsign())*W;
+      arma::cx_mat Wtr=make_rotation(step*fp->sign())*W;
       UnitaryFunction *newf=fp->copy();
 
-      double J=fp->getf();
+      double J=fp->cost();
       double Jtr=newf->cost_func(Wtr);
 
       // Accept the step?
-      if( fp->getsign()*(Jtr-J) > 0.0) {
+      if( fp->sign()*(Jtr-J) > 0.0) {
 	// Yes.
 	//	printf("Function value changed by %e, accept.\n",Jtr-J);
 	delete fp;
@@ -636,36 +636,36 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
 }
 
 double UnitaryOptimizer::step_der(const arma::cx_mat & W, const arma::cx_mat & der) const {
-  return 2.0*std::real(arma::trace(der*arma::trans(W)*arma::trans(H)));
+  return 2.0*std::real(arma::trace(der*arma::trans(W)*arma::trans(H_)));
 }
 
 void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
   // Start with half of maximum.
-  double step=Tmu/2.0;
+  double step=Tmu_/2.0;
 
   // Initial rotation matrix
-  arma::cx_mat R=get_rotation(step*fp->getsign());
+  arma::cx_mat R=make_rotation(step*fp->sign());
 
   // Helper
   UnitaryFunction *hlp=fp->copy();
 
   // Original rotation
-  arma::cx_mat W(fp->getW());
+  arma::cx_mat W(fp->W());
 
   // Current value
-  double J=fp->getf();
+  double J=fp->cost();
 
   // Evaluate function at R2
   double J2=hlp->cost_func(R*R*W);
 
-  if(fp->getsign()==-1) {
+  if(fp->sign()==-1) {
     // Minimization.
 
     // First condition: f(W) - f(R^2 W) >= mu*<G,H>
-    while(J-J2 >= step*bracket(G,H)) {
+    while(J-J2 >= step*bracket(G_,H_)) {
       // Increase step size.
       step*=2.0;
-      R=get_rotation(step*fp->getsign());
+      R=make_rotation(step*fp->sign());
 
       // and re-evaluate J2
       J2=hlp->cost_func(R*R*W);
@@ -675,23 +675,23 @@ void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
     double J1=hlp->cost_func(R*W);
 
     // Second condition: f(W) - f(R W) <= mu/2*<G,H>
-    while(J-J1 < step/2.0*bracket(G,H)) {
+    while(J-J1 < step/2.0*bracket(G_,H_)) {
       // Decrease step size.
       step/=2.0;
-      R=get_rotation(step*fp->getsign());
+      R=make_rotation(step*fp->sign());
 
       // and re-evaluate J1
       J1=hlp->cost_func(R*W);
     }
 
-  } else if(fp->getsign()==1) {
+  } else if(fp->sign()==1) {
     // Maximization
 
     // First condition: f(W) - f(R^2 W) >= mu*<G,H>
-    while(J-J2 <= -step*bracket(G,H)) {
+    while(J-J2 <= -step*bracket(G_,H_)) {
       // Increase step size.
       step*=2.0;
-      R=get_rotation(step*fp->getsign());
+      R=make_rotation(step*fp->sign());
 
       // and re-evaluate J2
       J2=hlp->cost_func(R*R*W);
@@ -701,10 +701,10 @@ void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
     double J1=hlp->cost_func(R*W);
 
     // Second condition: f(W) - f(R W) <= mu/2*<G,H>
-    while(J-J1 > -step/2.0*bracket(G,H)) {
+    while(J-J1 > -step/2.0*bracket(G_,H_)) {
       // Decrease step size.
       step/=2.0;
-      R=get_rotation(step*fp->getsign());
+      R=make_rotation(step*fp->sign());
 
       // and re-evaluate J1
       J1=hlp->cost_func(R*W);
@@ -740,9 +740,9 @@ arma::cx_vec fourier_shift(const arma::cx_vec & c) {
 
 void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   // Length of DFT interval
-  double fourier_interval=fourier_periods*Tmu;
+  double fourier_interval=fourier_periods_*Tmu_;
   // and of the transform. We want integer division here!
-  int fourier_length=2*((fourier_samples*fourier_periods)/2)+1;
+  int fourier_length=2*((fourier_samples_*fourier_periods_)/2)+1;
 
   // Step length is
   double deltaTmu=fourier_interval/fourier_length;
@@ -751,7 +751,7 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   UnitaryFunction * fs[fourier_length];
   for(int i=0;i<fourier_length;i++)
     fs[i]=f->copy();
-  arma::cx_mat W=f->getW();
+  arma::cx_mat W=f->W();
 
   // Values of mu, J(mu) and J'(mu)
   arma::vec mu(fourier_length);
@@ -762,7 +762,7 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
     mu(i)=i*deltaTmu;
 
     // Trial matrix is
-    arma::cx_mat Wtr=get_rotation(mu(i)*f->getsign())*W;
+    arma::cx_mat Wtr=make_rotation(mu(i)*f->sign())*W;
     arma::cx_mat der;
     fs[i]->cost_func_der(Wtr,fv(i),der);
 
@@ -830,12 +830,12 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
 
   // Figure out where the function goes to the wanted direction
   double findJ;
-  findJ=arma::max(f->getsign()*fv);
+  findJ=arma::max(f->sign()*fv);
 
   // and the corresponding value of mu is
   double findmu=mu(0);
   for(int i=0;i<fourier_length;i++)
-    if(f->getsign()*fv(i)==findJ) {
+    if(f->sign()*fv(i)==findJ) {
       findmu=mu(i);
       // Stop at closest extremum
       break;
@@ -856,14 +856,14 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   // Is the step length in the allowed region?
   if(step>0.0 && step <=fourier_interval) {
     // Yes. Calculate the new value
-    arma::cx_mat Wtr=get_rotation(step*f->getsign())*W;
+    arma::cx_mat Wtr=make_rotation(step*f->sign())*W;
     UnitaryFunction *newf=f->copy();
 
-    double J=f->getf();
+    double J=f->cost();
     double Jtr=newf->cost_func(Wtr);
 
     // Accept the step?
-    if( f->getsign()*(Jtr-J) > 0.0) {
+    if( f->sign()*(Jtr-J) > 0.0) {
       // Yes.
       delete f;
       f=newf;
@@ -877,8 +877,8 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   }
 
   // If we are still here, then just get the minimum value
-  if(step==0.0 || step > Tmu) {
-    double minval=arma::max(f->getsign()*fv);
+  if(step==0.0 || step > Tmu_) {
+    double minval=arma::max(f->sign()*fv);
     for(size_t i=0;i<mu.n_elem;i++)
       if(minval==fv(i)) {
 	delete f;
@@ -1101,13 +1101,13 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
 
 Brockett::Brockett(size_t N, unsigned long int seed) : UnitaryFunction(2, true) {
   // Get random complex matrix
-  sigma=randn_mat(N,N,seed)+COMPLEXI*randn_mat(N,N,seed+1);
+  sigma_=randn_mat(N,N,seed)+COMPLEXI*randn_mat(N,N,seed+1);
   // Hermitize it
-  sigma=sigma+arma::trans(sigma);
+  sigma_=sigma_+arma::trans(sigma_);
   // Get N matrix
-  Nmat.zeros(N,N);
+  Nmat_.zeros(N,N);
   for(size_t i=0;i<N;i++)
-    Nmat(i,i)=i+1;
+    Nmat_(i,i)=i+1;
 }
 
 Brockett::~Brockett() {
@@ -1118,14 +1118,14 @@ Brockett* Brockett::copy() const {
 }
 
 double Brockett::cost_func(const arma::cx_mat & Wv) {
-  W=Wv;
-  f=std::real(arma::trace(arma::trans(W)*sigma*W*Nmat));
-  return f;
+  W_=Wv;
+  f_=std::real(arma::trace(arma::trans(W_)*sigma_*W_*Nmat_));
+  return f_;
 }
 
 arma::cx_mat Brockett::cost_der(const arma::cx_mat & Wv) {
-  W=Wv;
-  return sigma*W*Nmat;
+  W_=Wv;
+  return sigma_*W_*Nmat_;
 }
 
 void Brockett::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
@@ -1149,7 +1149,7 @@ std::string Brockett::status(bool lfmt) {
 }
 
 double Brockett::diagonality() const {
-  arma::cx_mat WSW=arma::trans(W)*sigma*W;
+  arma::cx_mat WSW=arma::trans(W_)*sigma_*W_;
 
   double off=0.0;
   double dg=0.0;
@@ -1168,8 +1168,8 @@ double Brockett::diagonality() const {
 }
 
 double Brockett::unitarity() const {
-  arma::cx_mat U=W*arma::trans(W);
-  arma::cx_mat eye(W);
+  arma::cx_mat U=W_*arma::trans(W_);
+  arma::cx_mat eye(W_);
   eye.eye();
 
   double norm=pow(arma::norm(U-eye,"fro"),2);

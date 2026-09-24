@@ -401,18 +401,18 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
     }
 
     // Set matrix
-    func->setW(W);
+    func->update_W(W);
     // Log file?
     if(im==metstack.size()-1) {
       opt.open_log(fname);
-      opt.set_debug(debug);
+      opt.debug(debug);
     }
     // Run optimization
     opt.optimize(func,umet,uacc,maxiter);
     // Get updated matrix
-    W=func->getW();
+    W=func->W();
     // and cost function value
-    measure=func->getf();
+    measure=func->cost();
 
     // Clean up after PM?
     if(pipek) {
@@ -432,7 +432,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
 
 Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool delocalize) : UnitaryFunction(4*nv,delocalize) {
   // Save n
-  n=nv;
+  n_=nv;
 
   Timer t;
   if(ver) {
@@ -442,16 +442,16 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool d
 
   // Get R^2 matrix
   std::vector<arma::mat> momstack=basis.moment(2);
-  rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
+  rsq_=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
 
   // Get r matrices
   std::vector<arma::mat> rmat=basis.moment(1);
 
   // Convert matrices to MO basis
-  rsq=arma::trans(C)*rsq*C;
-  rx=arma::trans(C)*rmat[0]*C;
-  ry=arma::trans(C)*rmat[1]*C;
-  rz=arma::trans(C)*rmat[2]*C;
+  rsq_=arma::trans(C)*rsq_*C;
+  rx_=arma::trans(C)*rmat[0]*C;
+  ry_=arma::trans(C)*rmat[1]*C;
+  rz_=arma::trans(C)*rmat[2]*C;
 
   if(ver) {
     printf(" done (%s)\n",t.elapsed().c_str());
@@ -467,101 +467,101 @@ Boys* Boys::copy() const {
 }
 
 void Boys::set_n(int nv) {
-  n=nv;
+  n_=nv;
 
   // Set q accordingly
-  q=4*(n+1);
+  q_=4*(n_+1);
 }
 
 
 double Boys::cost_func(const arma::cx_mat & Wv) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != rsq.n_rows) {
+  if(W_.n_rows != rsq_.n_rows) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_rows << "!\n";
+    oss << "Matrix does not match size of problem: " << W_.n_rows << " vs " << rsq_.n_rows << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   double B=0;
 
   // For <i|r^2|i> terms
-  arma::cx_mat rsw=rsq*W;
+  arma::cx_mat rsw=rsq_*W_;
   // For <i|r|i>^2 terms
-  arma::cx_mat rxw=rx*W;
-  arma::cx_mat ryw=ry*W;
-  arma::cx_mat rzw=rz*W;
+  arma::cx_mat rxw=rx_*W_;
+  arma::cx_mat ryw=ry_*W_;
+  arma::cx_mat rzw=rz_*W_;
 
   // Loop over orbitals
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:B)
 #endif
-  for(size_t io=0;io<W.n_cols;io++) {
+  for(size_t io=0;io<W_.n_cols;io++) {
     // <r^2> term
-    double w=std::real(arma::as_scalar(arma::trans(W.col(io))*rsw.col(io)));
+    double w=std::real(arma::as_scalar(arma::trans(W_.col(io))*rsw.col(io)));
 
     // <r>^2 terms
-    double xp=std::real(arma::as_scalar(arma::trans(W.col(io))*rxw.col(io)));
-    double yp=std::real(arma::as_scalar(arma::trans(W.col(io))*ryw.col(io)));
-    double zp=std::real(arma::as_scalar(arma::trans(W.col(io))*rzw.col(io)));
+    double xp=std::real(arma::as_scalar(arma::trans(W_.col(io))*rxw.col(io)));
+    double yp=std::real(arma::as_scalar(arma::trans(W_.col(io))*ryw.col(io)));
+    double zp=std::real(arma::as_scalar(arma::trans(W_.col(io))*rzw.col(io)));
     w-=xp*xp + yp*yp + zp*zp;
 
     // Add to total
-    B+=pow(w,n);
+    B+=pow(w,n_);
   }
-  f=B;
+  f_=B;
 
-  return f;
+  return f_;
 }
 
 arma::cx_mat Boys::cost_der(const arma::cx_mat & Wv) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != rsq.n_cols) {
+  if(W_.n_rows != rsq_.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_cols << "!\n";
+    oss << "Matrix does not match size of problem: " << W_.n_rows << " vs " << rsq_.n_cols << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   // Returned matrix
-  arma::cx_mat Bder(W.n_cols,W.n_cols);
-  arma::cx_mat rsw=rsq*W;
-  arma::cx_mat rxw=rx*W;
-  arma::cx_mat ryw=ry*W;
-  arma::cx_mat rzw=rz*W;
+  arma::cx_mat Bder(W_.n_cols,W_.n_cols);
+  arma::cx_mat rsw=rsq_*W_;
+  arma::cx_mat rxw=rx_*W_;
+  arma::cx_mat ryw=ry_*W_;
+  arma::cx_mat rzw=rz_*W_;
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t b=0;b<W.n_cols;b++) {
+  for(size_t b=0;b<W_.n_cols;b++) {
     // Helpers for r terms
-    double xp=std::real(arma::as_scalar(arma::trans(W.col(b))*rxw.col(b)));
-    double yp=std::real(arma::as_scalar(arma::trans(W.col(b))*ryw.col(b)));
-    double zp=std::real(arma::as_scalar(arma::trans(W.col(b))*rzw.col(b)));
+    double xp=std::real(arma::as_scalar(arma::trans(W_.col(b))*rxw.col(b)));
+    double yp=std::real(arma::as_scalar(arma::trans(W_.col(b))*ryw.col(b)));
+    double zp=std::real(arma::as_scalar(arma::trans(W_.col(b))*rzw.col(b)));
 
     // Normal Boys contribution
-    double w=std::real(arma::as_scalar(arma::trans(W.col(b))*rsw.col(b)));
+    double w=std::real(arma::as_scalar(arma::trans(W_.col(b))*rsw.col(b)));
     w-=xp*xp + yp*yp + zp*zp;
 
     // r^2 terms
-    for(size_t a=0;a<W.n_cols;a++) {
+    for(size_t a=0;a<W_.n_cols;a++) {
       // Compute derivative
       std::complex<double> dert=rsw(a,b) - 2.0*(xp*rxw(a,b) + yp*ryw(a,b) + zp*rzw(a,b));
 
       // Set derivative
-      Bder(a,b)=n*pow(w,n-1)*dert;
+      Bder(a,b)=n_*pow(w,n_-1)*dert;
     }
   }
 
@@ -576,7 +576,7 @@ void Boys::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & de
 
 FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool delocalize) : UnitaryFunction(8*nv,delocalize) {
   // Save n
-  n=nv;
+  n_=nv;
 
   Timer t;
   if(ver) {
@@ -587,24 +587,24 @@ FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool
   // Get the r_i^2 r_j^2 matrices
   std::vector<arma::mat> momstack=basis.moment(4);
   // Diagonal: x^4 + y^4 + z^4
-  rfour=momstack[getind(4,0,0)] + momstack[getind(0,4,0)] + momstack[getind(0,0,4)] \
+  rfour_=momstack[getind(4,0,0)] + momstack[getind(0,4,0)] + momstack[getind(0,0,4)] \
     // Off-diagonal: 2 x^2 y^2 + 2 x^2 z^2 + 2 y^2 z^2
     +2.0*(momstack[getind(2,2,0)]+momstack[getind(2,0,2)]+momstack[getind(0,2,2)]);
   // Convert to MO basis
-  rfour=arma::trans(C)*rfour*C;
+  rfour_=arma::trans(C)*rfour_*C;
 
   // Get R^3 matrices
   momstack=basis.moment(3);
-  rrsq.resize(3);
+  rrsq_.resize(3);
   // x^3 + xy^2 + xz^2
-  rrsq[0]=momstack[getind(3,0,0)]+momstack[getind(1,2,0)]+momstack[getind(1,0,2)];
+  rrsq_[0]=momstack[getind(3,0,0)]+momstack[getind(1,2,0)]+momstack[getind(1,0,2)];
   // x^2y + y^3 + yz^2
-  rrsq[1]=momstack[getind(2,1,0)]+momstack[getind(0,3,0)]+momstack[getind(0,1,2)];
+  rrsq_[1]=momstack[getind(2,1,0)]+momstack[getind(0,3,0)]+momstack[getind(0,1,2)];
   // x^2z + y^2z + z^3
-  rrsq[2]=momstack[getind(2,0,1)]+momstack[getind(0,2,1)]+momstack[getind(0,0,3)];
+  rrsq_[2]=momstack[getind(2,0,1)]+momstack[getind(0,2,1)]+momstack[getind(0,0,3)];
   // and convert to the MO basis
   for(int ic=0;ic<3;ic++)
-    rrsq[ic]=arma::trans(C)*rrsq[ic]*C;
+    rrsq_[ic]=arma::trans(C)*rrsq_[ic]*C;
 
   // Get R^2 matrix
   momstack=basis.moment(2);
@@ -612,33 +612,33 @@ FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool
   for(size_t i=0;i<momstack.size();i++) {
     momstack[i]=arma::trans(C)*momstack[i]*C;
   }
-  rr.resize(3);
+  rr_.resize(3);
   for(int ic=0;ic<3;ic++)
-    rr[ic].resize(3);
+    rr_[ic].resize(3);
 
   // Diagonal
-  rr[0][0]=momstack[getind(2,0,0)];
-  rr[1][1]=momstack[getind(0,2,0)];
-  rr[2][2]=momstack[getind(0,0,2)];
+  rr_[0][0]=momstack[getind(2,0,0)];
+  rr_[1][1]=momstack[getind(0,2,0)];
+  rr_[2][2]=momstack[getind(0,0,2)];
 
   // Off-diagonal
-  rr[0][1]=momstack[getind(1,1,0)];
-  rr[1][0]=rr[0][1];
+  rr_[0][1]=momstack[getind(1,1,0)];
+  rr_[1][0]=rr_[0][1];
 
-  rr[0][2]=momstack[getind(1,0,1)];
-  rr[2][0]=rr[0][2];
+  rr_[0][2]=momstack[getind(1,0,1)];
+  rr_[2][0]=rr_[0][2];
 
-  rr[1][2]=momstack[getind(0,1,1)];
-  rr[2][1]=rr[1][2];
+  rr_[1][2]=momstack[getind(0,1,1)];
+  rr_[2][1]=rr_[1][2];
 
   // and the rsq matrix
-  rsq=rr[0][0]+rr[1][1]+rr[2][2];
+  rsq_=rr_[0][0]+rr_[1][1]+rr_[2][2];
 
   // Get r matrices
-  rmat=basis.moment(1);
+  rmat_=basis.moment(1);
   // and convert to the MO basis
-  for(size_t i=0;i<rmat.size();i++) {
-    rmat[i]=arma::trans(C)*rmat[i]*C;
+  for(size_t i=0;i<rmat_.size();i++) {
+    rmat_[i]=arma::trans(C)*rmat_[i]*C;
   }
 
   if(ver) {
@@ -655,158 +655,158 @@ FMLoc* FMLoc::copy() const {
 }
 
 void FMLoc::set_n(int nv) {
-  n=nv;
+  n_=nv;
 
   // Set q accordingly
-  q=8*(nv+1);
+  q_=8*(nv+1);
 }
 
 double FMLoc::cost_func(const arma::cx_mat & Wv) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != rsq.n_rows) {
+  if(W_.n_rows != rsq_.n_rows) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_rows << "!\n";
+    oss << "Matrix does not match size of problem: " << W_.n_rows << " vs " << rsq_.n_rows << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   double B=0;
 
   // For <i|r^4|i> terms
-  arma::cx_mat rfw=rfour*W;
+  arma::cx_mat rfw=rfour_*W_;
   // For <i|r^3|i> terms
   std::vector<arma::cx_mat> rrsqw(3);
   for(int ic=0;ic<3;ic++)
-    rrsqw[ic]=rrsq[ic]*W;
+    rrsqw[ic]=rrsq_[ic]*W_;
   // For <i|r^2|i> terms
   std::vector< std::vector<arma::cx_mat> > rrw(3);
   for(int ic=0;ic<3;ic++) {
     rrw[ic].resize(3);
     for(int jc=0;jc<3;jc++)
-      rrw[ic][jc]=rr[ic][jc]*W;
+      rrw[ic][jc]=rr_[ic][jc]*W_;
   }
-  arma::cx_mat rsqw=rsq*W;
+  arma::cx_mat rsqw=rsq_*W_;
   // For <i|r|i> terms
   std::vector<arma::cx_mat> rw(3);
   for(int ic=0;ic<3;ic++)
-    rw[ic]=rmat[ic]*W;
+    rw[ic]=rmat_[ic]*W_;
 
   // Loop over orbitals
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:B)
 #endif
-  for(size_t io=0;io<W.n_cols;io++) {
+  for(size_t io=0;io<W_.n_cols;io++) {
     // <r^4> term
-    double rfour_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rfw.col(io)));
+    double rfour_t=std::real(arma::as_scalar(arma::trans(W_.col(io))*rfw.col(io)));
 
     // rrsq
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
-      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrsqw[ic].col(io)));
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(W_.col(io))*rrsqw[ic].col(io)));
 
     // rr
     arma::mat rr_t(3,3);
     for(int ic=0;ic<3;ic++)
       for(int jc=0;jc<=ic;jc++) {
-	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrw[ic][jc].col(io)));
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(W_.col(io))*rrw[ic][jc].col(io)));
 	rr_t(jc,ic)=rr_t(ic,jc);
       }
 
     // rsq
-    double rsq_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rsqw.col(io)));
+    double rsq_t=std::real(arma::as_scalar(arma::trans(W_.col(io))*rsqw.col(io)));
 
     // r
     arma::vec r_t(3);
     for(int ic=0;ic<3;ic++)
-      r_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rw[ic].col(io)));
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(W_.col(io))*rw[ic].col(io)));
 
     // Collect terms
     double w= rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2);
 
     // Add to total
-    B+=pow(w,n);
+    B+=pow(w,n_);
   }
-  f=B;
+  f_=B;
 
   return B;
 }
 
 arma::cx_mat FMLoc::cost_der(const arma::cx_mat & Wv) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != rsq.n_rows) {
+  if(W_.n_rows != rsq_.n_rows) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_rows << "!\n";
+    oss << "Matrix does not match size of problem: " << W_.n_rows << " vs " << rsq_.n_rows << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   // Returned matrix
-  arma::cx_mat Bder(W.n_cols,W.n_cols);
+  arma::cx_mat Bder(W_.n_cols,W_.n_cols);
 
   // For <i|r^4|i> terms
-  arma::cx_mat rfw=rfour*W;
+  arma::cx_mat rfw=rfour_*W_;
   // For <i|r^3|i> terms
   std::vector<arma::cx_mat> rrsqw(3);
   for(int ic=0;ic<3;ic++)
-    rrsqw[ic]=rrsq[ic]*W;
+    rrsqw[ic]=rrsq_[ic]*W_;
   // For <i|r^2|i> terms
   std::vector< std::vector<arma::cx_mat> > rrw(3);
   for(int ic=0;ic<3;ic++) {
     rrw[ic].resize(3);
     for(int jc=0;jc<3;jc++)
-      rrw[ic][jc]=rr[ic][jc]*W;
+      rrw[ic][jc]=rr_[ic][jc]*W_;
   }
-  arma::cx_mat rsqw=rsq*W;
+  arma::cx_mat rsqw=rsq_*W_;
   // For <i|r|i> terms
   std::vector<arma::cx_mat> rw(3);
   for(int ic=0;ic<3;ic++)
-    rw[ic]=rmat[ic]*W;
+    rw[ic]=rmat_[ic]*W_;
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t io=0;io<W.n_cols;io++) {
+  for(size_t io=0;io<W_.n_cols;io++) {
     // <r^4> term
-    double rfour_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rfw.col(io)));
+    double rfour_t=std::real(arma::as_scalar(arma::trans(W_.col(io))*rfw.col(io)));
 
     // rrsq
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
-      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrsqw[ic].col(io)));
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(W_.col(io))*rrsqw[ic].col(io)));
 
     // rr
     arma::mat rr_t(3,3);
     for(int ic=0;ic<3;ic++)
       for(int jc=0;jc<=ic;jc++) {
-	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrw[ic][jc].col(io)));
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(W_.col(io))*rrw[ic][jc].col(io)));
 	rr_t(jc,ic)=rr_t(ic,jc);
       }
 
     // rsq
-    double rsq_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rsqw.col(io)));
+    double rsq_t=std::real(arma::as_scalar(arma::trans(W_.col(io))*rsqw.col(io)));
 
     // r
     arma::vec r_t(3);
     for(int ic=0;ic<3;ic++)
-      r_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rw[ic].col(io)));
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(W_.col(io))*rw[ic].col(io)));
 
     // Collect terms
     double w= rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2);
 
     // Compute derivative
-    for(size_t a=0;a<W.n_cols;a++) {
+    for(size_t a=0;a<W_.n_cols;a++) {
 
       // <r^4> term
       std::complex<double> rfour_d=rfw(a,io);
@@ -836,7 +836,7 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & Wv) {
       std::complex<double> dert=rfour_d - 4.0*(arma::dot(one*rrsq_t,r_d)+arma::dot(rrsq_d,one*r_t)) + 2.0*rsq_d*arma::dot(r_t,r_t) + 4.0*rsq_t*arma::dot(one*r_t,r_d) + 8.0*arma::as_scalar((one*(arma::trans(r_t)*rr_t))*r_d) + 4.0*arma::as_scalar(arma::trans(one*r_t)*rr_d*(one*r_t)) - 12.0*arma::dot(r_t,r_t)*arma::dot(one*r_t,r_d);
 
       // Set derivative
-      Bder(a,io)=n*pow(w,n-1)*dert;
+      Bder(a,io)=n_*pow(w,n_-1)*dert;
     }
   }
 
@@ -858,9 +858,9 @@ extern Settings settings;
 
 Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
   // Store used method
-  chg=chgv;
+  chg_=chgv;
   // and penalty exponent
-  p=pv;
+  p_=pv;
 
   // Overlap matrix tolerance threshold
   double otol=1e-5;
@@ -868,23 +868,23 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
   Timer tinit;
   if(ver) {
     printf("Initializing generalized Pipek-Mezey calculation with ");
-    if(chg==BADER)
+    if(chg_==BADER)
       printf("Bader");
-    else if(chg==BECKE)
+    else if(chg_==BECKE)
       printf("Becke");
-    else if(chg==HIRSHFELD)
+    else if(chg_==HIRSHFELD)
       printf("Hirshfeld");
-    else if(chg==ITERHIRSH)
+    else if(chg_==ITERHIRSH)
       printf("iterative Hirshfeld");
-    else if(chg==IAO)
+    else if(chg_==IAO)
       printf("IAO");
-    else if(chg==LOWDIN)
+    else if(chg_==LOWDIN)
       printf("Löwdin");
-    else if(chg==MULLIKEN)
+    else if(chg_==MULLIKEN)
       printf("Mulliken");
-    else if(chg==STOCKHOLDER)
+    else if(chg_==STOCKHOLDER)
       printf("Stockholder");
-    else if(chg==VORONOI)
+    else if(chg_==VORONOI)
       printf("Voronoi");
     printf(" charges...");
     fflush(stdout);
@@ -892,54 +892,54 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 
   Timer t;
 
-  if(chg==BADER || chg==VORONOI) {
+  if(chg_==BADER || chg_==VORONOI) {
     // Helper. Non-verbose operation
     BaderGrid bader;
     bader.set(basis,ver);
     // Construct integration grid
-    if(chg==BADER)
+    if(chg_==BADER)
       bader.construct_bader(P,otol);
     else
       bader.construct_voronoi(otol);
     // Amount of regions
-    N=bader.get_Nmax();
+    N_=bader.get_Nmax();
 
     // Calculate the regional overlaps
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       arma::mat Sat(bader.regional_overlap(iat));
       Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
-  } else if(chg==BECKE) {
+  } else if(chg_==BECKE) {
     // Amount of regions
-    N=basis.Nnuc();
+    N_=basis.Nnuc();
     // Grid
     DFTGrid grid(&basis,ver);
     // Construct integration grid
     grid.construct_becke(otol);
 
     // Calculate the regional overlaps
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       arma::mat Sat(grid.eval_overlap(iat));
       Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
-  } else if(chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER ) {
+  } else if(chg_==HIRSHFELD || chg_==ITERHIRSH || chg_==STOCKHOLDER ) {
     // Amount of regions
-    N=basis.Nnuc();
+    N_=basis.Nnuc();
 
     Hirshfeld hirsh;
-    if(chg==HIRSHFELD)
+    if(chg_==HIRSHFELD)
       // We don't know method here so just use HF.
       hirsh.compute(basis,"HF");
-    else if(chg==ITERHIRSH) {
+    else if(chg_==ITERHIRSH) {
       // Iterative Hirshfeld atomic charges
       HirshfeldI hirshi;
       hirshi.compute(basis,P);
       hirsh=hirshi.get();
-    } else if(chg==STOCKHOLDER) {
+    } else if(chg_==STOCKHOLDER) {
       // Stockholder atomic charges
       Stockholder stock(basis,P);
       hirsh=stock.get();
@@ -951,15 +951,15 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
     // Construct integration grid
     grid.construct_hirshfeld(hirsh,otol);
 
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       arma::mat Sat(grid.eval_hirshfeld_overlap(hirsh,iat));
       Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
-  } else if(chg==IAO) {
+  } else if(chg_==IAO) {
     // Amount of regions
-    N=basis.Nnuc();
+    N_=basis.Nnuc();
 
     if(ver)
       basis.print();
@@ -969,7 +969,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
     // Also need overlap matrix
     arma::mat S(basis.overlap());
 
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       // Construct IAO density matrix for atom
       arma::mat Piao(C.n_rows, C.n_rows);
       Piao.zeros();
@@ -986,14 +986,14 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
-  } else if(chg==MULLIKEN) {
+  } else if(chg_==MULLIKEN) {
     // Amount of regions
-    N=basis.Nnuc();
+    N_=basis.Nnuc();
     // Get overlap matrix
     arma::mat S(basis.overlap());
 
     // Get shells
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       // List of shells on atom
       std::vector<GaussianShell> shells(basis.funcs(iat));
 
@@ -1013,9 +1013,9 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
-  } else if(chg==LOWDIN) {
+  } else if(chg_==LOWDIN) {
     // Amount of regions
-    N=basis.Nnuc();
+    N_=basis.Nnuc();
 
     // Get overlap matrix
     arma::mat S(basis.overlap());
@@ -1024,7 +1024,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
     S_half_invhalf(S,Sh,Sinvh,settings.get_double("LinDepThresh"));
 
     // Get shells
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       // List of shells on atom
       std::vector<GaussianShell> shells(basis.funcs(iat));
 
@@ -1061,11 +1061,11 @@ Pipek* Pipek::copy() const {
 
 void Pipek::cleanup_disk() {
   // Delete the temporary files
-  for(size_t iat=0;iat<N;iat++)
+  for(size_t iat=0;iat<N_;iat++)
     remove(pipek_filename(iat).c_str());
 }
 
-arma::mat Pipek::get_charge(size_t iat) {
+arma::mat Pipek::load_charge(size_t iat) {
   arma::mat Sat;
   if(!Sat.load(pipek_filename(iat),PIPEK_FILEMODE))
     throw std::runtime_error("Error loading precomputed atomic overlap matrix from file " + pipek_filename(iat) + "!\n");
@@ -1074,9 +1074,9 @@ arma::mat Pipek::get_charge(size_t iat) {
 }
 
 double Pipek::cost_func(const arma::cx_mat & Wv) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
@@ -1087,29 +1087,29 @@ double Pipek::cost_func(const arma::cx_mat & Wv) {
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
 #endif
-  for(size_t iat=0;iat<N;iat++) {
+  for(size_t iat=0;iat<N_;iat++) {
     // Helper matrix
-    arma::cx_mat qw=get_charge(iat)*W;
-    for(size_t io=0;io<W.n_cols;io++) {
-      std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
-      Dinv+=std::real(std::pow(Qa,p));
+    arma::cx_mat qw=load_charge(iat)*W_;
+    for(size_t io=0;io<W_.n_cols;io++) {
+      std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W_.col(io))*qw.col(io)));
+      Dinv+=std::real(std::pow(Qa,p_));
     }
   }
-  f=Dinv;
+  f_=Dinv;
 
   return Dinv;
 }
 
 arma::cx_mat Pipek::cost_der(const arma::cx_mat & Wv) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
   // Returned matrix
-  arma::cx_mat Dder(W.n_cols,W.n_cols);
+  arma::cx_mat Dder(W_.n_cols,W_.n_cols);
   Dder.zeros();
 
   // Compute sum
@@ -1122,15 +1122,15 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & Wv) {
     arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       // Helper matrix
-      arma::cx_mat qw=get_charge(iat)*W;
+      arma::cx_mat qw=load_charge(iat)*W_;
 
-      for(size_t b=0;b<W.n_cols;b++) {
-	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	std::complex<double> t=p*std::pow(qwp,p-1);
+      for(size_t b=0;b<W_.n_cols;b++) {
+	std::complex<double> qwp=arma::as_scalar(arma::trans(W_.col(b))*qw.col(b));
+	std::complex<double> t=p_*std::pow(qwp,p_-1);
 
-	for(size_t a=0;a<W.n_cols;a++) {
+	for(size_t a=0;a<W_.n_cols;a++) {
 #ifdef _OPENMP
 	  Dwrk(a,b)+=t*qw(a,b);
 #else
@@ -1150,15 +1150,15 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & Wv) {
 }
 
 void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat & Dder) {
-  W=Wv;
+  W_=Wv;
 
-  if(W.n_rows != W.n_cols) {
+  if(W_.n_rows != W_.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
   // Returned matrix
-  Dder.zeros(W.n_cols,W.n_cols);
+  Dder.zeros(W_.n_cols,W_.n_cols);
   double D=0;
 
   // Compute sum
@@ -1171,16 +1171,16 @@ void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat &
     arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t iat=0;iat<N;iat++) {
+    for(size_t iat=0;iat<N_;iat++) {
       // Helper matrix
-      arma::cx_mat qw=get_charge(iat)*W;
+      arma::cx_mat qw=load_charge(iat)*W_;
 
-      for(size_t b=0;b<W.n_cols;b++) {
-	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	std::complex<double> t=p*std::pow(qwp,p-1);
-	D+=std::real(std::pow(qwp,p));
+      for(size_t b=0;b<W_.n_cols;b++) {
+	std::complex<double> qwp=arma::as_scalar(arma::trans(W_.col(b))*qw.col(b));
+	std::complex<double> t=p_*std::pow(qwp,p_-1);
+	D+=std::real(std::pow(qwp,p_));
 
-	for(size_t a=0;a<W.n_cols;a++) {
+	for(size_t a=0;a<W_.n_cols;a++) {
 #ifdef _OPENMP
 	  Dwrk(a,b)+=t*qw(a,b);
 #else
@@ -1197,29 +1197,29 @@ void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat &
   }
 
   Dinv=D;
-  f=D;
+  f_=D;
 }
 
 Edmiston::Edmiston(const BasisSet & basis, const BasisSet & fitbas, const arma::mat & Cv, bool delocalize) : UnitaryFunction(4,!delocalize) {
   // Store orbitals
-  C=Cv;
+  C_=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, Cholesky threshold 1e-9, use Hartree-Fock routine since it has better tolerance for linear dependencies
   if(!fitbas.Nbf())
-    dfit.fill(basis,basis.density_fitting(),true,1e-8,1e-9,false);
+    dfit_.fill(basis,basis.density_fitting(),true,1e-8,1e-9,false);
   else
-    dfit.fill(basis,fitbas,true,1e-8,1e-9,false);
+    dfit_.fill(basis,fitbas,true,1e-8,1e-9,false);
 }
 
 Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize, double cholthr) : UnitaryFunction(4,!delocalize) {
   // Store orbitals
-  C=Cv;
+  C_=Cv;
   // Compute Cholesky via the merged CD/DF entry point. The
   // two-step metric cleanup threshold gets the same value as the
   // CD threshold (pre-merge Edmiston used one-step CD with a
   // single threshold, so keep the single-knob feel here).
   double shthr=0.01; // Shell re-use threshhold
   double intthr=std::min(1e-10,cholthr/100.0); // Integrals threshold
-  dfit.fill_cholesky(basis,/*direct*/false,cholthr,shthr,intthr,cholthr,false);
+  dfit_.fill_cholesky(basis,/*direct*/false,cholthr,shthr,intthr,cholthr,false);
 }
 
 Edmiston::~Edmiston() {
@@ -1229,21 +1229,21 @@ Edmiston* Edmiston::copy() const {
   return new Edmiston(*this);
 }
 
-void Edmiston::setW(const arma::cx_mat & Wv) {
+void Edmiston::update_W(const arma::cx_mat & Wv) {
   // We need to update everything to match W
   arma::cx_mat der;
-  cost_func_der(Wv,f,der);
+  cost_func_der(Wv,f_,der);
 }
 
 double Edmiston::cost_func(const arma::cx_mat & Wv) {
   arma::cx_mat der;
-  cost_func_der(Wv,f,der);
-  return f;
+  cost_func_der(Wv,f_,der);
+  return f_;
 }
 
 arma::cx_mat Edmiston::cost_der(const arma::cx_mat & Wv) {
   arma::cx_mat der;
-  cost_func_der(Wv,f,der);
+  cost_func_der(Wv,f_,der);
   return der;
 }
 
@@ -1253,15 +1253,15 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(Wv.n_rows != C.n_cols) {
+  if(Wv.n_rows != C_.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
+    oss << "Matrix does not match size of problem: " << W_.n_rows << " vs " << C_.n_cols << "!\n";
     throw std::runtime_error(oss.str());
   }
 
   // Get transformed orbitals
-  arma::cx_mat Ctilde=C*Wv;
+  arma::cx_mat Ctilde=C_*Wv;
 
   // Orbital density matrices
   std::vector<arma::mat> Porb(Wv.n_cols);
@@ -1269,24 +1269,24 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
     Porb[io]=arma::real( Ctilde.col(io)*arma::trans(Ctilde.col(io)) );
 
   // Check if we need to do something
-  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
+  if(W_.n_rows != Wv.n_rows || W_.n_cols != Wv.n_cols || rms_cnorm(W_-Wv)>=DBL_EPSILON) {
     // Compute orbital-dependent Fock matrices
-    W=Wv;
+    W_=Wv;
 
-    Jorb=dfit.calcJ(Porb);
+    Jorb_=dfit_.calcJ(Porb);
   }
 
   // Compute self-repulsion
-  f=0.0;
-  for(size_t io=0;io<W.n_cols;io++)
-    f+=arma::trace(Porb[io]*Jorb[io]);
-  fv=f;
+  f_=0.0;
+  for(size_t io=0;io<W_.n_cols;io++)
+    f_+=arma::trace(Porb[io]*Jorb_[io]);
+  fv=f_;
 
   // Compute derivative
-  der.zeros(W.n_cols,W.n_cols);
-  for(size_t a=0;a<W.n_cols;a++)
-    for(size_t b=0;b<W.n_cols;b++)
-      der(a,b) =2.0 * arma::as_scalar( arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b) );
+  der.zeros(W_.n_cols,W_.n_cols);
+  for(size_t a=0;a<W_.n_cols;a++)
+    for(size_t b=0;b<W_.n_cols;b++)
+      der(a,b) =2.0 * arma::as_scalar( arma::trans(C_.col(a))*Jorb_[b]*Ctilde.col(b) );
 }
 
 inline double complex_norm(double phi, const arma::mat & S, const arma::cx_vec & C) {
