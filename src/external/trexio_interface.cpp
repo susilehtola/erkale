@@ -55,7 +55,7 @@ namespace {
   // Cartesian d and higher are genuinely different (6d != 5d) and not
   // supported for a spherical TREXIO export.
   size_t erkale_local_index(const GaussianShell & sh, int m) {
-    const int l = sh.get_am();
+    const int l = sh.am();
     if(sh.lm_in_use())
       return (size_t)(m + l);
     if(l == 0)
@@ -77,19 +77,41 @@ namespace {
     return (j & 1) ? (j + 1) / 2 : -(j / 2);
   }
 
-  // Per-shell permutation to TREXIO's storage order (m = 0,+1,-1,...).
+  // One contraction of an ERKALE shell. TREXIO has no general
+  // contractions, so a generally contracted shell is written as one
+  // TREXIO shell per contraction. ERKALE orders the functions of a
+  // generally contracted shell contraction-slowest, so contraction ic
+  // occupies [first, first+2l+1) and the segments keep ERKALE's order.
+  struct segment_t {
+    /// The ERKALE shell
+    const GaussianShell * sh;
+    /// Contraction index within the shell
+    size_t ic;
+    /// Index of the segment's first basis function
+    size_t first;
+  };
+  std::vector<segment_t> segments(const std::vector<GaussianShell> & shells) {
+    std::vector<segment_t> seg;
+    for(size_t ish=0; ish<shells.size(); ish++) {
+      const size_t nfunc = shells[ish].Nbf()/shells[ish].Nctr();
+      for(size_t ic=0; ic<shells[ish].Nctr(); ic++)
+        seg.push_back({&shells[ish], ic, shells[ish].first_ind() + ic*nfunc});
+    }
+    return seg;
+  }
+
+  // Per-segment permutation to TREXIO's storage order (m = 0,+1,-1,...).
   // perm[trexio_ao] = erkale_ao, so a quantity in ERKALE AO order is
-  // read as q_erkale[perm[a]] at TREXIO position a. Shell order is
-  // shared, and every shell has 2l+1 functions, so the global offset
+  // read as q_erkale[perm[a]] at TREXIO position a. Segment order is
+  // shared, and every segment has 2l+1 functions, so the global offset
   // is the same on both sides.
   std::vector<size_t> erkale_to_trexio_perm(const BasisSet & basis) {
-    const std::vector<GaussianShell> & shells = basis.get_shells();
-    std::vector<size_t> perm(basis.get_Nbf());
-    for(size_t ish=0; ish<shells.size(); ish++) {
-      const int l    = shells[ish].get_am();
-      const size_t f = shells[ish].get_first_ind();
+    const std::vector<GaussianShell> shells = basis.shells();
+    std::vector<size_t> perm(basis.Nbf());
+    for(const segment_t & sg : segments(shells)) {
+      const int l = sg.sh->am();
       for(int j=0; j<2*l+1; j++)
-        perm[f + j] = f + erkale_local_index(shells[ish], trexio_signed_m(j));
+        perm[sg.first + j] = sg.first + erkale_local_index(*sg.sh, trexio_signed_m(j));
     }
     return perm;
   }
@@ -100,10 +122,12 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
 
   BasisSet basis;
   chk.read(basis);
-  const std::vector<GaussianShell> & shells = basis.get_shells();
-  const std::vector<nucleus_t> nuclei = basis.get_nuclei();
-  const size_t Nbf = basis.get_Nbf();
-  const size_t Nsh = shells.size();
+  const std::vector<GaussianShell> & shells = basis.shells();
+  const std::vector<nucleus_t> nuclei = basis.nuclei();
+  const size_t Nbf = basis.Nbf();
+  // TREXIO shells: one per contraction of each ERKALE shell
+  const std::vector<segment_t> seg = segments(shells);
+  const size_t Nsh = seg.size();
   const size_t Nnuc = nuclei.size();
 
   // Spin handling: "C" present -> restricted, else "Ca"/"Cb".
@@ -169,14 +193,13 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     TX(trexio_write_electron_dn_num(tf, (int32_t) Nelb));
 
     // --- basis (Gaussian) ---
-    // One TREXIO shell per ERKALE shell; primitives flattened with a
-    // shell_index back-pointer. Coefficients are ERKALE's normalized
-    // contraction coefficients for the bare exp(-z r^2) primitive, so we
-    // set prim_factor = shell_factor = 1 and let the overlap self-check
-    // confirm the functions match.
+    // One TREXIO shell per ERKALE contraction; primitives flattened with a
+    // shell_index back-pointer. See below for the coefficient and
+    // prim_factor convention; the overlap self-check (when available)
+    // confirms the functions match.
     size_t Nprim=0;
     for(size_t ish=0; ish<Nsh; ish++)
-      Nprim += shells[ish].get_contr().size();
+      Nprim += seg[ish].sh->contr(seg[ish].ic).size();
 
     TX(trexio_write_basis_type(tf, "Gaussian", 16));
     TX(trexio_write_basis_shell_num(tf, (int32_t) Nsh));
@@ -189,10 +212,10 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     std::vector<double>  exponent(Nprim), coefficient(Nprim), prim_factor(Nprim);
     size_t ip=0;
     for(size_t ish=0; ish<Nsh; ish++) {
-      const int l = shells[ish].get_am();
-      nuc_index[ish] = (int32_t) shells[ish].get_center_ind();
+      const int l = seg[ish].sh->am();
+      nuc_index[ish] = (int32_t) seg[ish].sh->center_ind();
       shell_am[ish]  = (int32_t) l;
-      // get_contr_normalized() returns the coefficients for *normalized*
+      // contr_normalized() returns the coefficients for *normalized*
       // primitives (the basis-file contraction coefficients); TREXIO
       // overlaps bare primitives scaled by prim_factor, so prim_factor
       // is the spherical-Gaussian primitive normalization
@@ -200,7 +223,7 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
       // (ERKALE's own convention), and the contracted AO comes out
       // unit-normalized with shell_factor = 1.
       const double fac = pow(M_2_PI, 0.75) * pow(2.0, l) / std::sqrt(doublefact(2*l-1));
-      const std::vector<contr_t> c = shells[ish].get_contr_normalized();
+      const std::vector<contr_t> c = seg[ish].sh->contr_normalized(seg[ish].ic);
       for(size_t k=0; k<c.size(); k++) {
         shell_index[ip] = (int32_t) ish;
         exponent[ip]    = c[k].z;
@@ -222,11 +245,9 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     TX(trexio_write_ao_cartesian(tf, 0));
     TX(trexio_write_ao_num(tf, (int32_t) Nbf));
     std::vector<int32_t> ao_shell(Nbf);
-    for(size_t ish=0; ish<Nsh; ish++) {
-      const size_t f = shells[ish].get_first_ind();
-      for(size_t k=0; k<shells[ish].get_Nbf(); k++)
-        ao_shell[f+k] = (int32_t) ish;          // shell order is shared, so f is the TREXIO offset too
-    }
+    for(size_t ish=0; ish<Nsh; ish++)
+      for(int k=0; k<2*seg[ish].sh->am()+1; k++)
+        ao_shell[seg[ish].first+k] = (int32_t) ish;   // segment order is shared, so first is the TREXIO offset too
     TX(trexio_write_ao_shell(tf, ao_shell.data()));
     std::vector<double> ao_norm(Nbf, 1.0);
     TX(trexio_write_ao_normalization(tf, ao_norm.data()));
@@ -441,7 +462,7 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
 
   if(verbose) {
     printf("Wrote %s: %i nuclei, %i shells, %i AOs, %i MOs (%s).\n",
-           chkfile.c_str(), (int)basis.get_Nnuc(), (int)Nsh, (int)Nbf, (int)Nmo,
+           chkfile.c_str(), (int)basis.Nnuc(), (int)Nsh, (int)Nbf, (int)Nmo,
            restr ? "restricted" : "unrestricted");
     fflush(stdout);
   }
