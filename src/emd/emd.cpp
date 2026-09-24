@@ -25,15 +25,15 @@
 #include <cfloat>
 
 // Value of moment of electron density in Fourier space
-#define moment(i,k) (pow(dens[i].p,k+2) * dens[i].d)
+#define moment(i,k) (pow(dens_[i].p,k+2) * dens_[i].d)
 // Value of momentum density
-#define density(i)  (pow(dens[i].p,2)   * dens[i].d)
+#define density(i)  (pow(dens_[i].p,2)   * dens_[i].d)
 
 // Integration rules
-#define finedens(i)   ( (density(i-2)  + 4.0*density(i-1)  + 2.0*density(i)  + 4.0*density(i+1)  + density(i+2)  ) * (dens[i+2].p-dens[i-2].p)/12.0)
-#define roughdens(i)  ( (density(i-2)                      + 4.0*density(i)                      + density(i+2)  ) * (dens[i+2].p-dens[i-2].p)/6.0)
-#define finemom(i,k)  ( (moment(i-2,k) + 4.0*moment(i-1,k) + 2.0*moment(i,k) + 4.0*moment(i+1,k) + moment(i+2,k) ) * (dens[i+2].p-dens[i-2].p)/12.0)
-#define roughmom(i,k) ( (moment(i-2,k)                     + 4.0*moment(i,k)                     + moment(i+2,k) ) * (dens[i+2].p-dens[i-2].p)/6.0)
+#define finedens(i)   ( (density(i-2)  + 4.0*density(i-1)  + 2.0*density(i)  + 4.0*density(i+1)  + density(i+2)  ) * (dens_[i+2].p-dens_[i-2].p)/12.0)
+#define roughdens(i)  ( (density(i-2)                      + 4.0*density(i)                      + density(i+2)  ) * (dens_[i+2].p-dens_[i-2].p)/6.0)
+#define finemom(i,k)  ( (moment(i-2,k) + 4.0*moment(i-1,k) + 2.0*moment(i,k) + 4.0*moment(i+1,k) + moment(i+2,k) ) * (dens_[i+2].p-dens_[i-2].p)/12.0)
+#define roughmom(i,k) ( (moment(i-2,k)                     + 4.0*moment(i,k)                     + moment(i+2,k) ) * (dens_[i+2].p-dens_[i-2].p)/6.0)
 
 // Maximum number of points allowed for converging number of electrons
 #define MAXPOINTS 4000
@@ -53,14 +53,14 @@
 //#define DEBUG
 
 RadialFourier::RadialFourier(int lv) {
-  l=lv;
+  l_=lv;
 }
 
 RadialFourier::~RadialFourier() {
 }
 
-int RadialFourier::getl() const {
-  return l;
+int RadialFourier::l() const {
+  return l_;
 }
 
 bool operator<(const coupl_coeff_t & lhs, const coupl_coeff_t & rhs) {
@@ -130,11 +130,11 @@ EMDEvaluator::EMDEvaluator() {
 
 EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv, int lp, int mp) {
 
-  idfuncs=idfuncsv;
-  loc=locv;
-  P=Pv;
+  idfuncs_=idfuncsv;
+  loc_=locv;
+  P_=Pv;
 
-  if(P.n_rows!=P.n_cols)
+  if(P_.n_rows!=P_.n_cols)
     throw std::runtime_error("Density matrix not square!\n");
 
   // Compute the coupling coefficients.
@@ -145,12 +145,12 @@ EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, 
 }
 
 void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
-  Nat=coord.size();
-  dist.resize((Nat*(Nat+1))/2);
-  YLM.resize((Nat*(Nat+1))/2);
+  Nat_=coord.size();
+  dist_.resize((Nat_*(Nat_+1))/2);
+  YLM_.resize((Nat_*(Nat_+1))/2);
 
-  for(size_t i=0;i<YLM.size();i++)
-    YLM[i].resize(lmind(Lmax,Lmax)+1);
+  for(size_t i=0;i<YLM_.size();i++)
+    YLM_[i].resize(lmind(Lmax_,Lmax_)+1);
 
   for(size_t i=0;i<coord.size();i++)
     for(size_t j=0;j<=i;j++) {
@@ -160,21 +160,21 @@ void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
 
       if(i==j) {
 	// Same atom.
-	dist[ind]=0.0;
+	dist_[ind]=0.0;
 
 	// Initialize array
-	for(int L=0;L<=Lmax;L++)
+	for(int L=0;L<=Lmax_;L++)
 	  for(int M=-L;M<=L;M++)
-	    YLM[ind][lmind(L,M)]=0.0;
+	    YLM_[ind][lmind(L,M)]=0.0;
 	// However, Y_0^0 is 1/sqrt(4*pi)
-	YLM[ind][lmind(0,0)]=1.0/sqrt(4.0*M_PI);
+	YLM_[ind][lmind(0,0)]=1.0/sqrt(4.0*M_PI);
       } else {
 	// Displacement vector
 	coords_t dr_vec=coord[i]-coord[j];
 
 	// Compute distance
 	double dr=norm(dr_vec);
-	dist[ind]=dr;
+	dist_[ind]=dr;
 
 	// Phi and cos(theta)
 	double phi, theta;
@@ -187,15 +187,15 @@ void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
 	}
 
 	// Loop over L and M
-	for(int L=0;L<=Lmax;L++)
+	for(int L=0;L<=Lmax_;L++)
 	  for(int M=-L;M<=L;M++)
-	    YLM[ind][lmind(L,M)]=std::conj(spherical_harmonics(L,M,theta,phi));
+	    YLM_[ind][lmind(L,M)]=std::conj(spherical_harmonics(L,M,theta,phi));
       }
     }
 }
 
 void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm, int lp, int mp) {
-  if(clm.size()!=idfuncs.size())
+  if(clm.size()!=idfuncs_.size())
     throw std::runtime_error("Sizes of clm and idfuncs do not match!\n");
 
   // Sanity check
@@ -216,7 +216,7 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 
   // Resize coupling coefficient array
   //  cc.resize(N*(N+1)/2);
-  cc.resize(N*N);
+  cc_.resize(N*N);
 
   // Determine the maximum value of L we need
   int lmax=0;
@@ -226,10 +226,10 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 	lmax=clm[i][j].l;
 
   // We can thus couple up to
-  Lmax=2*lmax+lp;
+  Lmax_=2*lmax+lp;
 
   // Compute Gaunt coefficient table.
-  Gaunt gaunt(lmax+lp,Lmax,lmax+lp);
+  Gaunt gaunt(lmax+lp,Lmax_,lmax+lp);
 
   // Form the coefficients. Loop over groups of equivalent functions.
   for(size_t iig=0;iig<clm.size();iig++) {
@@ -298,10 +298,10 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 
   // Clear coefficients with zero weight
   size_t nclean=0;
-  for(size_t i=0;i<cc.size();i++) {
-    for(size_t j=cc[i].size()-1;j<cc[i].size();j--)
-      if(norm(cc[i][j].c)==0.0) {
-	cc[i].erase(cc[i].begin()+j);
+  for(size_t i=0;i<cc_.size();i++) {
+    for(size_t j=cc_[i].size()-1;j<cc_[i].size();j--)
+      if(norm(cc_[i][j].c)==0.0) {
+	cc_[i].erase(cc_[i].begin()+j);
 	nclean++;
       }
   }
@@ -312,13 +312,13 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 EMDEvaluator::~EMDEvaluator() {
 }
 
-std::vector<radf_val_t> EMDEvaluator::get_radial(size_t ig, double p) const {
+std::vector<radf_val_t> EMDEvaluator::radial(size_t ig, double p) const {
   std::vector<radf_val_t> ret;
 
-  for(size_t j=0;j<rad[ig].size();j++) {
+  for(size_t j=0;j<rad_[ig].size();j++) {
     radf_val_t hlp;
-    hlp.l=rad[ig][j]->getl();
-    hlp.f=rad[ig][j]->get(p);
+    hlp.l=rad_[ig][j]->l();
+    hlp.f=rad_[ig][j]->eval(p);
     if(norm(hlp.f)>0.0)
       ret.push_back(hlp);
   }
@@ -328,7 +328,7 @@ std::vector<radf_val_t> EMDEvaluator::get_radial(size_t ig, double p) const {
 
 void EMDEvaluator::add_coupling(size_t ig, size_t jg, coupl_coeff_t t) {
   // Index is
-  size_t ijdx=ig*idfuncs.size()+jg;
+  size_t ijdx=ig*idfuncs_.size()+jg;
 
 #ifdef DEBUG
   if(ijdx>=cc.size()) {
@@ -338,31 +338,31 @@ void EMDEvaluator::add_coupling(size_t ig, size_t jg, coupl_coeff_t t) {
   }
 #endif
 
-  if(cc[ijdx].size()==0) {
-    cc[ijdx].push_back(t);
+  if(cc_[ijdx].size()==0) {
+    cc_[ijdx].push_back(t);
   } else {
     // Get upper bound
     std::vector<coupl_coeff_t>::iterator high;
-    high=std::upper_bound(cc[ijdx].begin(),cc[ijdx].end(),t);
+    high=std::upper_bound(cc_[ijdx].begin(),cc_[ijdx].end(),t);
 
     // Corresponding index is
-    size_t ind=high-cc[ijdx].begin();
+    size_t ind=high-cc_[ijdx].begin();
 
-    if(ind>0 && cc[ijdx][ind-1]==t)
+    if(ind>0 && cc_[ijdx][ind-1]==t)
       // Found it.
-      cc[ijdx][ind-1].c+=t.c;
+      cc_[ijdx][ind-1].c+=t.c;
     else {
       // Term does not exist, add it
-      cc[ijdx].insert(high,t);
+      cc_[ijdx].insert(high,t);
     }
   }
 }
 
-void EMDEvaluator::get_coupling(size_t ig, size_t jg, int l, int lp, std::vector<total_coupl_t> & c) const {
+void EMDEvaluator::coupling(size_t ig, size_t jg, int l, int lp, std::vector<total_coupl_t> & c) const {
   // Find coupling coefficients with the wanted l and l'
 
   // The index in the cc list is
-  size_t ijidx=ig*idfuncs.size()+jg;
+  size_t ijidx=ig*idfuncs_.size()+jg;
 
   /*
   // Lower limit
@@ -402,21 +402,21 @@ void EMDEvaluator::get_coupling(size_t ig, size_t jg, int l, int lp, std::vector
   */
 
   c.clear();
-  for(size_t i=0;i<cc[ijidx].size();i++)
-    if((cc[ijidx][i].l==l) && (cc[ijidx][i].lp==lp)) {
+  for(size_t i=0;i<cc_[ijidx].size();i++)
+    if((cc_[ijidx][i].l==l) && (cc_[ijidx][i].lp==lp)) {
 
       total_coupl_t hlp;
-      hlp.L=cc[ijidx][i].L;
-      hlp.M=cc[ijidx][i].M;
-      hlp.c=cc[ijidx][i].c;
+      hlp.L=cc_[ijidx][i].L;
+      hlp.M=cc_[ijidx][i].M;
+      hlp.c=cc_[ijidx][i].c;
       c.push_back(hlp);
     }
 }
 
-void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & ret, std::vector<total_coupl_t> & tmp) const {
+void EMDEvaluator::total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & ret, std::vector<total_coupl_t> & tmp) const {
   // Get the radial parts
-  std::vector<radf_val_t> ri=get_radial(ig,p);
-  std::vector<radf_val_t> rj=get_radial(jg,p);
+  std::vector<radf_val_t> ri=radial(ig,p);
+  std::vector<radf_val_t> rj=radial(jg,p);
 
   // Clear return array
   ret.clear();
@@ -431,7 +431,7 @@ void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vecto
       int lp=rj[ilp].l;
 
       // Get the coupling constants
-      get_coupling(ig,jg,l,lp,tmp);
+      coupling(ig,jg,l,lp,tmp);
 
       // Increment total value
       for(size_t ic=0;ic<tmp.size();ic++) {
@@ -462,11 +462,11 @@ void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vecto
 
 void EMDEvaluator::print() const {
   printf("Radial parts\n");
-  for(size_t i=0;i<rad.size();i++) {
-    printf("Function %i / %i\n",(int) i+1, (int) rad.size());
-    for(size_t j=0;j<rad[i].size();j++) {
+  for(size_t i=0;i<rad_.size();i++) {
+    printf("Function %i / %i\n",(int) i+1, (int) rad_.size());
+    for(size_t j=0;j<rad_[i].size();j++) {
       printf("%2i ",(int) j);
-      rad[i][j]->print();
+      rad_[i][j]->print();
     }
   }
 }
@@ -475,12 +475,12 @@ void EMDEvaluator::check_norm() const {
   // Get radial grid
   std::vector<radial_grid_t> grid=form_radial_grid(NRAD);
 
-  for(size_t i=0;i<rad.size();i++) {
-    for(size_t j=0;j<rad[i].size();j++) {
+  for(size_t i=0;i<rad_.size();i++) {
+    for(size_t j=0;j<rad_[i].size();j++) {
       // Calculate norm
       double norm=0.0;
       for(size_t ip=0;ip<grid.size();ip++)
-	norm+=grid[ip].w*std::norm(rad[i][j]->get(grid[ip].r));
+	norm+=grid[ip].w*std::norm(rad_[i][j]->eval(grid[ip].r));
       norm=sqrt(norm);
 
 #ifdef DEBUG
@@ -495,20 +495,20 @@ void EMDEvaluator::check_norm() const {
   printf("Norms of the functions checked.\n");
 }
 
-std::complex<double> EMDEvaluator::get(double p) const {
+std::complex<double> EMDEvaluator::eval(double p) const {
   // Arguments of Bessel functions are
-  std::vector<double> args(dist);
+  std::vector<double> args(dist_);
   for(size_t i=0;i<args.size();i++)
     args[i]*=p;
   // Evaluate Bessel functions
-  arma::mat jl=bessel_array(args,Lmax);
+  arma::mat jl=bessel_array(args,Lmax_);
 
   // Continue by computing the radial EMD
   std::complex<double> np=0.0;
 
   // List of off-diagonal elements
   std::vector<noneqradf_t> offd;
-  for(size_t iig=0;iig<idfuncs.size();iig++)
+  for(size_t iig=0;iig<idfuncs_.size();iig++)
     for(size_t jjg=0;jjg<iig;jjg++) {
       noneqradf_t hlp;
       hlp.i=iig;
@@ -535,20 +535,20 @@ std::complex<double> EMDEvaluator::get(double p) const {
       size_t jjg=offd[iii].j;
 
       // Get the total coupling coefficient
-      get_total_coupling(iig,jjg,p,totc,tmp);
+      total_coupling(iig,jjg,p,totc,tmp);
       if(totc.size()==0)
 	continue;
 
       // Loop over the individual functions
-      for(size_t ii=0;ii<idfuncs[iig].size();ii++)
-	for(size_t jj=0;jj<idfuncs[jjg].size();jj++) {
+      for(size_t ii=0;ii<idfuncs_[iig].size();ii++)
+	for(size_t jj=0;jj<idfuncs_[jjg].size();jj++) {
 	  // The indices are
-	  size_t mu=idfuncs[iig][ii];
-	  size_t nu=idfuncs[jjg][jj];
+	  size_t mu=idfuncs_[iig][ii];
+	  size_t nu=idfuncs_[jjg][jj];
 
 	  // and the functions are centered on
-	  size_t iat=loc[mu];
-	  size_t jat=loc[nu];
+	  size_t iat=loc_[mu];
+	  size_t jat=loc_[nu];
 
 	  // so the corresponding index in the Bessel and spherical harmonics arrays is
 	  size_t ibes;
@@ -571,7 +571,7 @@ std::complex<double> EMDEvaluator::get(double p) const {
 	    int M=totc[ic].M;
 
 	    // Increment EMD; we get the increment twice since we are off-diagonal.
-	    std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
+	    std::complex<double> incr=2.0*P_(mu,nu)*totc[ic].c*YLM_[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
 	    npre+=incr.real();
 	    npim+=incr.imag();
 	  }
@@ -590,22 +590,22 @@ std::complex<double> EMDEvaluator::get(double p) const {
 #pragma omp for schedule(dynamic)
 #endif
     // Then, do diagonal. Get the total coupling coefficient
-    for(size_t iig=0;iig<idfuncs.size();iig++) {
-      get_total_coupling(iig,iig,p,totc,tmp);
+    for(size_t iig=0;iig<idfuncs_.size();iig++) {
+      total_coupling(iig,iig,p,totc,tmp);
       if(totc.size()==0)
 	continue;
 
       // Loop over the individual functions
-      for(size_t ii=0;ii<idfuncs[iig].size();ii++)
-	for(size_t jj=0;jj<idfuncs[iig].size();jj++) {
+      for(size_t ii=0;ii<idfuncs_[iig].size();ii++)
+	for(size_t jj=0;jj<idfuncs_[iig].size();jj++) {
 
 	  // The indices are
-	  size_t mu=idfuncs[iig][ii];
-	  size_t nu=idfuncs[iig][jj];
+	  size_t mu=idfuncs_[iig][ii];
+	  size_t nu=idfuncs_[iig][jj];
 
 	  // and the functions are centered on
-	  size_t iat=loc[mu];
-	  size_t jat=loc[nu];
+	  size_t iat=loc_[mu];
+	  size_t jat=loc_[nu];
 
 	  // so the corresponding index in the Bessel and spherical harmonics arrays is
 	  size_t ibes;
@@ -628,7 +628,7 @@ std::complex<double> EMDEvaluator::get(double p) const {
 	    int M=totc[ic].M;
 
 	    // Increment EMD
-	    std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
+	    std::complex<double> incr=P_(mu,nu)*totc[ic].c*YLM_[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
 	    npre+=incr.real();
 	    npim+=incr.imag();
 	  }
@@ -668,23 +668,23 @@ arma::mat bessel_array(const std::vector<double> & args, int lmax) {
 
 
 EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, double Nelv, int lv, int mv) {
-  Nel=Nelv;
-  poseval=posevalp;
-  l=lv;
-  m=mv;
+  Nel_=Nelv;
+  poseval_=posevalp;
+  l_=lv;
+  m_=mv;
 
-  if(m>0) {
-    negeval=negevalp;
-    negcoef=M_SQRT1_2;
-    poscoef=std::pow(-1.0,m)*M_SQRT1_2;
-  } else if(m==0) {
-    negeval=NULL;
-    negcoef=0.0;
-    poscoef=1.0;
+  if(m_>0) {
+    negeval_=negevalp;
+    negcoef_=M_SQRT1_2;
+    poscoef_=std::pow(-1.0,m_)*M_SQRT1_2;
+  } else if(m_==0) {
+    negeval_=NULL;
+    negcoef_=0.0;
+    poscoef_=1.0;
   } else {
-    negeval=negevalp;
-    negcoef=std::complex<double>(0.0,M_SQRT1_2);
-    poscoef=-std::pow(-1.0,m)*std::complex<double>(0.0,M_SQRT1_2);
+    negeval_=negevalp;
+    negcoef_=std::complex<double>(0.0,M_SQRT1_2);
+    poscoef_=-std::pow(-1.0,m_)*std::complex<double>(0.0,M_SQRT1_2);
   }
 }
 
@@ -696,10 +696,10 @@ double EMD::eval(double p) const {
   std::complex<double> r;
 
   // Positive part
-  if(negcoef!=0.0)
-    r = poscoef*poseval->get(p) + negcoef*negeval->get(p);
+  if(negcoef_!=0.0)
+    r = poscoef_*poseval_->eval(p) + negcoef_*negeval_->eval(p);
   else
-    r = poscoef*poseval->get(p);
+    r = poscoef_*poseval_->eval(p);
 
   // Return real part
   return r.real();
@@ -730,14 +730,14 @@ void EMD::add4(size_t loc) {
 #endif
   for(int ipoint=2;ipoint>-2;ipoint--) {
     // Value of p is
-    integ[2-ipoint].p=0.5*(dens[loc+ipoint].p+dens[loc+ipoint-1].p);
+    integ[2-ipoint].p=0.5*(dens_[loc+ipoint].p+dens_[loc+ipoint-1].p);
     // Value of the density at this point is
     integ[2-ipoint].d=eval(integ[2-ipoint].p);
     // Add value to the list
 #ifdef _OPENMP
 #pragma omp ordered
 #endif
-    dens.insert(dens.begin()+loc+ipoint,integ[2-ipoint]);
+    dens_.insert(dens_.begin()+loc+ipoint,integ[2-ipoint]);
   }
 }
 
@@ -765,7 +765,7 @@ void EMD::find_electrons(bool verbose, double tol) {
 
     maxerror=0;
     // Calculate integral and find maximum error
-    for(size_t i=dens.size()-3;i<dens.size();i-=4) {
+    for(size_t i=dens_.size()-3;i<dens_.size();i-=4) {
       // The rough value is (3-point Simpson)
       rough=roughdens(i);
       // The fine value is (5-point Simpson)
@@ -782,12 +782,12 @@ void EMD::find_electrons(bool verbose, double tol) {
       }
     }
 
-    if(fabs(Nel-integral)/Nel>tol) {
+    if(fabs(Nel_-integral)/Nel_>tol) {
       // Check that the calculation will actually converge at some point..
-      if(dens.size()>MAXPOINTS) {
+      if(dens_.size()>MAXPOINTS) {
 	ERROR_INFO();
 	std::ostringstream oss;
-	oss << "Error in find_electrons: maximum allowed number of points reached. int=" << integral << ", Nel=" << Nel <<".\n";
+	oss << "Error in find_electrons: maximum allowed number of points reached. int=" << integral << ", Nel=" << Nel_ <<".\n";
 	throw std::runtime_error(oss.str());
       }
 
@@ -812,7 +812,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
   std::vector<int> moms;
   int kmin=-2;
   int kmax=4;
-  if(l>0)
+  if(l_>0)
     // Don't go up to p^4, it converges very badly for l>0.
     kmax=3;
 
@@ -856,7 +856,7 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
       mommaxerrloc[imom]=-1;
 
       // Calculate <p^k>
-      for(size_t i=dens.size()-3;i<dens.size();i-=4) {
+      for(size_t i=dens_.size()-3;i<dens_.size();i-=4) {
 	rough=roughmom(i,mom);
 	fine=finemom(i,mom);
 
@@ -884,10 +884,10 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
     // Print out current values if necessary
     if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
-      if(l==0 && m==0)
-	printf("\nUsing %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
+      if(l_==0 && m_==0)
+	printf("\nUsing %u points, charge differs from Nel by %e.\n",(unsigned int) dens_.size(),momval[2]-Nel_);
       else
-	printf("\nUsing %u points.\n",(unsigned int) dens.size());
+	printf("\nUsing %u points.\n",(unsigned int) dens_.size());
       printf("Current values of moments are:\n");
       printf("\t%2s\t%13s\t%12s\t%12s\n","k","<p^k>","Abs error","Rel error");
       for(size_t imom=0;imom<moms.size();imom++)
@@ -902,10 +902,10 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
 
   if(verbose) {
     t.set();
-      if(l==0 && m==0)
-	printf("\nUsed %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
+      if(l_==0 && m_==0)
+	printf("\nUsed %u points, charge differs from Nel by %e.\n",(unsigned int) dens_.size(),momval[2]-Nel_);
       else
-	printf("\nUsed %u points.\n",(unsigned int) dens.size());
+	printf("\nUsed %u points.\n",(unsigned int) dens_.size());
       printf("Final values of moments are:\n");
       printf("\t%2s\t%13s\t%12s\t%12s\n","k","<p^k>","Abs error","Rel error");
       for(size_t imom=0;imom<moms.size();imom++)
@@ -921,9 +921,9 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
   }
 
   // Add the origin
-  dens.resize(1);
-  dens[0].p=0.0;
-  dens[0].d=eval(0.0);
+  dens_.resize(1);
+  dens_[0].p=0.0;
+  dens_[0].d=eval(0.0);
 
   // Loop over intervals
   double pmin=0.0;
@@ -939,8 +939,8 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
     size_t Nint=(size_t) round((len-pmin)/(4*h));
 
     // Allocate memory
-    size_t i0=dens.size();
-    dens.resize(dens.size()+4*Nint);
+    size_t i0=dens_.size();
+    dens_.resize(dens_.size()+4*Nint);
 
     // Loop over intervals
 #ifdef _OPENMP
@@ -948,8 +948,8 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
 #endif
     for(size_t i=0;i<Nint;i++)
       for(int j=0;j<4;j++) {
-	dens[i0+4*i+j].p = pmin + 4*i*h + (j+1)*h;
-	dens[i0+4*i+j].d = eval(dens[i0+4*i+j].p);
+	dens_[i0+4*i+j].p = pmin + 4*i*h + (j+1)*h;
+	dens_[i0+4*i+j].d = eval(dens_[i0+4*i+j].p);
       }
 
     pmin+=Nint*4*h;
@@ -957,25 +957,25 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
     len*=lfac;
 
     // Check if density is insignificant (Slater functions die pretty slowly)
-    if(dens[dens.size()-1].d*std::pow(dens[dens.size()-1].p,4)<=cutoff && dens[dens.size()-2].d*std::pow(dens[dens.size()-1].p,4)<=cutoff)
+    if(dens_[dens_.size()-1].d*std::pow(dens_[dens_.size()-1].p,4)<=cutoff && dens_[dens_.size()-2].d*std::pow(dens_[dens_.size()-1].p,4)<=cutoff)
       break;
   }
 
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
-    printf("Grid filled up to p = %e.\n",dens[dens.size()-1].p);
+    printf("Grid filled up to p = %e.\n",dens_[dens_.size()-1].p);
     fflush(stdout);
   }
 }
 
-std::vector<emd_t> EMD::get() const {
-  return dens;
+std::vector<emd_t> EMD::dens() const {
+  return dens_;
 }
 
 void EMD::save(const std::string & fname) const {
   FILE *out=fopen(fname.c_str(),"w");
-  for(size_t i=0;i<dens.size();i++)
-    fprintf(out,"%.15e\t%.15e\n",dens[i].p,dens[i].d);
+  for(size_t i=0;i<dens_.size();i++)
+    fprintf(out,"%.15e\t%.15e\n",dens_[i].p,dens_[i].d);
   fclose(out);
 }
 
@@ -991,18 +991,18 @@ arma::mat EMD::moments() const {
   arma::mat moms(Nm,3);
 
   // Helper variables
-  const size_t N=dens.size();
+  const size_t N=dens_.size();
   double p[N], integrand[N];
 
   // Fill in momentum grid
   for(size_t i=0;i<N;i++)
-    p[i]=dens[i].p;
+    p[i]=dens_[i].p;
 
   // Calculate the moments
   for(int mi=0;mi<Nm;mi++) {
     // Fill in helper grid
     for(size_t i=0;i<N;i++)
-      integrand[i]=pow(p[i],2+momarr[mi])*dens[i].d;
+      integrand[i]=pow(p[i],2+momarr[mi])*dens_[i].d;
 
     // Zero out old values
     moms(mi,0)=momarr[mi];
@@ -1036,14 +1036,14 @@ void EMD::moments(const std::string & fname) const {
 
 arma::mat EMD::compton_profile() const {
   double rough, fine, Jint, Jerr;
-  double integrand[dens.size()];
+  double integrand[dens_.size()];
 
-  size_t N=(dens.size()-1)/4;
+  size_t N=(dens_.size()-1)/4;
   arma::mat J(N,3);
 
   // Calculate integrand
-  for(size_t i=0;i<dens.size();i++)
-    integrand[i]=dens[i].p*dens[i].d;
+  for(size_t i=0;i<dens_.size();i++)
+    integrand[i]=dens_[i].p*dens_[i].d;
 
   // Calculate the Compton profile
   rough=0.0;
@@ -1053,15 +1053,15 @@ arma::mat EMD::compton_profile() const {
   size_t n=N-1;
 
   // Calculate integral
-  for(size_t i=dens.size()-3;i<dens.size();i-=4) {
-    rough=(integrand[i-2]+4.0*integrand[i]+integrand[i+2])/6.0*(dens[i+2].p-dens[i-2].p);
-    fine=(integrand[i-2]+4.0*integrand[i-1]+2.0*integrand[i]+4.0*integrand[i+1]+integrand[i+2])/12.0*(dens[i+2].p-dens[i-2].p);
+  for(size_t i=dens_.size()-3;i<dens_.size();i-=4) {
+    rough=(integrand[i-2]+4.0*integrand[i]+integrand[i+2])/6.0*(dens_[i+2].p-dens_[i-2].p);
+    fine=(integrand[i-2]+4.0*integrand[i-1]+2.0*integrand[i]+4.0*integrand[i+1]+integrand[i+2])/12.0*(dens_[i+2].p-dens_[i-2].p);
 
     Jint+=fine;
     Jerr+=fabs(fine-rough)/15.0;
 
     // Save profile
-    J(n,0)=dens[i-2].p; // Must be i-1 to get J(0) = 1st moment of density / 2
+    J(n,0)=dens_[i-2].p; // Must be i-1 to get J(0) = 1st moment of density / 2
     J(n,1)=0.5*Jint; // J = 1/2 \int_{|q|}^\infty
     J(n,2)=0.5*Jerr;
     n--;

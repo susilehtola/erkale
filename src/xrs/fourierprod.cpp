@@ -103,7 +103,7 @@ prod_fourier::prod_fourier(const prod_gaussian_3d & prod) {
     ft.clean();
 
     // Store the polynomial
-    std::vector<trans3d_t> fterms=ft.get();
+    std::vector<trans3d_t> fterms=ft.terms();
     for(size_t j=0;j<fterms.size();j++) {
       // Form term
       prod_fourier_contr_t tmp;

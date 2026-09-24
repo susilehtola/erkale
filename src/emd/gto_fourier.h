@@ -70,7 +70,7 @@ bool operator==(const poly1d_t & lhs, const poly1d_t & rhs);
 
 class FourierPoly_1D {
   /// 1-dimensional Fourier polynomial
-  std::vector<poly1d_t> poly;
+  std::vector<poly1d_t> poly_;
 
   /**
    * Helper for the constructor - use recursion formula to compute
@@ -93,11 +93,11 @@ class FourierPoly_1D {
   FourierPoly_1D operator+(const FourierPoly_1D & rhs) const;
 
   /// Get number of terms in the polynomial
-  size_t getN() const;
+  size_t N() const;
   /// Get the i:th contraction coefficient
-  std::complex<double> getc(size_t i) const;
+  std::complex<double> c(size_t i) const;
   /// Get the exponent of p in the i:th term
-  int getl(size_t i) const;
+  int l(size_t i) const;
 
   /// Print polynomial
   void print() const;
@@ -146,7 +146,7 @@ bool operator==(const trans3d_t & lhs, const trans3d_t& rhs);
 
 class GTO_Fourier {
   /// The terms of the Fourier transformed GTO
-  std::vector<trans3d_t> trans;
+  std::vector<trans3d_t> trans_;
  public:
   /// Dummy constructor
   GTO_Fourier();
@@ -164,7 +164,7 @@ class GTO_Fourier {
   GTO_Fourier & operator+=(const GTO_Fourier & rhs);
 
   /// Get the expansion in terms
-  std::vector<trans3d_t> get() const;
+  std::vector<trans3d_t> terms() const;
 
   /// Print Fourier transform
   void print() const;
