@@ -67,3 +67,34 @@ run_neo(neo_two_particles "-76.34112")
 
 # Generate list with genlist.sh
 include(TestList.txt)
+
+# TREXIO export: write TREXIO files from the checkpoints of a few of the
+# tests above (restricted, unrestricted and ROHF; up to g functions) and
+# validate them with trexio-validate. Each file is also imported back and
+# re-exported, and the result validated, which exercises the import.
+function(run_trexio target)
+  set(trexio_env "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
+  add_test(NAME ${target}_trexio_export COMMAND erkale_trexio export ${target}.chk ${target}.h5)
+  add_test(NAME ${target}_trexio_import COMMAND erkale_trexio import ${target}.h5 ${target}_trexio.chk)
+  add_test(NAME ${target}_trexio_reexport COMMAND erkale_trexio export ${target}_trexio.chk ${target}_trexio.h5)
+  set_tests_properties(${target}_trexio_export ${target}_trexio_import ${target}_trexio_reexport
+    PROPERTIES ENVIRONMENT "${trexio_env}")
+  set_tests_properties(${target}_trexio_export PROPERTIES DEPENDS ${target}_chk FIXTURES_SETUP ${target}_trexio)
+  set_tests_properties(${target}_trexio_import PROPERTIES FIXTURES_REQUIRED ${target}_trexio FIXTURES_SETUP ${target}_trexio_rt)
+  set_tests_properties(${target}_trexio_reexport PROPERTIES FIXTURES_REQUIRED ${target}_trexio_rt FIXTURES_SETUP ${target}_trexio_rt2)
+  set(required basis nucleus_repulsion electron_count mo_orthonormality)
+  trexio_validate_add_test(${target}_trexio_validate
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/${target}.h5
+    FIXTURES_REQUIRED ${target}_trexio REQUIRE ${required})
+  trexio_validate_add_test(${target}_trexio_revalidate
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/${target}_trexio.h5
+    FIXTURES_REQUIRED ${target}_trexio_rt2 REQUIRE ${required})
+endfunction()
+
+if(TARGET erkale_trexio AND COMMAND trexio_validate_add_test)
+  add_test(build_erkale_trexio "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale_trexio trexio-validate)
+  run_trexio(H2O_tz_pbe)
+  run_trexio(H2O+_tz_hf)
+  run_trexio(Mg+_rohf_tz)
+  run_trexio(H2O_qz)
+endif()
