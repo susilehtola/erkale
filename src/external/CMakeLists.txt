@@ -43,9 +43,10 @@ elseif(ERKALE_FETCH_TREXIO)
   # trexio-release mirrors the release tarballs, which ship the generated
   # C sources. The upstream git repository only has the org-mode sources
   # and a .devel marker that makes TREXIO regenerate them with emacs.
+  # The mirror has no tags: pin the "Update to trexio-2.6.1" commit.
   FetchContent_Declare(trexio
-    GIT_REPOSITORY https://github.com/susilehtola/trexio-release.git
-    GIT_TAG        v2.6.1)
+    GIT_REPOSITORY https://github.com/TREX-CoE/trexio-release.git
+    GIT_TAG        42cc2029f9f6bb345e57803ca82fae7833cf89c2)
   FetchContent_MakeAvailable(trexio)
   set(ERKALE_BUILD_TREXIO ON)
   add_library(erkale_trexio_lib INTERFACE)
@@ -91,8 +92,8 @@ if(ERKALE_BUILD_TREXIO)
       set(LIBCINT_INCLUDE_DIR "${cint_BINARY_DIR}/include")
     endif()
     FetchContent_Declare(TrexioValidate
-      GIT_REPOSITORY https://github.com/susilehtola/trexio-validate.git
-      GIT_TAG        33c3e1b59c8ed83698ce8d34e31f0106aa5b9d2c)
+      GIT_REPOSITORY https://github.com/TREX-CoE/trexio-validate.git
+      GIT_TAG        b9882bcd431928467814460a166e50d6951b5f3c)
     FetchContent_MakeAvailable(TrexioValidate)
   endif()
 endif()
