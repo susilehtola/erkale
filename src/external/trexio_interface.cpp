@@ -17,6 +17,8 @@
 #include "trexio_interface.h"
 #include "../checkpoint.h"
 #include "../basis.h"
+#include "../cintenv.h"
+#include "../eriworker.h"
 #include "../elements.h"
 #include "../mathf.h"
 
@@ -115,9 +117,101 @@ namespace {
     }
     return perm;
   }
+
+  /// An AO matrix in ERKALE order as a TREXIO array (TREXIO AO order,
+  /// row major; the matrices written here are symmetric).
+  std::vector<double> ao_array(const arma::mat & M, const std::vector<size_t> & perm) {
+    const size_t N=perm.size();
+    std::vector<double> v(N*N);
+    for(size_t a=0; a<N; a++)
+      for(size_t b=0; b<N; b++)
+        v[a*N+b] = M(perm[a], perm[b]);
+    return v;
+  }
+
+  /// An AO matrix transformed to the MO basis C (row major).
+  std::vector<double> mo_array(const arma::mat & M, const arma::mat & C) {
+    const arma::mat X(C.t()*M*C);
+    const size_t N=X.n_rows;
+    std::vector<double> v(N*N);
+    for(size_t i=0; i<N; i++)
+      for(size_t j=0; j<N; j++)
+        v[i*N+j] = X(i,j);
+    return v;
+  }
+
+  /**
+   * Write the AO electron repulsion integrals. Each symmetry-unique
+   * integral above thr is stored once, in TREXIO's physicists' notation
+   * <ab|cd> = (ac|bd) and TREXIO AO order. The loop covers the shell
+   * quartets with is>=js, ks>=ls and is>=ks, a superset of the canonical
+   * ones (for is==ks, which pair is larger depends on the functions, not
+   * just on the shells), and the canonical integrals are picked out by
+   * their TREXIO indices.
+   */
+  size_t write_ao_eri(trexio_t * tf, const BasisSet & basis, const std::vector<size_t> & perm, double thr) {
+    // TREXIO index of each ERKALE AO
+    std::vector<size_t> iperm(perm.size());
+    for(size_t a=0; a<perm.size(); a++)
+      iperm[perm[a]] = a;
+
+    const std::vector<GaussianShell> shells = basis.shells();
+    const size_t Nsh = shells.size();
+    CintEnv cenv(basis);
+    auto eri = make_eri_worker(cenv, 0.0, 1.0, 0.0);
+
+    // Buffered sparse write
+    const size_t bufsize = 1<<20;
+    std::vector<int32_t> idx;
+    std::vector<double> val;
+    idx.reserve(4*bufsize);
+    val.reserve(bufsize);
+    int64_t offset = 0;
+    auto flush = [&]() {
+      if(val.empty())
+        return;
+      TX(trexio_write_ao_2e_int_eri(tf, offset, (int64_t) val.size(), idx.data(), val.data()));
+      offset += val.size();
+      idx.clear();
+      val.clear();
+    };
+
+    // Pair index of a >= b
+    auto pair = [](size_t a, size_t b) { return a*(a+1)/2 + b; };
+
+    for(size_t is=0; is<Nsh; is++)
+      for(size_t js=0; js<=is; js++)
+        for(size_t ks=0; ks<=is; ks++)
+          for(size_t ls=0; ls<=ks; ls++) {
+            eri->compute(is, js, ks, ls);
+            const std::vector<double> & ints = *eri->getp();
+            const size_t Ni=shells[is].Nbf(), Nj=shells[js].Nbf(), Nk=shells[ks].Nbf(), Nl=shells[ls].Nbf();
+            const size_t i0=shells[is].first_ind(), j0=shells[js].first_ind(), k0=shells[ks].first_ind(), l0=shells[ls].first_ind();
+            for(size_t ii=0; ii<Ni; ii++)
+              for(size_t jj=0; jj<Nj; jj++)
+                for(size_t kk=0; kk<Nk; kk++)
+                  for(size_t ll=0; ll<Nl; ll++) {
+                    const double v = ints[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+                    if(std::abs(v) <= thr)
+                      continue;
+                    // Chemists' (ij|kl) in TREXIO indices
+                    const size_t i=iperm[i0+ii], j=iperm[j0+jj], k=iperm[k0+kk], l=iperm[l0+ll];
+                    if(i<j || k<l || pair(i,j)<pair(k,l))
+                      continue;
+                    // Physicists' <ik|jl>
+                    const int32_t q[4] = {(int32_t) i, (int32_t) k, (int32_t) j, (int32_t) l};
+                    idx.insert(idx.end(), q, q+4);
+                    val.push_back(v);
+                    if(val.size() == bufsize)
+                      flush();
+                  }
+          }
+    flush();
+    return (size_t) offset;
+  }
 }
 
-void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, bool verbose) {
+void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, bool eri, bool verbose) {
   Checkpoint chk(chkfile, false);
 
   BasisSet basis;
@@ -166,7 +260,7 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     std::vector<const char *> label(Nnuc);
     std::vector<std::string> labelstr(Nnuc);
     for(size_t i=0; i<Nnuc; i++) {
-      charge[i]      = nuclei[i].Z;
+      charge[i]      = nuclei[i].bsse ? 0.0 : nuclei[i].Z;   // ghost atoms carry no charge
       coord[3*i+0]   = nuclei[i].r.x;   // ERKALE stores coordinates in bohr
       coord[3*i+1]   = nuclei[i].r.y;
       coord[3*i+2]   = nuclei[i].r.z;
@@ -284,6 +378,37 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     TX(trexio_write_mo_occupation(tf, occ.data()));
     TX(trexio_write_mo_energy(tf, energy.data()));
     TX(trexio_write_mo_spin(tf, spin.data()));
+
+    // --- one-electron integrals, in the AO and the MO basis ---
+    // TREXIO's dipole operator is -r about the origin.
+    const arma::mat Cmo = restr ? Ca : arma::mat(arma::join_rows(Ca, Cb));
+    const arma::mat S(basis.overlap()), T(basis.kinetic()), V(basis.nuclear());
+    const arma::mat H(T+V);
+    const std::vector<arma::mat> r = basis.moment(1);
+    const arma::mat dx(-r[0]), dy(-r[1]), dz(-r[2]);
+    TX(trexio_write_ao_1e_int_overlap(tf, ao_array(S, perm).data()));
+    TX(trexio_write_ao_1e_int_kinetic(tf, ao_array(T, perm).data()));
+    TX(trexio_write_ao_1e_int_potential_n_e(tf, ao_array(V, perm).data()));
+    TX(trexio_write_ao_1e_int_core_hamiltonian(tf, ao_array(H, perm).data()));
+    TX(trexio_write_ao_1e_int_dipole_x(tf, ao_array(dx, perm).data()));
+    TX(trexio_write_ao_1e_int_dipole_y(tf, ao_array(dy, perm).data()));
+    TX(trexio_write_ao_1e_int_dipole_z(tf, ao_array(dz, perm).data()));
+    TX(trexio_write_mo_1e_int_overlap(tf, mo_array(S, Cmo).data()));
+    TX(trexio_write_mo_1e_int_kinetic(tf, mo_array(T, Cmo).data()));
+    TX(trexio_write_mo_1e_int_potential_n_e(tf, mo_array(V, Cmo).data()));
+    TX(trexio_write_mo_1e_int_core_hamiltonian(tf, mo_array(H, Cmo).data()));
+    TX(trexio_write_mo_1e_int_dipole_x(tf, mo_array(dx, Cmo).data()));
+    TX(trexio_write_mo_1e_int_dipole_y(tf, mo_array(dy, Cmo).data()));
+    TX(trexio_write_mo_1e_int_dipole_z(tf, mo_array(dz, Cmo).data()));
+
+    // --- two-electron integrals (optional: the list grows as N^4) ---
+    if(eri) {
+      const size_t nint = write_ao_eri(tf, basis, perm, 1e-14);
+      if(verbose) {
+        printf("Wrote %zu unique AO electron repulsion integrals.\n", nint);
+        fflush(stdout);
+      }
+    }
   } catch(...) {
     trexio_close(tf);
     throw;

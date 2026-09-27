@@ -29,8 +29,10 @@
 Settings settings;
 
 void help() {
-  printf("Usage: erkale_trexio export <in.chk> <out.trexio>\n");
+  printf("Usage: erkale_trexio export [--eri] <in.chk> <out.trexio>\n");
   printf("       erkale_trexio import <in.trexio> <out.chk>\n");
+  printf("The export includes the one-electron integrals; --eri also writes\n");
+  printf("the AO electron repulsion integrals, whose number grows as N^4.\n");
   fflush(stdout);
 }
 
@@ -43,17 +45,23 @@ int main_guarded(int argc, char ** argv) {
 #endif
   print_hostname();
 
-  if(argc != 4) {
+  // Optional flag after the mode
+  const bool eri = (argc == 5 && std::string(argv[2]) == "--eri");
+  if(argc != 4 && !eri) {
     help();
     return 1;
   }
 
   const std::string mode = argv[1];
-  const std::string in   = argv[2];
-  const std::string out  = argv[3];
+  const std::string in   = argv[argc-2];
+  const std::string out  = argv[argc-1];
 
+  if(eri && mode != "export") {
+    help();
+    return 1;
+  }
   if(mode == "export")
-    chk_to_trexio(in, out);
+    chk_to_trexio(in, out, eri);
   else if(mode == "import")
     trexio_to_chk(in, out);
   else {

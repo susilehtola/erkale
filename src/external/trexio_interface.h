@@ -24,8 +24,11 @@
  *
  * Converts between ERKALE's HDF5 checkpoint (.chk) and the TREXIO
  * wavefunction format. The wavefunction groups -- metadata, nucleus,
- * electron, basis, ao, mo -- are mapped both ways; integrals are not
- * (yet) exported.
+ * electron, basis, ao, mo -- are mapped both ways. The export also
+ * writes the one-electron integrals (overlap, kinetic, electron-nucleus
+ * potential, core Hamiltonian, dipole) in the AO and MO bases, and
+ * optionally the AO electron repulsion integrals; the import ignores
+ * integrals.
  *
  * The one convention subtlety is the per-shell ordering of the real
  * spherical harmonics: ERKALE stores them as m = -l..+l, TREXIO as
@@ -36,8 +39,10 @@
  */
 
 /// Write the wavefunction in the ERKALE checkpoint chkfile to a TREXIO
-/// file (HDF5 back end). Overwrites trexiofile if it exists.
-void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, bool verbose=true);
+/// file (HDF5 back end), including the one-electron integrals and, if
+/// eri is set, the AO electron repulsion integrals. Overwrites
+/// trexiofile if it exists.
+void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, bool eri=false, bool verbose=true);
 
 /// Read a TREXIO wavefunction and write it as an ERKALE checkpoint.
 void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, bool verbose=true);
