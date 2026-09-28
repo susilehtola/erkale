@@ -1,10 +1,9 @@
-
 name: CMake CI
 
 on: [push, pull_request]
 
 jobs:
-  build:
+  ubuntu:
     runs-on: ubuntu-24.04
 
     name: Ubuntu 24.04 Build and Test
@@ -14,8 +13,29 @@ jobs:
       - name: Resolve dependencies
         # System packages for the deps that Ubuntu ships. libcint and
         # libwignernj are not packaged and are fetched and built from
-        # source by CMake automatically.
+        # source by CMake automatically. Ubuntu's libxc is 5.2, so this
+        # job also checks that ERKALE builds and runs without the
+        # functionals that came in libxc 7.
         run: sudo apt-get update && sudo apt-get install -y cmake gfortran libgsl-dev liblapack-dev libarmadillo-dev libeigen3-dev libxc-dev libhdf5-serial-dev nlohmann-json3-dev
+
+      - name: Compile
+        run: cmake -B build && cmake --build build -j$(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  fedora:
+    runs-on: ubuntu-24.04
+    container: fedora:44
+
+    name: Fedora 44 Build and Test
+    steps:
+      - name: Resolve dependencies
+        # Fedora packages libxc 7, qcint (the libcint API) and a 64-bit
+        # integer (ILP64) FlexiBLAS; libwignernj is fetched by CMake.
+        run: dnf install -y --setopt=install_weak_deps=False git cmake make gcc gcc-c++ gcc-gfortran gsl-devel flexiblas-devel armadillo-devel eigen3-devel libxc-devel qcint-devel hdf5-devel json-devel
+
+      - uses: actions/checkout@v4
 
       - name: Compile
         run: cmake -B build && cmake --build build -j$(nproc)
