@@ -89,7 +89,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("ComplexBasis", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
-  settings.add_bool("ODA", "Use optimal damping algorithm?", false);
+  settings.add_string("SCFMethods", "SCF convergence methods to use", "DIIS + LBFGS");
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -113,7 +113,7 @@ int main_guarded(int argc, char **argv) {
   double confinement = settings.get_double("HarmonicConfinement");
   bool unrestricted = !(settings.get_bool("Restricted"));
   std::string guess = settings.get_string("Guess");
-  bool oda = settings.get_bool("ODA");
+  std::string scfmethods = settings.get_string("SCFMethods");
 
   Checkpoint chkpt(savechk,true);
 
@@ -546,10 +546,7 @@ int main_guarded(int argc, char **argv) {
   scfsolver.verbosity(verbosity);
   scfsolver.maximum_iterations(maxiter);
   scfsolver.maximum_history_length(diisorder);
-  if(oda)
-    scfsolver.run_optimal_damping();
-  else
-    scfsolver.run();
+  scfsolver.run(scfmethods);
 
   auto fock = scfsolver.get_fock_matrix();
   save_matrices(fock);
