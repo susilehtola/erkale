@@ -133,8 +133,10 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const BasisSet & bas) {
     // The angular coefficients of one contraction's functions
     std::vector< std::vector<ylmcoeff_t> > block;
 
-    // Are spherical harmonics used?
-    if(bas.lm_in_use(idsh[iid][0])) {
+    // Are spherical harmonics used? Spherical p functions are the
+    // cartesian ones, in the same (x, y, z) order, so they take the
+    // cartesian route.
+    if(bas.lm_in_use(idsh[iid][0]) && l!=1) {
       // Easy job.
       for(int m=-l;m<=l;m++) {
 	// The coefficients for current m

@@ -46,6 +46,20 @@ extern "C" {
 #undef atm
 #undef bas
 
+/**
+ * Cartesian-to-spherical transformation of a shell of angular momentum
+ * am, in ERKALE's function order. This is the order of libcint, which
+ * evaluates all the integrals: m = -l, ..., l for d and higher, but
+ * (x, y, z), i.e. m = 1, -1, 0, for p, the same as the cartesian p
+ * functions. Everything that evaluates spherical functions itself (the
+ * DFT grid, the reference integrals) must use this.
+ */
+static arma::mat shell_transmat(int am) {
+  arma::mat T(Ylm_transmat(am));
+  if(am==1)
+    T=T.rows(arma::uvec({2, 0, 1}));
+  return T;
+}
 
 // Derivative operator
 inline double _der1(const double x[], int l, double zeta) {
@@ -184,7 +198,7 @@ GaussianShell::GaussianShell(int amv, bool lm, const std::vector<contr_t> & C) {
 
   // If spherical harmonics are used, fill transformation matrix
   if(uselm_)
-    transmat_=Ylm_transmat(am_);
+    transmat_=shell_transmat(am_);
   else {
     // Do away with uninitialized value warnings in valgrind
     transmat_=arma::mat(1,1);
@@ -530,7 +544,7 @@ void GaussianShell::set_lm(bool lm) {
   uselm_=lm;
 
   if(uselm_)
-    transmat_=Ylm_transmat(am_);
+    transmat_=shell_transmat(am_);
   else
     transmat_=arma::mat();
 }
@@ -1582,23 +1596,24 @@ arma::ivec BasisSet::m_values() const {
     // Angular momentum is
     int am(this->am(is));
 
-    // First function on shell
-    size_t i0(first_ind(is));
+    // m values of one contraction's functions
+    arma::ivec mc;
+    if(am==0)
+      mc={0};
+    else if(am==1)
+      // Cartesian and spherical p functions are both x, y, z i.e. 1, -1, 0
+      mc={1, -1, 0};
+    else if(lm_in_use(is))
+      // Functions are -m, -m+1, ..., m-1, m
+      mc=arma::linspace<arma::ivec>(-am,am,2*am+1);
+    else
+      throw std::logic_error("Need to use spherical basis for linear symmetry!\n");
 
-    // Functions are -m, -m+1, ..., m-1, m
-    if(lm_in_use(is)) {
-      ret.subvec(i0,i0+2*am)=arma::linspace<arma::ivec>(-am,am,2*am+1);
-    } else {
-      if(am==0)
-        ret(i0)=0;
-      else if(am==1) {
-        // Functions are in order x, y, z i.e. 1, -1, 0
-        ret(i0)=1;
-        ret(i0+1)=-1;
-        ret(i0+2)=0;
-      } else
-        throw std::logic_error("Need to use spherical basis for linear symmetry!\n");
-    }
+    // A generally contracted shell holds its contractions one after
+    // another, each with the same functions
+    const size_t i0(first_ind(is));
+    for(size_t ic=0;ic<shells_[is].Nctr();ic++)
+      ret.subvec(i0+ic*mc.n_elem,i0+(ic+1)*mc.n_elem-1)=mc;
   }
 
   return ret;
@@ -2015,7 +2030,7 @@ arma::mat BasisSet::cart_to_sph_trans() const {
     int Nl=2*am+1;
 
     // Get transformation matrix
-    tmp=Ylm_transmat(am);
+    tmp=shell_transmat(am);
 
     // Store transformation matrix
     trans.submat(l,n,l+Nl-1,n+Nc-1)=tmp;

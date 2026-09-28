@@ -97,4 +97,6 @@ if(TARGET erkale_trexio AND COMMAND trexio_validate_add_test)
   run_trexio(H2O+_tz_hf)
   run_trexio(Mg+_rohf_tz)
   run_trexio(H2O_qz)
+  # Spherical p functions (OptLM false): libcint's (x, y, z) order
+  run_trexio(H2O_tz_pbe_sphp ERI)
 endif()

@@ -104,7 +104,10 @@ std::vector<int> form_shelltypes(const BasisSet & basis) {
     // Get angular momentum
     int am=shells[i].am();
     // Use spherical harmonics?
-    const int t = shells[i].lm_in_use() ? -am : am;
+    // Negative types are spherical shells, but -1 means an sp shell:
+    // spherical and cartesian p are the same functions in the same
+    // (x, y, z) order, so p is always written as type 1.
+    const int t = (shells[i].lm_in_use() && am>1) ? -am : am;
 
     for(size_t ic=0;ic<shells[i].Nctr();ic++)
       shtypes.push_back(t);
