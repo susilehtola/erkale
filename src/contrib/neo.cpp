@@ -20,6 +20,7 @@
 #include "checkpoint.h"
 #include "dftgrid.h"
 #include "dftfuncs.h"
+#include "electronic_xc.h"
 #include "scf.h"
 #include "elements.h"
 #include "find_molecules.h"
@@ -253,71 +254,28 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  // Electronic exchange-correlation functional (HF when Method is
-  // Hartree-Fock) and the electron-proton correlation (EPC) functional.
-  bool ehf = (stricmp(settings.get_string("Method"),"HF")==0);
-  int ex_func=0, ec_func=0;
-  if(!ehf)
-    parse_xc_func(ex_func, ec_func, settings.get_string("Method"));
-  // Fraction of exact exchange (1 for HF, the hybrid coefficient for DFT).
-  double kfrac = ehf ? 1.0 : exact_exchange(ex_func);
+  // Electronic exchange-correlation (Hartree-Fock when Method is HF) and
+  // the electron-proton correlation (EPC) functional. The EPC term is
+  // evaluated on the electron grid with the proton basis, so the grid is
+  // built for it even with Hartree-Fock electrons.
   std::string epcname = settings.get_string("EPCFunctional");
   int epc_func = epcname.size() ? find_func(epcname) : 0;
-  bool do_exc = (ex_func>0 || ec_func>0);
   bool do_epc = (epc_func>0);
-
-  // Refuse what the Fock builders below do not implement, rather than
-  // silently computing something else.
-  if(ex_func>0 && is_range_separated(ex_func))
-    throw std::runtime_error("Range-separated functionals are not supported in erkale_neo.\n");
-  {
-    double b, C;
-    if((ex_func>0 && needs_VV10(ex_func, b, C)) || (ec_func>0 && needs_VV10(ec_func, b, C)))
-      throw std::runtime_error("VV10 functionals are not supported in erkale_neo.\n");
-  }
   // The EPC functionals are parametrized for a proton.
   if(do_epc && (particle.q != 1.0 || particle.m != PROTON_MASS))
     throw std::runtime_error("EPCFunctional requires the quantum particle to be a proton.\n");
+  ElectronicXC exc(basis, verbose);
+  exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"), do_epc);
+  const bool do_exc = exc.active();
+  // Fraction of exact exchange (1 for HF, the hybrid coefficient for DFT).
+  const double kfrac = exc.exact_exchange_fraction();
 
-  // Electronic integration grid for the XC / EPC terms (the EPC term is
-  // evaluated on this shared electron grid with the proton basis).
-  DFTGrid egrid(&basis, verbose);
-  if(do_exc || do_epc) {
-    const std::string gridstr = settings.get_string("DFTGrid");
-    if(stricmp(gridstr,"Auto")==0)
-      throw std::runtime_error("Adaptive DFT grids are not supported in erkale_neo; give DFTGrid as nrad lmax.\n");
-    dft_t griddft;
-    parse_grid(griddft, gridstr, "DFT");
-    egrid.construct(griddft.nrad, griddft.lmax, ex_func, ec_func);
-  }
-
-  // Electronic exchange-correlation energy and potential, restricted
-  // (total density Pe) and unrestricted (spin densities). Zero when the
-  // electrons are treated with Hartree-Fock.
-  std::function<double(const arma::mat &, arma::mat &)> electronic_xc = [&](const arma::mat & Pe, arma::mat & Vxc) {
-    double Exc=0.0, Nelxc;
-    if(do_exc)
-      egrid.eval_Fxc(ex_func, ec_func, Pe, Vxc, Exc, Nelxc);
-    else
-      Vxc.zeros(Pe.n_rows, Pe.n_cols);
-    return Exc;
-  };
-  std::function<double(const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> electronic_xc_u = [&](const arma::mat & Pa, const arma::mat & Pb, arma::mat & Vxca, arma::mat & Vxcb) {
-    double Exc=0.0, Nelxc;
-    if(do_exc)
-      egrid.eval_Fxc(ex_func, ec_func, Pa, Pb, Vxca, Vxcb, Exc, Nelxc);
-    else {
-      Vxca.zeros(Pa.n_rows, Pa.n_cols);
-      Vxcb.zeros(Pb.n_rows, Pb.n_cols);
-    }
-    return Exc;
-  };
   // Electron-proton correlation energy and its electron and proton
   // potentials, evaluated on the electron grid with the proton basis.
   std::function<double(const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> ep_correlation = [&](const arma::mat & Pe, const arma::mat & Pp, arma::mat & Vepce, arma::mat & Vepcp) {
     double Eepc=0.0, Nelxc;
     if(do_epc)
-      egrid.eval_Fxc(epc_func, 0, Pe, Pp, Vepce, Vepcp, Eepc, Nelxc, &pbasis);
+      exc.grid().eval_Fxc(epc_func, 0, Pe, Pp, Vepce, Vepcp, Eepc, Nelxc, &pbasis);
     else {
       Vepce.zeros(Pe.n_rows, Pe.n_cols);
       Vepcp.zeros(Pp.n_rows, Pp.n_cols);
@@ -689,7 +647,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat J, K;
     std::tie(J, K) = electronic_terms(Ce, occe);
     arma::mat Vxc, Vepce, Vepcp;
-    double Exc = electronic_xc(Pe, Vxc);
+    double Exc = exc.eval(Pe, Vxc);
     double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp);
     // Form the Fock matrices
     arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxc + Vepce + frozen_Jpe) * X;
@@ -744,7 +702,7 @@ int main_guarded(int argc, char **argv) {
     std::tie(Ja, Ka) = electronic_terms(Ca, occa);
     std::tie(Jb, Kb) = electronic_terms(Cb, occb);
     arma::mat Vxca, Vxcb, Vepce, Vepcp;
-    double Exc = electronic_xc_u(Pa, Pb, Vxca, Vxcb);
+    double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
     double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp);
     // Form the Fock matrices
     arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + frozen_Jpe) * X;
@@ -816,7 +774,7 @@ int main_guarded(int argc, char **argv) {
 
     // Electronic exchange-correlation and electron-proton correlation
     arma::mat Vxce, Vepce, Vepcp;
-    double Exce = electronic_xc(Pe, Vxce);
+    double Exce = exc.eval(Pe, Vxce);
     double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp);
 
     // Form the Fock matrices
@@ -890,7 +848,7 @@ int main_guarded(int argc, char **argv) {
 
     // Electronic exchange-correlation and electron-proton correlation
     arma::mat Vxca, Vxcb, Vepce, Vepcp;
-    double Exce = electronic_xc_u(Pa, Pb, Vxca, Vxcb);
+    double Exce = exc.eval(Pa, Pb, Vxca, Vxcb);
     double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp);
 
     // Form the Fock matrices
@@ -1208,7 +1166,7 @@ int main_guarded(int argc, char **argv) {
           double Ecoul = 0.5*arma::trace(J*Pe);
           double Eexch = 0.25*kfrac*arma::trace(K*Pe);
           arma::mat Vxc;
-          double Exc = electronic_xc(Pe, Vxc);
+          double Exc = exc.eval(Pe, Vxc);
           frozen_Ee = Ekin+Enuc+Ecoul+Eexch+Exc;
 
         } else {
@@ -1234,7 +1192,7 @@ int main_guarded(int argc, char **argv) {
           double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
           double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
           arma::mat Vxca, Vxcb;
-          double Exc = electronic_xc_u(Pa, Pb, Vxca, Vxcb);
+          double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
           frozen_Ee = Ekin+Enuc+Ecoul+Eexch+Exc;
         }
       }
