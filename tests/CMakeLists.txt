@@ -94,6 +94,12 @@ run_complex_orbs(complex_orbs_b_ml_0 "-24.3478542")
 run_complex_orbs(complex_orbs_b_ml_p "-24.3943705")
 run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
 
+# Second-order trust-region SCF and stability analysis (OpenTrustRegion)
+if(ERKALE_TRUST_REGION)
+  run_complex_orbs(complex_orbs_h2_instability "-1.0027839")
+  run_neo(neo_proton_tr "-75.98665")
+endif()
+
 # Generate list with genlist.sh
 include(TestList.txt)
 

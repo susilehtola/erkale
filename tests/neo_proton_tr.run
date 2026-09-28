@@ -1,0 +1,10 @@
+# neo_proton, finished with the trust-region solver and a stability
+# analysis of the coupled electron-proton solution
+System H2O.xyz
+Basis cc-pVDZ
+ProtonBasis PB4-D
+QuantumProtons 2
+Method HF
+TrustRegion true
+StabilityAnalysis true
+SaveChk neo_proton_tr.chk

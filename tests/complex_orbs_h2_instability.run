@@ -1,0 +1,15 @@
+# Stretched H2, unrestricted but started from the spin-symmetric
+# solution, which is a saddle point: the stability analysis finds the
+# instability and the trust-region solver follows it to the
+# broken-symmetry solution.
+System H2_stretched.xyz
+Basis cc-pVDZ
+Method HF
+Multiplicity 1
+Restricted false
+ComplexBasis true
+JKMethod Cholesky
+ConvThr 1e-8
+TrustRegion true
+StabilityAnalysis true
+SaveChk complex_orbs_h2_instability.chk
