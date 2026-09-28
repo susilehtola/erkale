@@ -65,6 +65,34 @@ target_include_directories(erkale_neo_deps INTERFACE "${OPENORBITAL_HEADER}")
 target_link_libraries(erkale_neo_deps INTERFACE
   Eigen3::Eigen liberkale_cmp liberkale_emd liberkale)
 
+# Optional second-order trust-region orbital optimization and stability
+# analysis with OpenTrustRegion (Greiner, Hoyvik, Lehtola, Eriksen, JCTC
+# 22, 881 (2026)), a Fortran library with a C interface. Fetched at a
+# pinned release unless disabled; its BLAS/LAPACK integers must match
+# ERKALE's.
+option(ERKALE_TRUST_REGION "Trust-region SCF and stability analysis in erkale_neo and erkale_complex_orbs (OpenTrustRegion)" ON)
+if(ERKALE_TRUST_REGION)
+  enable_language(Fortran)
+  if(ERKALE_USE_ILP64)
+    set(INTEGER_SIZE 8 CACHE STRING "OpenTrustRegion integer size" FORCE)
+  else()
+    set(INTEGER_SIZE 4 CACHE STRING "OpenTrustRegion integer size" FORCE)
+  endif()
+  set(OpenTrustRegion_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  set(OpenTrustRegion_ENABLE_XHOST OFF CACHE BOOL "" FORCE)
+  include(FetchContent)
+  FetchContent_Declare(OpenTrustRegion
+    GIT_REPOSITORY https://github.com/eriksen-lab/opentrustregion.git
+    GIT_TAG        v2.0.1)
+  FetchContent_MakeAvailable(OpenTrustRegion)
+  target_link_libraries(erkale_neo_deps INTERFACE opentrustregion)
+  target_compile_definitions(erkale_neo_deps INTERFACE ERKALE_TRUST_REGION)
+  if(ERKALE_USE_ILP64)
+    # The C header's integer type follows this macro
+    target_compile_definitions(erkale_neo_deps INTERFACE USE_ILP64)
+  endif()
+endif()
+
 add_executable(erkale_neo neo.cpp neo_dump.cpp neo_cholesky.cpp)
 set_target_properties(erkale_neo PROPERTIES OUTPUT_NAME "erkale_neo${SUFFIX}")
 target_link_libraries(erkale_neo erkale_neo_deps)

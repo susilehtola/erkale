@@ -5,6 +5,9 @@
 #include "jkbuilder.h"
 #include "dftgrid.h"
 #include "electronic_xc.h"
+#ifdef ERKALE_TRUST_REGION
+#include "trust_region.h"
+#endif
 #include "elements.h"
 #include "find_molecules.h"
 #include "guess.h"
@@ -91,6 +94,8 @@ int main_guarded(int argc, char **argv) {
   settings.add_bool("ComplexBasis", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
   settings.add_string("SCFMethods", "SCF convergence methods to use", "DIIS + LBFGS");
+  settings.add_bool("TrustRegion", "Finish the SCF with second-order trust-region optimization (OpenTrustRegion)?", false);
+  settings.add_bool("StabilityAnalysis", "Check the stability of the solution within its symmetry, following instabilities if TrustRegion is used?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -115,6 +120,12 @@ int main_guarded(int argc, char **argv) {
   bool unrestricted = !(settings.get_bool("Restricted"));
   std::string guess = settings.get_string("Guess");
   std::string scfmethods = settings.get_string("SCFMethods");
+  bool trustregion = settings.get_bool("TrustRegion");
+  bool stability = settings.get_bool("StabilityAnalysis");
+#ifndef ERKALE_TRUST_REGION
+  if(trustregion || stability)
+    throw std::runtime_error("TrustRegion and StabilityAnalysis need ERKALE built with OpenTrustRegion.\n");
+#endif
 
   Checkpoint chkpt(savechk,true);
 
@@ -580,9 +591,34 @@ int main_guarded(int argc, char **argv) {
   scfsolver.run(scfmethods);
 
   auto fock = scfsolver.get_fock_matrix();
+  double E = scfsolver.get_energy();
+
+#ifdef ERKALE_TRUST_REGION
+  // Second-order trust-region optimization and stability analysis. The
+  // rotations stay within the symmetry blocks.
+  if(trustregion || stability) {
+    const int otr_verbose = verbosity >= 10 ? 4 : (verbosity >= 5 ? 3 : 2);
+    TrustRegionSCF tr(fock_builder, scfsolver.get_solution());
+    if(trustregion) {
+      printf("\nTrust-region optimization with OpenTrustRegion\n");
+      fflush(stdout);
+      tr.optimize(convergence_threshold, stability, otr_verbose);
+    } else {
+      printf("\nStability analysis with OpenTrustRegion\n");
+      fflush(stdout);
+      if(!tr.is_stable(convergence_threshold, otr_verbose))
+        printf("Warning: the solution is unstable within its symmetry; use TrustRegion to follow the instability.\n");
+      else
+        printf("The solution is stable within its symmetry.\n");
+      fflush(stdout);
+    }
+    auto ret = fock_builder(tr.density_matrix());
+    E = ret.first;
+    fock = ret.second;
+  }
+#endif
   save_matrices(fock);
 
-  double E = scfsolver.get_energy();
   printf("SCF converged. Total energy is % .10f\n", E);
   fflush(stdout);
 

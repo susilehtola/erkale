@@ -23,6 +23,9 @@
 #include "dftgrid.h"
 #include "dftfuncs.h"
 #include "electronic_xc.h"
+#ifdef ERKALE_TRUST_REGION
+#include "trust_region.h"
+#endif
 #include "scf.h"
 #include "elements.h"
 #include "find_molecules.h"
@@ -123,6 +126,8 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("NEODumpIntegrals", "Integral representation in NEODump: btensor (engine CD/RI factors) or dense", "btensor");
   settings.add_bool("NEODumpVerify", "Reconstruct the energy from the NEODump tensors and check it against the SCF energy", true);
   settings.add_string("EPCFunctional", "Electron-proton correlation functional (e.g. lda_c_epc17_2); empty for none", "");
+  settings.add_bool("TrustRegion", "Finish the coupled SCF with second-order trust-region optimization (OpenTrustRegion)?", false);
+  settings.add_bool("StabilityAnalysis", "Check the stability of the coupled solution, following instabilities if TrustRegion is used?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -140,6 +145,12 @@ int main_guarded(int argc, char **argv) {
   double intthr = settings.get_double("IntegralThresh");
   double init_convergence_threshold = settings.get_double("InitConvThr");
   double convergence_threshold = settings.get_double("ConvThr");
+  bool trustregion = settings.get_bool("TrustRegion");
+  bool stability = settings.get_bool("StabilityAnalysis");
+#ifndef ERKALE_TRUST_REGION
+  if(trustregion || stability)
+    throw std::runtime_error("TrustRegion and StabilityAnalysis need ERKALE built with OpenTrustRegion.\n");
+#endif
   bool verbose = settings.get_bool("Verbose");
   int nstepwise = settings.get_int("StepwiseSCFIter");
   std::string error_norm = settings.get_string("ErrorNorm");
@@ -1285,6 +1296,32 @@ int main_guarded(int argc, char **argv) {
 
     auto dm = scfsolver.get_solution();
     auto fock = scfsolver.get_fock_matrix();
+    double Escf = scfsolver.get_energy();
+#ifdef ERKALE_TRUST_REGION
+    // Second-order trust-region optimization and stability analysis of
+    // the coupled electron-proton solution
+    if(trustregion || stability) {
+      const int otr_verbose = verbosity >= 10 ? 4 : (verbosity >= 5 ? 3 : 2);
+      TrustRegionSCF tr(fock_builder, dm);
+      if(trustregion) {
+        printf("\nTrust-region optimization with OpenTrustRegion\n");
+        fflush(stdout);
+        tr.optimize(convergence_threshold, stability, otr_verbose);
+      } else {
+        printf("\nStability analysis with OpenTrustRegion\n");
+        fflush(stdout);
+        if(!tr.is_stable(convergence_threshold, otr_verbose))
+          printf("Warning: the solution is unstable; use TrustRegion to follow the instability.\n");
+        else
+          printf("The solution is stable.\n");
+        fflush(stdout);
+      }
+      dm = tr.density_matrix();
+      auto ret = fock_builder(dm);
+      Escf = ret.first;
+      fock = ret.second;
+    }
+#endif
     size_t Nmat = fock.size();
     save_proton_matrices(std::make_pair(std::vector<arma::mat>({dm.first[Nmat-1]}),std::vector<arma::vec>({dm.second[Nmat-1]})), std::vector<arma::mat>({fock[Nmat-1]}));
     if(M==1) {
@@ -1331,7 +1368,7 @@ int main_guarded(int argc, char **argv) {
                basis, dfit, restricted_e, Ce, occe_v, hcore_e,
                pbasis, pfit, Cp_ao, occp, hcore_p,
                Nel, (int) proton_indices.size(), proton_mass, proton_charge,
-               scfsolver.get_energy(), Ecnucr,
+               Escf, Ecnucr,
                factorized_ep, omega, alpha, beta, version);
     }
   }
