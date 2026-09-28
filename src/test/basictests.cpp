@@ -27,6 +27,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <sstream>
 
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;
@@ -437,6 +438,120 @@ void test_bse_json_ecp() {
   printf("BSE JSON ECP rejection OK.\n");
 }
 
+void check_spherical_order() {
+  // The spherical functions ERKALE evaluates itself (on the DFT grid,
+  // in the reference integrals) come from GaussianShell::transmat,
+  // whereas libcint evaluates the integrals. The two must agree on the
+  // spherical functions and their order for every l: the libcint
+  // overlap in the spherical basis must equal the one transformed from
+  // the cartesian basis with transmat.
+  std::vector<contr_t> c(3);
+  const double z[3]={3.0, 0.9, 0.25};
+  const double a[3]={0.30, 0.50, 0.40};
+  for(int i=0;i<3;i++) {
+    c[i].z=z[i];
+    c[i].c=a[i];
+  }
+
+  BasisSet bsph, bcart;
+  for(size_t inuc=0;inuc<2;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    // A general geometry, so that no symmetry hides a wrong order
+    nuc.r.x=0.3*inuc; nuc.r.y=-0.7*inuc; nuc.r.z=1.1*inuc;
+    nuc.bsse=false;
+    nuc.symbol="C";
+    nuc.Z=6;
+    nuc.Q=0;
+    bsph.add_nucleus(nuc);
+    bcart.add_nucleus(nuc);
+    for(int am=0;am<=4;am++) {
+      bsph.add_shell(inuc, am, true, c, false);
+      bcart.add_shell(inuc, am, false, c, false);
+    }
+  }
+  bsph.finalize();
+  bcart.finalize();
+
+  // Block-diagonal transformation from the cartesian to the spherical basis
+  arma::mat T(bsph.Nbf(), bcart.Nbf(), arma::fill::zeros);
+  for(size_t is=0;is<bsph.Nshells();is++) {
+    // transmat acts on the bare monomials, whereas the cartesian basis
+    // functions carry their own normalization factors
+    const std::vector<shellf_t> cart(bcart.shells()[is].cart());
+    arma::vec rn(cart.size());
+    for(size_t ic=0;ic<cart.size();ic++)
+      rn(ic)=cart[ic].relnorm;
+    T.submat(bsph.first_ind(is), bcart.first_ind(is), bsph.first_ind(is)+bsph.Nbf(is)-1, bcart.first_ind(is)+bcart.Nbf(is)-1)=bsph.shells()[is].transmat()*arma::diagmat(1.0/rn);
+  }
+
+  const arma::mat Ssph(bsph.overlap());
+  arma::mat Stra(T*bcart.overlap()*T.t());
+  // transmat carries the solid-harmonic prefactors, and the functions
+  // are normalized afterwards; compare the normalized overlaps
+  const arma::vec n(1.0/arma::sqrt(arma::diagvec(Stra)));
+  Stra=arma::diagmat(n)*Stra*arma::diagmat(n);
+  const double d=arma::abs(Ssph-Stra).max();
+  if(d>1e-10) {
+    std::ostringstream oss;
+    oss << "check_spherical_order: the spherical overlap from libcint and from transmat differ by " << d << ".\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
+void check_m_values() {
+  // m labels for linear symmetry. Two nuclei on the z axis carry
+  // generally contracted s, p and d shells, with cartesian s and p
+  // functions (the OptLM default) as well as spherical ones. The labels
+  // are checked against the functions themselves: in a linear molecule,
+  // functions with different m do not overlap.
+  BasisSet basis;
+  for(size_t inuc=0;inuc<2;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=0.0; nuc.r.y=0.0; nuc.r.z=2.1*inuc;
+    nuc.bsse=false;
+    nuc.symbol="N";
+    nuc.Z=7;
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+  }
+  // Two contractions over the same exponents form one generally
+  // contracted shell
+  const double z[3]={4.0, 1.1, 0.35};
+  const double a[2][3]={{0.20, 0.55, 0.35}, {-0.09, 0.31, 0.82}};
+  for(size_t inuc=0;inuc<2;inuc++)
+    for(int am=0;am<=2;am++)
+      for(int lm=0;lm<=1;lm++) {
+        // Cartesian functions only carry m for s and p
+        if(!lm && am>1)
+          continue;
+        for(int ic=0;ic<2;ic++) {
+          std::vector<contr_t> c(3);
+          for(int i=0;i<3;i++) {
+            c[i].z=z[i];
+            c[i].c=a[ic][i];
+          }
+          basis.add_shell(inuc, am, lm, c, false);
+        }
+      }
+  basis.finalize();
+
+  const arma::ivec m(basis.m_values());
+  const arma::mat S(basis.overlap());
+  if(m.n_elem != S.n_rows)
+    throw std::runtime_error("check_m_values: wrong number of m values.\n");
+  if(arma::abs(m).max() > 2)
+    throw std::runtime_error("check_m_values: m value outside the angular momenta of the basis.\n");
+  for(size_t i=0;i<S.n_rows;i++)
+    for(size_t j=0;j<S.n_cols;j++)
+      if(m(i)!=m(j) && std::abs(S(i,j))>1e-10) {
+        std::ostringstream oss;
+        oss << "check_m_values: functions " << i << " (m=" << m(i) << ") and " << j << " (m=" << m(j) << ") overlap by " << S(i,j) << ".\n";
+        throw std::runtime_error(oss.str());
+      }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -450,6 +565,12 @@ int main(void) {
   // Generally contracted shells
   check_general_contraction();
   printf("General contraction OK.\n");
+  // Spherical functions: transmat against libcint
+  check_spherical_order();
+  printf("Spherical harmonic order OK.\n");
+  // m labels of the functions for linear symmetry
+  check_m_values();
+  printf("Linear-symmetry m values OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection

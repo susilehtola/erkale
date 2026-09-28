@@ -1,0 +1,16 @@
+# Water molecule
+System H2O.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis cc-pVTZ
+Direct false
+IntegralThresh 1e-14
+
+
+
+Logfile H2O_tz_pbe_sphp.log
+SaveChk H2O_tz_pbe_sphp.chk
+BasisRotate false
+DFTGrid 50 -194
+# Spherical p functions: exercises libcint's p order in the integrals
+# against ERKALE's own on the DFT grid
+OptLM false

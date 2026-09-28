@@ -47,17 +47,15 @@ namespace {
 #define TX(call) check((call), #call)
 
   // ERKALE local index of the function with signed m in a shell of
-  // angular momentum l. Spherical shells store m = -l..+l. ERKALE's
-  // OptLM default keeps s and p as *cartesian*, but for l<2 those are
-  // the same functions as the solid harmonics, in the order:
+  // angular momentum l. Spherical d and higher shells store
+  // m = -l..+l. s and p functions are the same whether cartesian (the
+  // OptLM default) or spherical, and follow libcint's order:
   //   l=0: [s]              (m=0 -> 0)
   //   l=1: [x, y, z]        (m=+1 -> 0, m=-1 -> 1, m=0 -> 2)
   // Cartesian d and higher are genuinely different (6d != 5d) and not
   // supported for a spherical TREXIO export.
   size_t erkale_local_index(const GaussianShell & sh, int m) {
     const int l = sh.am();
-    if(sh.lm_in_use())
-      return (size_t)(m + l);
     if(l == 0)
       return 0;
     if(l == 1) {
@@ -65,6 +63,8 @@ namespace {
       if(m == -1) return 1;   // y
       return 2;               // z (m == 0)
     }
+    if(sh.lm_in_use())
+      return (size_t)(m + l);
     throw std::runtime_error("TREXIO spherical export needs spherical d and higher shells (run with UseLM true; cartesian d+ unsupported).");
   }
 
