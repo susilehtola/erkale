@@ -64,9 +64,14 @@ bool XCFunctional::has_exc() const {
 }
 
 bool XCFunctional::is_epc() const {
-  // libxc gives EPC no structural marker -- match the known ids.
+  // libxc gives EPC no structural marker -- match the known ids. The
+  // EPC functionals came in libxc 7.
+#ifdef XC_LDA_C_EPC17
   return id == XC_LDA_C_EPC17 || id == XC_LDA_C_EPC17_2 ||
          id == XC_LDA_C_EPC18_1 || id == XC_LDA_C_EPC18_2;
+#else
+  return false;
+#endif
 }
 
 void XCFunctional::eval(size_t N, const double * rho, const double * sigma,

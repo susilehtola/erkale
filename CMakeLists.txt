@@ -127,6 +127,18 @@ FetchContent_MakeAvailable(Libxc)
 if(NOT TARGET Libxc::xc AND TARGET xc)
   add_library(Libxc::xc ALIAS xc)
 endif()
+# Does libxc have the electron-proton correlation functionals (libxc 7)?
+# A fetched libxc is the pinned 7.0.0; a found one is checked, since its
+# headers exist at configure time.
+if(TARGET xc)
+  set(ERKALE_LIBXC_HAS_EPC ON)
+else()
+  include(CheckSymbolExists)
+  get_target_property(_xc_inc Libxc::xc INTERFACE_INCLUDE_DIRECTORIES)
+  set(CMAKE_REQUIRED_INCLUDES ${_xc_inc})
+  check_symbol_exists(XC_LDA_C_EPC17 "xc_funcs.h" ERKALE_LIBXC_HAS_EPC)
+  unset(CMAKE_REQUIRED_INCLUDES)
+endif()
 
 # --- libcint (also satisfied by API-compatible qcint). No upstream CMake
 # config package, so find header+library and wrap them in an imported
