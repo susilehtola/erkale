@@ -1,0 +1,12 @@
+# Linear-symmetry SCF in the complex basis of e^{im phi} functions,
+# restricted hybrid DFT; the energy equals erkale's.
+System N2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_b3lyp
+Multiplicity 1
+Restricted true
+ComplexBasis true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-8
+SaveChk complex_orbs_n2_b3lyp.chk

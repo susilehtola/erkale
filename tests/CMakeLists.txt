@@ -46,6 +46,16 @@ function(run_neo target energy)
   set_property(TEST ${target} PROPERTY PASS_REGULAR_EXPRESSION "Converged to energy ${energy}")
 endfunction()
 
+# Linear-symmetry SCF with erkale_complex_orbs, checked against the
+# energy erkale gives for the same calculation.
+function(run_complex_orbs target energy)
+  add_test(NAME ${target} COMMAND erkale_complex_orbs ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)
+  set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_SYSDIR=${CMAKE_CURRENT_SOURCE_DIR}/xyz")
+  set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
+  set_property(TEST ${target} APPEND PROPERTY DEPENDS erkale_complex_orbs)
+  set_property(TEST ${target} PROPERTY PASS_REGULAR_EXPRESSION "Total energy is ${energy}")
+endfunction()
+
 # First, compile and run the basic test
 add_test(build_basictests  "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target basictests)
 add_test(NAME basictests COMMAND basictests)
@@ -71,6 +81,11 @@ if(ERKALE_LIBXC_HAS_EPC)
   run_neo(neo_dft_epc "-75.84436")
   run_neo(neo_dft_epc_u "-75.38644")
 endif()
+
+# Linear symmetry in the complex basis, restricted and unrestricted DFT
+add_test(build_erkale_complex_orbs "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale_complex_orbs)
+run_complex_orbs(complex_orbs_n2_b3lyp "-109.53324")
+run_complex_orbs(complex_orbs_o2_tpss "-150.35981")
 
 # Generate list with genlist.sh
 include(TestList.txt)

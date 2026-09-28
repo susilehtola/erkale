@@ -1,0 +1,13 @@
+# Linear-symmetry SCF in the complex basis, unrestricted meta-GGA with
+# spherical p functions; the energy equals erkale's.
+System O2.xyz
+Basis cc-pVDZ
+Method mgga_x_tpss-mgga_c_tpss
+Multiplicity 3
+Restricted false
+ComplexBasis true
+OptLM false
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-8
+SaveChk complex_orbs_o2_tpss.chk
