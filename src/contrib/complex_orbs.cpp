@@ -4,6 +4,7 @@
 #include "density_fitting.h"
 #include "jkbuilder.h"
 #include "dftgrid.h"
+#include "electronic_xc.h"
 #include "elements.h"
 #include "find_molecules.h"
 #include "guess.h"
@@ -125,7 +126,7 @@ int main_guarded(int argc, char **argv) {
   BasisSetLibrary potlib;
   potlib.load_basis(settings.get_string("SAPBasis"));
 
-  auto atoms=load_xyz(settings.get_string("System"),!settings.get_bool("InputBohr"));
+  auto atoms=load_system(settings.get_string("System"),!settings.get_bool("InputBohr"));
 
   // Nucleus repulsion energy
   double Enucr = 0.0;
@@ -164,6 +165,18 @@ int main_guarded(int argc, char **argv) {
   jk.init(basis, verbose);
   size_t Nbf = basis.Nbf();
 
+  // Exchange-correlation (Hartree-Fock when Method is HF). The basis
+  // functions are real, so the density, its gradient and the kinetic
+  // energy density depend only on the real part of the density matrix,
+  // which the Fock builders below pass on.
+  ElectronicXC exc(basis, verbose);
+  exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"));
+  const double kfrac = exc.exact_exchange_fraction();
+  // Without the current density, the kinetic energy density is not gauge
+  // invariant in a magnetic field.
+  if(linB != 0.0 && exc.is_meta_gga())
+    throw std::runtime_error("Meta-GGA functionals are not supported with a magnetic field (LinearB).\n");
+
   // Calculate matrices
   arma::mat S(basis.overlap());
   arma::mat T(basis.kinetic());
@@ -178,15 +191,23 @@ int main_guarded(int argc, char **argv) {
   if (complexbas) {
     const auto & shells = basis.shells();
     for (size_t i=0; i<shells.size(); i++) {
-      // The transform acts on one set of 2l+1 spherical harmonics. A
+      // The transform acts on one set of 2l+1 real functions in the order
+      // m = -l, ..., l. The functions are not stored in that order for p
+      // shells (x, y, z), so place each function by its m label. A
       // generally contracted shell carries nctr such sets stacked
       // contraction-slowest, so place the transform block-diagonally,
       // once per contraction.
-      const arma::cx_mat Tm = basis_transform_mat(shells[i].am());
+      const int l = shells[i].am();
+      const arma::cx_mat Tm = basis_transform_mat(l);
       const size_t Nlm = Tm.n_rows;
-      const size_t i0 = shells[i].first_ind();
-      for(size_t ic=0; ic<shells[i].Nctr(); ic++)
-        D.submat(i0+ic*Nlm, i0+ic*Nlm, i0+(ic+1)*Nlm-1, i0+(ic+1)*Nlm-1) = Tm;
+      for(size_t ic=0; ic<shells[i].Nctr(); ic++) {
+        const size_t i0 = shells[i].first_ind() + ic*Nlm;
+        // Index of the function with m = k-l
+        arma::uvec idx(Nlm);
+        for(size_t p=0; p<Nlm; p++)
+          idx(mvals(i0+p)+l) = i0+p;
+        D.submat(idx, idx) = Tm;
+      }
     }
   } else
     D.eye();
@@ -337,8 +358,11 @@ int main_guarded(int argc, char **argv) {
     arma::cx_mat cP = complex_density(orbitals, occupations);
     arma::mat cbP = complex_basis_density(orbitals, occupations);
 
+    arma::mat Vxc;
+    double Exc = exc.eval(P, Vxc);
+
     // Form the Fock matrices
-    arma::cx_mat F = T + V + J + 0.5*K;
+    arma::cx_mat F = T + V + J + 0.5*kfrac*K + Vxc;
     arma::cx_mat DFD;
     if(complexbas)
       DFD = D.t()*F*D + Bterms;
@@ -353,15 +377,17 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * J);
-    double Eexch = 0.25 * std::real(arma::trace(cP * K));
+    double Eexch = 0.25 * kfrac * std::real(arma::trace(cP * K));
     double Emag = arma::trace(cbP * Bterms);
-    double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
+    double Etot = Ekin + Enuc + Ecoul + Eexch + Exc + Enucr + Emag;
 
     if(verbosity >= 10) {
       printf("e kinetic energy            % .10f\n", Ekin);
       printf("e nuclear attraction        % .10f\n", Enuc);
       printf("e-e Coulomb energy          % .10f\n", Ecoul);
       printf("e-e exchange energy         % .10f\n", Eexch);
+      if(exc.active())
+        printf("e exchange-correlation      % .10f\n", Exc);
       printf("nuclear repulsion energy    % .10f\n", Enucr);
       printf("field interaction energy    % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
@@ -407,12 +433,15 @@ int main_guarded(int argc, char **argv) {
 
     arma::mat P = Pa + Pb;
 
+    arma::mat Vxca, Vxcb;
+    double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
+
     arma::mat Ba = - 0.5 * linB * S;
     arma::mat Bb = + 0.5 * linB * S;
 
     // Form the Fock matrices
-    arma::cx_mat Fa = T + V + Ja + Jb + Ka + Ba;
-    arma::cx_mat Fb = T + V + Ja + Jb + Kb + Bb;
+    arma::cx_mat Fa = T + V + Ja + Jb + kfrac*Ka + Vxca + Ba;
+    arma::cx_mat Fb = T + V + Ja + Jb + kfrac*Kb + Vxcb + Bb;
     arma::cx_mat DFDa, DFDb;
     if(complexbas) {
       DFDa = D.t() * Fa * D + Bterms;
@@ -434,15 +463,17 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
-    double Eexch = 0.5 * std::real(arma::trace(cPa * Ka) + arma::trace(cPb * Kb));
+    double Eexch = 0.5 * kfrac * std::real(arma::trace(cPa * Ka) + arma::trace(cPb * Kb));
     double Emag = arma::trace((cbPa + cbPb) * Bterms) - linB * 0.5 * (Nela - Nelb);
-    double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
+    double Etot = Ekin + Enuc + Ecoul + Eexch + Exc + Enucr + Emag;
 
     if(verbosity >= 10) {
       printf("e kinetic energy            % .10f\n", Ekin);
       printf("e nuclear attraction        % .10f\n", Enuc);
       printf("e-e Coulomb energy          % .10f\n", Ecoul);
       printf("e-e exchange energy         % .10f\n", Eexch);
+      if(exc.active())
+        printf("e exchange-correlation      % .10f\n", Exc);
       printf("nuclear repulsion energy    % .10f\n", Enucr);
       printf("field interaction energy    % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
