@@ -86,6 +86,13 @@ endif()
 add_test(build_erkale_complex_orbs "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale_complex_orbs)
 run_complex_orbs(complex_orbs_n2_b3lyp "-109.53324")
 run_complex_orbs(complex_orbs_o2_tpss "-150.35981")
+# States erkale cannot represent: boron with its p electron in the
+# complex m=+1 orbital, without and with a magnetic field. The occupation
+# file is read from the working directory.
+configure_file(complex_orbs_b_ml.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_b_ml.linocc COPYONLY)
+run_complex_orbs(complex_orbs_b_ml_0 "-24.3478542")
+run_complex_orbs(complex_orbs_b_ml_p "-24.3943705")
+run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
 
 # Generate list with genlist.sh
 include(TestList.txt)
