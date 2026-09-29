@@ -1,0 +1,16 @@
+# Boron 2P with its p electron in the complex m=+1 orbital, without a
+# field. Its LDA energy differs from that of the real p_x state that
+# erkale would give (-24.34874), by 0.89 mEh.
+System B.xyz
+Basis cc-pVDZ
+Method lda_x-lda_c_vwn
+Multiplicity 2
+Restricted false
+ComplexBasis true
+LinearOccupations -1
+LinearOccupationFile complex_orbs_b_ml.linocc
+LinearB 0.0
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-9
+SaveChk complex_orbs_b_ml_0.chk

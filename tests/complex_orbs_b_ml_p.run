@@ -1,0 +1,17 @@
+# Boron 2P with its p electron in the complex m=+1 orbital, in a
+# magnetic field B=0.05 along z. Within a symmetry block the Zeeman term
+# is a constant, so E(+B)-E(-B) = -B (M_L + 2 M_S) = -0.1 exactly
+# (M_L=1, M_S=1/2); the complex_orbs_b_ml_p and _m references satisfy it.
+System B.xyz
+Basis cc-pVDZ
+Method lda_x-lda_c_vwn
+Multiplicity 2
+Restricted false
+ComplexBasis true
+LinearOccupations -1
+LinearOccupationFile complex_orbs_b_ml.linocc
+LinearB 0.05
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-9
+SaveChk complex_orbs_b_ml_p.chk
