@@ -17,6 +17,8 @@
 #include "basislibrary.h"
 #include "basis.h"
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include "checkpoint.h"
 #include "dftgrid.h"
 #include "dftfuncs.h"
@@ -272,14 +274,17 @@ int main_guarded(int argc, char **argv) {
 
   // Electron-proton correlation energy and its electron and proton
   // potentials, evaluated on the electron grid with the proton basis.
-  std::function<double(const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> ep_correlation = [&](const arma::mat & Pe, const arma::mat & Pp, arma::mat & Vepce, arma::mat & Vepcp) {
+  // Only the requested potentials are built (with_e, with_p); the
+  // stepwise solution holds one of the two densities fixed and needs
+  // only the other potential.
+  std::function<double(const arma::mat &, const arma::mat &, arma::mat &, arma::mat &, bool, bool)> ep_correlation = [&](const arma::mat & Pe, const arma::mat & Pp, arma::mat & Vepce, arma::mat & Vepcp, bool with_e, bool with_p) {
     double Eepc=0.0, Nelxc;
     if(do_epc)
-      exc.grid().eval_Fxc(epc_func, 0, Pe, Pp, Vepce, Vepcp, Eepc, Nelxc, &pbasis);
-    else {
+      exc.grid().eval_Fxc(epc_func, 0, Pe, Pp, Vepce, Vepcp, Eepc, Nelxc, &pbasis, with_e, with_p);
+    if(with_e && !Vepce.n_elem)
       Vepce.zeros(Pe.n_rows, Pe.n_cols);
+    if(with_p && !Vepcp.n_elem)
       Vepcp.zeros(Pp.n_rows, Pp.n_cols);
-    }
     return Eepc;
   };
 
@@ -440,6 +445,21 @@ int main_guarded(int argc, char **argv) {
   arma::mat frozen_Jpe(T.n_rows, T.n_cols, arma::fill::zeros);
   arma::mat frozen_Jep(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
   double frozen_Ee=0.0, frozen_Ep=0.0;
+  // Energy of the electrons alone (kinetic, nuclear attraction, Coulomb,
+  // exchange and XC) for each set of orbitals and occupations that the
+  // stepwise electronic builders evaluate. The stepwise proton solution
+  // freezes the electrons at the preceding electronic solution, and takes
+  // their energy from here instead of recomputing it. The key is a hash
+  // of the exact orbitals and occupations the builder was given.
+  std::unordered_map<size_t, double> electronic_energies;
+  std::function<size_t(const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double,double> &)> dm_key = [](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double,double> & dm) {
+    std::string bytes;
+    for(size_t b=0;b<dm.first.size();b++) {
+      bytes.append((const char *) dm.first[b].memptr(), dm.first[b].n_elem*sizeof(double));
+      bytes.append((const char *) dm.second[b].memptr(), dm.second[b].n_elem*sizeof(double));
+    }
+    return std::hash<std::string>{}(bytes);
+  };
   // Frozen densities for the stepwise solution: the electron-proton
   // correlation couples the two components through the densities.
   arma::mat frozen_Pe(T.n_rows, T.n_cols, arma::fill::zeros);
@@ -648,7 +668,7 @@ int main_guarded(int argc, char **argv) {
     std::tie(J, K) = electronic_terms(Ce, occe);
     arma::mat Vxc, Vepce, Vepcp;
     double Exc = exc.eval(Pe, Vxc);
-    double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp);
+    double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp, true, false);
     // Form the Fock matrices
     arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxc + Vepce + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fe});
@@ -660,6 +680,7 @@ int main_guarded(int argc, char **argv) {
     double Eexch = 0.25*kfrac*arma::trace(K*Pe);
     double Epe = arma::trace(Pe*frozen_Jpe);
     double Etot = Ekin+Enuc+Ecoul+Eexch+Exc+Eepc+Ecnucr+Epe+frozen_Ep;
+    electronic_energies[dm_key(dm)] = Ekin+Enuc+Ecoul+Eexch+Exc;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
@@ -703,7 +724,7 @@ int main_guarded(int argc, char **argv) {
     std::tie(Jb, Kb) = electronic_terms(Cb, occb);
     arma::mat Vxca, Vxcb, Vepce, Vepcp;
     double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
-    double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp);
+    double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp, true, false);
     // Form the Fock matrices
     arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + frozen_Jpe) * X;
     arma::mat Fb = X.t() * (T + Vc + Ja + Jb + kfrac*Kb + Vxcb + Vepce + frozen_Jpe) * X;
@@ -716,6 +737,7 @@ int main_guarded(int argc, char **argv) {
     double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
     double Epe = arma::trace(Pe*frozen_Jpe);
     double Etot = Ekin+Enuc+Ecoul+Eexch+Exc+Eepc+Ecnucr+Epe+frozen_Ep;
+    electronic_energies[dm_key(dm)] = Ekin+Enuc+Ecoul+Eexch+Exc;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
@@ -775,7 +797,7 @@ int main_guarded(int argc, char **argv) {
     // Electronic exchange-correlation and electron-proton correlation
     arma::mat Vxce, Vepce, Vepcp;
     double Exce = exc.eval(Pe, Vxce);
-    double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp);
+    double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp, true, true);
 
     // Form the Fock matrices
     arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxce + Vepce + Jpe) * X;
@@ -849,7 +871,7 @@ int main_guarded(int argc, char **argv) {
     // Electronic exchange-correlation and electron-proton correlation
     arma::mat Vxca, Vxcb, Vepce, Vepcp;
     double Exce = exc.eval(Pa, Pb, Vxca, Vxcb);
-    double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp);
+    double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp, true, true);
 
     // Form the Fock matrices
     arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + Jpe) * X;
@@ -1055,6 +1077,7 @@ int main_guarded(int argc, char **argv) {
   double Eold=0.0;
   for(size_t istep=0;istep<nstepwise;istep++) {
     // Run electronic calculation
+    electronic_energies.clear();
     if(M==1) {
       number_of_blocks_per_particle_type = {1};
       maximum_occupation = {2.0};
@@ -1138,63 +1161,13 @@ int main_guarded(int argc, char **argv) {
       frozen_Jep = electron_proton_coulomb(Pe);
       frozen_Pe = Pe;
 
-      // Update the frozen electron energy
+      // Update the frozen electron energy: that of the electronic
+      // solution, recorded by the builder that evaluated it
       {
-        const auto & orbitals = electronic_dm.first;
-        const auto & occupations = electronic_dm.second;
-
-        if(M==1) {
-          // Get the electronic and protonic orbital coefficients
-          arma::mat Ce = X*orbitals[0];
-
-          // and occupations
-          arma::vec occe = occupations[0];
-
-          // Density matrices
-          arma::mat Pe = Ce * arma::diagmat(occe) * Ce.t();
-
-          // Compute the terms in the Fock matrices
-          arma::mat J, K;
-          std::tie(J, K) = electronic_terms(Ce, occe);
-          // Form the Fock matrices
-          arma::mat Fe = X.t() * (T + Vc + J + .5*K + frozen_Jpe) * X;
-          std::vector<arma::mat> fock({Fe});
-
-          // Compute energy terms
-          double Ekin = arma::trace(Pe*T);
-          double Enuc = arma::trace(Pe*Vc);
-          double Ecoul = 0.5*arma::trace(J*Pe);
-          double Eexch = 0.25*kfrac*arma::trace(K*Pe);
-          arma::mat Vxc;
-          double Exc = exc.eval(Pe, Vxc);
-          frozen_Ee = Ekin+Enuc+Ecoul+Eexch+Exc;
-
-        } else {
-          // Get the electronic and protonic orbital coefficients
-          arma::mat Ca = X*orbitals[0];
-          arma::mat Cb = X*orbitals[1];
-          // and occupations
-          arma::vec occa = occupations[0];
-          arma::vec occb = occupations[1];
-          // Density matrices
-          arma::mat Pa = Ca * arma::diagmat(occa) * Ca.t();
-          arma::mat Pb = Cb * arma::diagmat(occb) * Cb.t();
-          arma::mat Pe = Pa+Pb;
-
-          // Compute the terms in the Fock matrices
-          arma::mat Ja, Jb, Ka, Kb, Jp, Kp, Jep, Jpe;
-          std::tie(Ja, Ka) = electronic_terms(Ca, occa);
-          std::tie(Jb, Kb) = electronic_terms(Cb, occb);
-
-          // Compute energy terms
-          double Ekin = arma::trace(Pe*T);
-          double Enuc = arma::trace(Pe*Vc);
-          double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
-          double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
-          arma::mat Vxca, Vxcb;
-          double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
-          frozen_Ee = Ekin+Enuc+Ecoul+Eexch+Exc;
-        }
+        auto it = electronic_energies.find(dm_key(electronic_dm));
+        if(it == electronic_energies.end())
+          throw std::logic_error("The energy of the electronic solution was not recorded.\n");
+        frozen_Ee = it->second;
       }
 
       OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> nuclear_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
@@ -1216,7 +1189,7 @@ int main_guarded(int argc, char **argv) {
 
         // Electron-proton correlation with the frozen electrons
         arma::mat Vepce, Vepcp;
-        double Eepc = ep_correlation(frozen_Pe, Pp, Vepce, Vepcp);
+        double Eepc = ep_correlation(frozen_Pe, Pp, Vepce, Vepcp, false, true);
 
         // Form the Fock matrices
         arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Vepcp + frozen_Jep) * Xp;

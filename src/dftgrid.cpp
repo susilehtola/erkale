@@ -1813,7 +1813,7 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
   }
 }
 
-void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BFTable * tab_b) const {
+void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool alpha, bool beta, const BFTable * tab_b) const {
   if(!polarized_) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
@@ -1836,17 +1836,20 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BF
     return;
 
   arma::mat Ha, Hb;
-  Ha.zeros(bf_ind_.n_elem,bf_ind_.n_elem);
+  if(alpha)
+    Ha.zeros(bf_ind_.n_elem,bf_ind_.n_elem);
   if(beta)
     Hb.zeros(BFIb.n_elem,BFIb.n_elem);
 
   {
-    // LDA potential
-    arma::rowvec vrhoa(vxc_.row(0));
-    // Multiply weights into potential
-    vrhoa%=w_;
-    // Increment matrix
-    increment_lda<double>(Ha,vrhoa,bf_,screen);
+    if(alpha) {
+      // LDA potential
+      arma::rowvec vrhoa(vxc_.row(0));
+      // Multiply weights into potential
+      vrhoa%=w_;
+      // Increment matrix
+      increment_lda<double>(Ha,vrhoa,bf_,screen);
+    }
 
     if(beta) {
       arma::rowvec vrhob(vxc_.row(1));
@@ -1854,7 +1857,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BF
       increment_lda<double>(Hb,vrhob,BFb,screen);
     }
   }
-  if(Ha.has_nan() || (beta && Hb.has_nan()))
+  if((alpha && Ha.has_nan()) || (beta && Hb.has_nan()))
     throw std::logic_error("NaN encountered!\n");
 
   if(do_gga_) {
@@ -1868,13 +1871,15 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BF
     arma::mat gr_a0(arma::trans(grho_.rows(idxa)));
     arma::mat gr_b0(arma::trans(grho_.rows(idxb)));
 
-    // Multiply grad rho by vsigma and the weights
-    arma::mat gr_a(gr_a0);
-    for(size_t i=0;i<gr_a.n_rows;i++)
-      for(size_t ic=0;ic<gr_a.n_cols;ic++)
-	gr_a(i,ic)=w_(i)*(2.0*vs_aa(i)*gr_a0(i,ic) + vs_ab(i)*gr_b0(i,ic));
-    // Increment matrix
-    increment_gga<double>(Ha,gr_a,bf_,bf_x_,bf_y_,bf_z_,screen);
+    if(alpha) {
+      // Multiply grad rho by vsigma and the weights
+      arma::mat gr_a(gr_a0);
+      for(size_t i=0;i<gr_a.n_rows;i++)
+        for(size_t ic=0;ic<gr_a.n_cols;ic++)
+          gr_a(i,ic)=w_(i)*(2.0*vs_aa(i)*gr_a0(i,ic) + vs_ab(i)*gr_b0(i,ic));
+      // Increment matrix
+      increment_gga<double>(Ha,gr_a,bf_,bf_x_,bf_y_,bf_z_,screen);
+    }
 
     if(beta) {
       arma::rowvec vs_bb(vsigma_.row(2));
@@ -1887,19 +1892,21 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BF
   }
 
   if(do_mgga_t_ && do_mgga_l_) {
-    // Get vtau and vlapl
-    arma::rowvec vt_a(vtau_.row(0));
-    arma::rowvec vl_a(vlapl_.row(0));
+    if(alpha) {
+      // Get vtau and vlapl
+      arma::rowvec vt_a(vtau_.row(0));
+      arma::rowvec vl_a(vlapl_.row(0));
 
-    // Scale both with weights
-    vt_a%=w_;
-    vl_a%=w_;
+      // Scale both with weights
+      vt_a%=w_;
+      vl_a%=w_;
 
-    // Evaluate kinetic contribution
-    increment_mgga_kin<double>(Ha,0.5*vt_a + 2.0*vl_a,bf_x_,bf_y_,bf_z_,screen);
+      // Evaluate kinetic contribution
+      increment_mgga_kin<double>(Ha,0.5*vt_a + 2.0*vl_a,bf_x_,bf_y_,bf_z_,screen);
 
-    // Evaluate laplacian contribution. Get function laplacian
-    increment_mgga_lapl<double>(Ha,vl_a,bf_,bf_lapl_,screen);
+      // Evaluate laplacian contribution. Get function laplacian
+      increment_mgga_lapl<double>(Ha,vl_a,bf_,bf_lapl_,screen);
+    }
 
     if(beta) {
       arma::rowvec vt_b(vtau_.row(1));
@@ -1910,19 +1917,23 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BF
       increment_mgga_lapl<double>(Hb,vl_b,BFb,BFbl,screen);
     }
   } else if(do_mgga_t_) {
-    arma::rowvec vt_a(vtau_.row(0));
-    vt_a%=w_;
-    increment_mgga_kin<double>(Ha,0.5*vt_a,bf_x_,bf_y_,bf_z_,screen);
+    if(alpha) {
+      arma::rowvec vt_a(vtau_.row(0));
+      vt_a%=w_;
+      increment_mgga_kin<double>(Ha,0.5*vt_a,bf_x_,bf_y_,bf_z_,screen);
+    }
     if(beta) {
       arma::rowvec vt_b(vtau_.row(1));
       vt_b%=w_;
       increment_mgga_kin<double>(Hb,0.5*vt_b,BFbx,BFby,BFbz,screen);
     }
   } else if(do_mgga_l_) {
-    arma::rowvec vl_a(vlapl_.row(0));
-    vl_a%=w_;
-    increment_mgga_kin<double>(Ha,2.0*vl_a,bf_x_,bf_y_,bf_z_,screen);
-    increment_mgga_lapl<double>(Ha,vl_a,bf_,bf_lapl_,screen);
+    if(alpha) {
+      arma::rowvec vl_a(vlapl_.row(0));
+      vl_a%=w_;
+      increment_mgga_kin<double>(Ha,2.0*vl_a,bf_x_,bf_y_,bf_z_,screen);
+      increment_mgga_lapl<double>(Ha,vl_a,bf_,bf_lapl_,screen);
+    }
 
     if(beta) {
       arma::rowvec vl_b(vlapl_.row(1));
@@ -1932,7 +1943,8 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta, const BF
     }
   }
 
-  Hao(bf_ind_,bf_ind_)+=Ha;
+  if(alpha)
+    Hao(bf_ind_,bf_ind_)+=Ha;
   if(beta)
     Hbo(BFIb,BFIb)+=Hb;
 }
@@ -4417,14 +4429,22 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 }
 
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b) {
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b, bool fock_a, bool fock_b) {
   // Clear Hamiltonian. Channel a is the primary basis; channel b is the
   // primary basis too in ordinary unrestricted DFT, or a second basis
   // (basis_b) for multicomponent (NEO) XC, where channel b is the proton
-  // density and Hb is sized by the proton basis.
-  Ha.zeros(basp_->Nbf(),basp_->Nbf());
+  // density and Hb is sized by the proton basis. Only the requested
+  // matrices are built; without either, only the energy is computed.
   const size_t Nb = basis_b ? basis_b->Nbf() : Pb.n_rows;
-  Hb.zeros(Nb,Nb);
+  if(fock_a)
+    Ha.zeros(basp_->Nbf(),basp_->Nbf());
+  else
+    Ha.reset();
+  if(fock_b)
+    Hb.zeros(Nb,Nb);
+  else
+    Hb.reset();
+  const bool fock = fock_a || fock_b;
   // Clear exchange-correlation energy
   double Ex=0.0, Ec=0.0;
   // Clear number of electrons
@@ -4438,11 +4458,8 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
   std::vector<arma::mat> Hawrk, Hbwrk;
 
   for(int i=0;i<maxt;i++) {
-    Hawrk.push_back(arma::mat(Ha.n_rows,Ha.n_cols));
-    Hawrk[i].zeros();
-
-    Hbwrk.push_back(arma::mat(Hb.n_rows,Hb.n_cols));
-    Hbwrk[i].zeros();
+    Hawrk.push_back(arma::zeros<arma::mat>(Ha.n_rows,Ha.n_cols));
+    Hbwrk.push_back(arma::zeros<arma::mat>(Hb.n_rows,Hb.n_cols));
   }
 
 #pragma omp parallel shared(Hawrk,Hbwrk) reduction(+:Nel,Ex,Ec)
@@ -4484,14 +4501,14 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       wrk_[ith].init_xc();
       // Compute the functionals
       if(x_func>0) {
-	wrk_[ith].compute_xc(x_func,true);
+	wrk_[ith].compute_xc(x_func,fock);
         wrk_[ith].check_xc();
 	// Evaluate the energy
 	Ex+=wrk_[ith].eval_Exc();
 	wrk_[ith].zero_Exc();
       }
       if(c_func>0) {
-	wrk_[ith].compute_xc(c_func,true);
+	wrk_[ith].compute_xc(c_func,fock);
         wrk_[ith].check_xc();
 	// Evaluate the energy
 	Ec+=wrk_[ith].eval_Exc();
@@ -4499,11 +4516,13 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       }
 
       // and construct the Fock matrices
+      if(fock) {
 #ifdef _OPENMP
-      wrk_[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith],true,tab_b);
+        wrk_[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith],fock_a,fock_b,tab_b);
 #else
-      wrk_[ith].eval_Fxc(Ha,Hb,true,tab_b);
+        wrk_[ith].eval_Fxc(Ha,Hb,fock_a,fock_b,tab_b);
 #endif
+      }
 
       // Free memory
       wrk_[ith].free();
@@ -4513,8 +4532,10 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 #ifdef _OPENMP
   // Sum results
   for(int i=0;i<maxt;i++) {
-    Ha+=Hawrk[i];
-    Hb+=Hbwrk[i];
+    if(fock_a)
+      Ha+=Hawrk[i];
+    if(fock_b)
+      Hb+=Hbwrk[i];
   }
 #endif
 
@@ -4599,7 +4620,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & CW, std::vec
 	if(fock) {
 	  Hwrk.zeros(); // need to clear this here
 
-	  wrk_[ith].eval_Fxc(Hwrk,Hdum,false);
+	  wrk_[ith].eval_Fxc(Hwrk,Hdum,true,false);
 
 #ifdef _OPENMP
 #pragma omp critical
