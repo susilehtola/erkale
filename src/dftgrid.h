@@ -496,8 +496,9 @@ class AngularGrid {
 
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
-  /// Evaluate Fock matrix, unrestricted calculation
-  void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool beta=true, const BFTable * tab_b=nullptr) const;
+  /// Evaluate Fock matrix, unrestricted calculation. alpha and beta
+  /// select the channels that are assembled.
+  void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
@@ -606,8 +607,10 @@ class DFTGrid {
   /// channel a uses the grid's primary basis -- the two channels live on
   /// different bases (multicomponent / NEO: electron and proton). The
   /// supplied functional is then a two-channel coupling functional (EPC).
-  /// basis_b = nullptr is ordinary unrestricted DFT.
-  void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr);
+  /// basis_b = nullptr is ordinary unrestricted DFT. fock_a and fock_b
+  /// select the matrices that are built (the energy always is); a matrix
+  /// that is not built is left empty.
+  void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true);
 
   /**
    * Compute Fock matrix, exchange-correlation energy and integrated
