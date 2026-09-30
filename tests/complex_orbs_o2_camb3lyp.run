@@ -1,0 +1,13 @@
+# Range-separated hybrid in the complex basis, unrestricted triplet; the
+# energy equals erkale's. (Tighter thresholds hit the numerical noise
+# floor of the orbital gradient, about 1e-8.)
+System O2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_cam_b3lyp
+Multiplicity 3
+Restricted false
+ComplexBasis true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-7
+SaveChk complex_orbs_o2_camb3lyp.chk

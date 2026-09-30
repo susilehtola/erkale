@@ -1,0 +1,10 @@
+# Multicomponent DFT with a range-separated hybrid (full- and
+# short-range exact exchange for the electrons), one quantum proton
+System H2O.xyz
+Basis cc-pVDZ
+ProtonBasis PB4-D
+QuantumProtons 2
+Method hyb_gga_xc_wb97x
+JKMethod Cholesky
+DFTGrid 75 -302
+SaveChk neo_wb97x.chk

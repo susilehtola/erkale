@@ -182,7 +182,9 @@ int main_guarded(int argc, char **argv) {
   // which the Fock builders below pass on.
   ElectronicXC exc(basis, verbose);
   exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"));
-  const double kfrac = exc.exact_exchange_fraction();
+  // Exact exchange: kfull K + kshort K_sr(omega); this also builds the
+  // short-range integrals of a range-separated functional
+  jk.set_range_separation(exc.kfull(), exc.kshort(), exc.omega());
   // Without the current density, the kinetic energy density is not gauge
   // invariant in a magnetic field.
   if(linB != 0.0 && exc.is_meta_gga())
@@ -331,10 +333,16 @@ int main_guarded(int argc, char **argv) {
     arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
     arma::mat J = jk.calcJ(P);
-    arma::cx_mat K = -jk.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), S);
 
-    // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
-    K = arma::conj(K);
+    // Exact exchange, including its admixture. The code in ERKALE has a
+    // different convention for complex integrals; the complex conjugate
+    // makes it compatible with this code.
+    const std::vector<double> occv = arma::conv_to<std::vector<double>>::from(occs);
+    arma::cx_mat K(Nbf, Nbf, arma::fill::zeros);
+    if(exc.kfull() != 0.0)
+      K -= exc.kfull() * arma::conj(jk.calcK(C_c, occv, S));
+    if(exc.kshort() != 0.0)
+      K -= exc.kshort() * arma::conj(jk.calcK_short(C_c, occv, S));
 
     return std::make_tuple(P, J, K);
   };
@@ -373,7 +381,7 @@ int main_guarded(int argc, char **argv) {
     double Exc = exc.eval(P, Vxc);
 
     // Form the Fock matrices
-    arma::cx_mat F = T + V + J + 0.5*kfrac*K + Vxc;
+    arma::cx_mat F = T + V + J + 0.5*K + Vxc;
     arma::cx_mat DFD;
     if(complexbas)
       DFD = D.t()*F*D + Bterms;
@@ -388,7 +396,7 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * J);
-    double Eexch = 0.25 * kfrac * std::real(arma::trace(cP * K));
+    double Eexch = 0.25 * std::real(arma::trace(cP * K));
     double Emag = arma::trace(cbP * Bterms);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Exc + Enucr + Emag;
 
@@ -451,8 +459,8 @@ int main_guarded(int argc, char **argv) {
     arma::mat Bb = + 0.5 * linB * S;
 
     // Form the Fock matrices
-    arma::cx_mat Fa = T + V + Ja + Jb + kfrac*Ka + Vxca + Ba;
-    arma::cx_mat Fb = T + V + Ja + Jb + kfrac*Kb + Vxcb + Bb;
+    arma::cx_mat Fa = T + V + Ja + Jb + Ka + Vxca + Ba;
+    arma::cx_mat Fb = T + V + Ja + Jb + Kb + Vxcb + Bb;
     arma::cx_mat DFDa, DFDb;
     if(complexbas) {
       DFDa = D.t() * Fa * D + Bterms;
@@ -474,7 +482,7 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
-    double Eexch = 0.5 * kfrac * std::real(arma::trace(cPa * Ka) + arma::trace(cPb * Kb));
+    double Eexch = 0.5 * std::real(arma::trace(cPa * Ka) + arma::trace(cPb * Kb));
     double Emag = arma::trace((cbPa + cbPb) * Bterms) - linB * 0.5 * (Nela - Nelb);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Exc + Enucr + Emag;
 

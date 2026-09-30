@@ -1,0 +1,12 @@
+# Range-separated hybrid (full- and short-range exact exchange) in the
+# complex basis, restricted; the energy equals erkale's.
+System N2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_wb97x
+Multiplicity 1
+Restricted true
+ComplexBasis true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-8
+SaveChk complex_orbs_n2_wb97x.chk
