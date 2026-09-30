@@ -2005,49 +2005,6 @@ n",(int) Nbf(),max_am());
     printf("Cartesian Gaussians are used by default.\n");
 }
 
-arma::mat BasisSet::cart_to_sph_trans() const {
-  // Form transformation matrix to spherical harmonics
-
-  const size_t Nlm=this->Nlm();
-  const size_t Ncart=this->Ncart();
-
-  // Returned matrix
-  arma::mat trans(Nlm,Ncart);
-  trans.zeros();
-
-  // Bookkeeping indices
-  size_t n=0, l=0;
-
-  // Helper matrix
-  arma::mat tmp;
-
-  for(size_t i=0;i<shells_.size();i++) {
-    // Get angular momentum of shell
-    int am=shells_[i].am();
-
-    // Number of cartesians and harmonics on shell
-    int Nc=(am+1)*(am+2)/2;
-    int Nl=2*am+1;
-
-    // Get transformation matrix
-    tmp=shell_transmat(am);
-
-    // Store transformation matrix
-    trans.submat(l,n,l+Nl-1,n+Nc-1)=tmp;
-    n+=Nc;
-    l+=Nl;
-  }
-
-  return trans;
-}
-
-arma::mat BasisSet::sph_to_cart_trans() const {
-  // Form transformation matrix to cartesians
-
-  return inv(cart_to_sph_trans());
-}
-
-
 arma::mat BasisSet::overlap() const {
   // Form overlap matrix
   const size_t N=Nbf();

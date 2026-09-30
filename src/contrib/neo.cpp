@@ -1293,6 +1293,10 @@ int main_guarded(int argc, char **argv) {
     scfsolver.maximum_iterations(maxiter);
     scfsolver.maximum_history_length(diisorder);
     scfsolver.run();
+    // Like erkale, do not carry on from an SCF that did not converge; the
+    // trust-region solver, however, finishes it
+    if(!scfsolver.converged() && !trustregion)
+      throw std::runtime_error("NEO-SCF did not converge in " + std::to_string(maxiter) + " iterations!\n");
 
     auto dm = scfsolver.get_solution();
     auto fock = scfsolver.get_fock_matrix();
