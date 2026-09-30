@@ -279,9 +279,11 @@ int main_guarded(int argc, char **argv) {
     throw std::runtime_error("EPCFunctional requires the quantum particle to be a proton.\n");
   ElectronicXC exc(basis, verbose);
   exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"), do_epc);
+  // The dump is a Hartree-Fock reference for post-SCF correlation, and its
+  // verification rebuilds the Hartree-Fock energy
+  if(settings.get_string("NEODump").size() && (exc.active() || do_epc))
+    throw std::runtime_error("NEODump exports a Hartree-Fock reference: use Method HF without EPCFunctional.\n");
   const bool do_exc = exc.active();
-  // Fraction of exact exchange (1 for HF, the hybrid coefficient for DFT).
-  const double kfrac = exc.exact_exchange_fraction();
 
   // Electron-proton correlation energy and its electron and proton
   // potentials, evaluated on the electron grid with the proton basis.
@@ -409,6 +411,17 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
+  // Short-range electronic exchange of a range-separated functional,
+  // fitted the same way as the full-range interaction
+  DensityFit dfit_sr;
+  if(exc.kshort() != 0.0) {
+    dfit_sr.set_range_separation(exc.omega(), 0.0, 1.0);
+    if(density_fitting)
+      dfit_sr.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
+    else
+      dfit_sr.fill_cholesky(basis,direct,settings.get_double("CholeskyThr"),settings.get_double("CholeskyShThr"),settings.get_double("IntegralThresh"),settings.get_double("FittingCholeskyThreshold"),verbose);
+  }
+
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.unique_shellpairs().size());
   printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.unique_shellpairs().size());
   fflush(stdout);
@@ -479,7 +492,13 @@ int main_guarded(int argc, char **argv) {
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J=dfit.calcJ(P);
-    arma::mat K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+    // Exact exchange, including its admixture: kfull K + kshort K_sr
+    const std::vector<double> occv(arma::conv_to<std::vector<double>>::from(occs));
+    arma::mat K(C.n_rows,C.n_rows,arma::fill::zeros);
+    if(exc.kfull() != 0.0)
+      K-=exc.kfull()*dfit.calcK(C,occv);
+    if(exc.kshort() != 0.0)
+      K-=exc.kshort()*dfit_sr.calcK(C,occv);
     return std::make_pair(J,K);
   };
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&](const arma::mat & C, const arma::vec & occs) {
@@ -681,14 +700,14 @@ int main_guarded(int argc, char **argv) {
     double Exc = exc.eval(Pe, Vxc);
     double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp, true, false);
     // Form the Fock matrices
-    arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxc + Vepce + frozen_Jpe) * X;
+    arma::mat Fe = X.t() * (T + Vc + J + .5*K + Vxc + Vepce + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fe});
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
     double Enuc = arma::trace(Pe*Vc);
     double Ecoul = 0.5*arma::trace(J*Pe);
-    double Eexch = 0.25*kfrac*arma::trace(K*Pe);
+    double Eexch = 0.25*arma::trace(K*Pe);
     double Epe = arma::trace(Pe*frozen_Jpe);
     double Etot = Ekin+Enuc+Ecoul+Eexch+Exc+Eepc+Ecnucr+Epe+frozen_Ep;
     electronic_energies[dm_key(dm)] = Ekin+Enuc+Ecoul+Eexch+Exc;
@@ -737,15 +756,15 @@ int main_guarded(int argc, char **argv) {
     double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
     double Eepc = ep_correlation(Pe, frozen_Pp, Vepce, Vepcp, true, false);
     // Form the Fock matrices
-    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + frozen_Jpe) * X;
-    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + kfrac*Kb + Vxcb + Vepce + frozen_Jpe) * X;
+    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + Ka + Vxca + Vepce + frozen_Jpe) * X;
+    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + Kb + Vxcb + Vepce + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fa,Fb});
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
     double Enuc = arma::trace(Pe*Vc);
     double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
-    double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
+    double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
     double Epe = arma::trace(Pe*frozen_Jpe);
     double Etot = Ekin+Enuc+Ecoul+Eexch+Exc+Eepc+Ecnucr+Epe+frozen_Ep;
     electronic_energies[dm_key(dm)] = Ekin+Enuc+Ecoul+Eexch+Exc;
@@ -811,7 +830,7 @@ int main_guarded(int argc, char **argv) {
     double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp, true, true);
 
     // Form the Fock matrices
-    arma::mat Fe = X.t() * (T + Vc + J + .5*kfrac*K + Vxce + Vepce + Jpe) * X;
+    arma::mat Fe = X.t() * (T + Vc + J + .5*K + Vxce + Vepce + Jpe) * X;
     arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Vepcp + Jep) * Xp;
     std::vector<arma::mat> fock({Fe,Fp});
 
@@ -822,7 +841,7 @@ int main_guarded(int argc, char **argv) {
     double Epnuc = arma::trace(Pp*Vpc);
     double Ecoul = 0.5*arma::trace(J*Pe);
     double Epcoul = 0.5*arma::trace(Jp*Pp);
-    double Eexch = 0.25*kfrac*arma::trace(K*Pe);
+    double Eexch = 0.25*arma::trace(K*Pe);
     double Epexch = 0.5*arma::trace(Kp*Pp);
     double Eepcoul = arma::trace(Jep*Pp);
     double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Ecnucr+Exce+Eepc;
@@ -885,8 +904,8 @@ int main_guarded(int argc, char **argv) {
     double Eepc = ep_correlation(Pe, Pp, Vepce, Vepcp, true, true);
 
     // Form the Fock matrices
-    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + kfrac*Ka + Vxca + Vepce + Jpe) * X;
-    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + kfrac*Kb + Vxcb + Vepce + Jpe) * X;
+    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + Ka + Vxca + Vepce + Jpe) * X;
+    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + Kb + Vxcb + Vepce + Jpe) * X;
     arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Vepcp + Jep) * Xp;
     std::vector<arma::mat> fock({Fa,Fb,Fp});
 
@@ -897,7 +916,7 @@ int main_guarded(int argc, char **argv) {
     double Epnuc = arma::trace(Pp*Vpc);
     double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
     double Epcoul = 0.5*arma::trace(Jp*Pp);
-    double Eexch = 0.5*kfrac*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
+    double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
     double Epexch = 0.5*arma::trace(Kp*Pp);
     double Eepcoul = arma::trace(Jep*Pp);
     double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Ecnucr+Exce+Eepc;

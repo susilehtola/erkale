@@ -81,11 +81,16 @@ if(ERKALE_LIBXC_HAS_EPC)
   run_neo(neo_dft_epc "-75.84436")
   run_neo(neo_dft_epc_u "-75.38644")
 endif()
+# Multicomponent DFT with a range-separated hybrid for the electrons
+run_neo(neo_wb97x "-76.36052")
 
 # Linear symmetry in the complex basis, restricted and unrestricted DFT
 add_test(build_erkale_complex_orbs "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale_complex_orbs)
 run_complex_orbs(complex_orbs_n2_b3lyp "-109.53324")
 run_complex_orbs(complex_orbs_o2_tpss "-150.35981")
+# Range-separated hybrids
+run_complex_orbs(complex_orbs_n2_wb97x "-109.5077902")
+run_complex_orbs(complex_orbs_o2_camb3lyp "-150.2878160")
 # States erkale cannot represent: boron with its p electron in the
 # complex m=+1 orbital, without and with a magnetic field. The occupation
 # file is read from the working directory.

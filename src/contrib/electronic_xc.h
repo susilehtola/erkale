@@ -28,16 +28,21 @@
 /**
  * Electronic exchange-correlation for the stand-alone SCF programs
  * (erkale_neo, erkale_complex_orbs), which build their own Fock
- * matrices. Parses the Method functional, refuses what these programs
- * do not implement, builds a fixed integration grid, and evaluates the
- * XC energy and AO matrix. With Hartree-Fock (Method HF) it is inactive:
- * the exact-exchange fraction is one and the XC terms are zero.
+ * matrices. Parses the Method functional, gives its exact-exchange
+ * admixture, refuses what these programs do not implement, builds a
+ * fixed integration grid, and evaluates the XC energy and AO matrix.
+ * The exact exchange is kfull K + kshort K_sr(omega), where K_sr is the
+ * exchange with the short-range (erfc) interaction: a global hybrid has
+ * only kfull, a range-separated one also kshort and omega. With
+ * Hartree-Fock (Method HF) it is inactive: kfull is one and the XC terms
+ * are zero.
  */
 class ElectronicXC {
   /// Exchange and correlation functionals (0 for none)
   int x_func_=0, c_func_=0;
-  /// Fraction of exact exchange
-  double kfrac_=1.0;
+  /// Exact-exchange admixture: full-range and short-range fractions,
+  /// and the range-separation parameter
+  double kfull_=1.0, kshort_=0.0, omega_=0.0;
   /// Integration grid
   DFTGrid grid_;
   /// Is the grid constructed?
@@ -58,11 +63,15 @@ class ElectronicXC {
     if(stricmp(method,"HF")!=0)
       parse_xc_func(x_func_, c_func_, method);
     // Hartree-Fock has full exact exchange; a functional has its own
-    // fraction, which is zero without an exchange functional.
-    kfrac_ = active() ? exact_exchange(x_func_) : 1.0;
+    // admixture, which is zero without an exchange functional.
+    if(active())
+      range_separation(x_func_, omega_, kfull_, kshort_);
+    else {
+      kfull_=1.0;
+      kshort_=0.0;
+      omega_=0.0;
+    }
 
-    if(x_func_>0 && is_range_separated(x_func_))
-      throw std::runtime_error("Range-separated functionals are not supported in this program.\n");
     double b, C;
     if((x_func_>0 && needs_VV10(x_func_, b, C)) || (c_func_>0 && needs_VV10(c_func_, b, C)))
       throw std::runtime_error("VV10 functionals are not supported in this program.\n");
@@ -79,8 +88,12 @@ class ElectronicXC {
 
   /// Is there an XC functional?
   bool active() const { return x_func_>0 || c_func_>0; }
-  /// Fraction of exact exchange
-  double exact_exchange_fraction() const { return kfrac_; }
+  /// Full-range exact-exchange fraction
+  double kfull() const { return kfull_; }
+  /// Short-range exact-exchange fraction
+  double kshort() const { return kshort_; }
+  /// Range-separation parameter (zero without range separation)
+  double omega() const { return omega_; }
   /// Does the functional depend on the kinetic energy density or the laplacian?
   bool is_meta_gga() const {
     for(int f : {x_func_, c_func_}) {
