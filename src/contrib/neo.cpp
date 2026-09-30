@@ -192,8 +192,12 @@ int main_guarded(int argc, char **argv) {
   // Collect quantum protons
   std::vector<atom_t> quantum_protons;
   for(auto idx: proton_indices) {
+    if(idx >= atoms.size())
+      throw std::runtime_error("QuantumProtons refers to atom " + std::to_string(idx+1) + ", but the system has only " + std::to_string(atoms.size()) + " atoms.\n");
     quantum_protons.push_back(atoms[idx]);
   }
+  if(quantum_protons.empty())
+    throw std::runtime_error("erkale_neo needs at least one quantum proton: give QuantumProtons as atom indices, or * for all hydrogens.\n");
   for(size_t i=0; i<quantum_protons.size(); i++)
     quantum_protons[i].num=i;
 
