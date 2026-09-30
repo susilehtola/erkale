@@ -23,6 +23,7 @@
 #include <armadillo>
 #include <cstdio>
 #include <exception>
+#include <functional>
 #include <stdexcept>
 #include <vector>
 
@@ -46,15 +47,36 @@ class TrustRegionSCF {
  public:
   using DensityMatrix = OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double>;
   using FockBuilder = OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double>;
+  /**
+   * Linear response of the Fock matrices, for analytic Hessian-vector
+   * products. Given the current orbitals and occupations and, for each
+   * block, a transition density D_b = L_b R_b^T + R_b L_b^T (L and R in
+   * the block's orthonormal basis, like the orbitals), it returns the
+   * change of each block's Fock matrix to first order in D, in the same
+   * basis as the Fock builder: dF_b = sum_c dF_b/dP_c D_c.
+   */
+  using ResponseBuilder = std::function<std::vector<arma::mat>(const DensityMatrix & dm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R)>;
 
-  /// Constructor: Fock builder and the starting orbitals and occupations
-  TrustRegionSCF(const FockBuilder & fock, const DensityMatrix & dm, double fdstep=1e-4) : fock_(fock), C_(dm.first), occ_(dm.second), fdstep_(fdstep) {
+  /// Constructor: Fock builder, the starting orbitals and occupations, and
+  /// optionally the Fock response for analytic Hessian-vector products
+  /// (without it, the products are finite differences of the gradient)
+  TrustRegionSCF(const FockBuilder & fock, const DensityMatrix & dm, const ResponseBuilder & response=ResponseBuilder(), double fdstep=1e-4) : fock_(fock), response_(response), C_(dm.first), occ_(dm.second), fdstep_(fdstep) {
     // Rotations between orbitals of different occupation
-    for(size_t b=0;b<C_.size();b++)
-      for(size_t i=0;i<occ_[b].n_elem;i++)
+    occupied_.resize(C_.size());
+    for(size_t b=0;b<C_.size();b++) {
+      std::vector<arma::uword> occd;
+      for(size_t i=0;i<occ_[b].n_elem;i++) {
+        bool is_occupied=false;
         for(size_t a=0;a<occ_[b].n_elem;a++)
-          if(occ_[b](i)-occ_[b](a) > 1e-10)
+          if(occ_[b](i)-occ_[b](a) > 1e-10) {
             pairs_.push_back({b, a, i, occ_[b](i)-occ_[b](a)});
+            is_occupied=true;
+          }
+        if(is_occupied)
+          occd.push_back(i);
+      }
+      occupied_[b]=arma::uvec(occd);
+    }
     evaluate(C_, E_, Fmo_);
     grad_=gradient(Fmo_);
   }
@@ -118,10 +140,14 @@ class TrustRegionSCF {
   };
 
   FockBuilder fock_;
+  /// Fock response (empty: finite-difference Hessian-vector products)
+  ResponseBuilder response_;
   /// Orbitals and occupations by block
   std::vector<arma::mat> C_;
   std::vector<arma::vec> occ_;
   std::vector<pair_t> pairs_;
+  /// Orbitals that lose occupation in some rotation, by block
+  std::vector<arma::uvec> occupied_;
   /// Finite-difference step for the Hessian-vector products
   double fdstep_;
   /// Energy, orbital-basis Fock matrices, and gradient at the current orbitals
@@ -192,15 +218,60 @@ class TrustRegionSCF {
     }
     return h;
   }
+  /// Hessian-vector product: analytic with a Fock response, else finite differences
+  arma::vec hessian_times(const double * x) const {
+    return response_ ? hessian_times_analytic(x) : hessian_times_fd(x);
+  }
+
   /**
-   * Hessian-vector product: central difference of the gradient along x.
+   * Analytic Hessian-vector product. With C -> C exp(K) and the
+   * occupations N fixed, the energy to second order is
+   *   E = E0 + tr(F [K,N]) + tr(F [K,[K,N]])/2 + tr([K,N] G([K,N]))/2
+   * in the orbital basis, where F are the current Fock matrices and G(D)
+   * the Fock response to the transition density D. Differentiating,
+   *   (H x)_ai = dn [F,X]_ai + [F,M]_ai + 2 dn G(M)_ai,  M = [X,N].
+   * The transition density D = C M C^T is passed to the response as
+   * L R^T + R L^T, with L the orbitals that lose occupation: M only has
+   * rows and columns of those orbitals.
+   */
+  arma::vec hessian_times_analytic(const double * x) const {
+    std::vector<arma::mat> X(generators(x));
+    std::vector<arma::mat> M(C_.size()), L(C_.size()), R(C_.size());
+    for(size_t b=0;b<C_.size();b++) {
+      const arma::mat N(arma::diagmat(occ_[b]));
+      M[b]=X[b]*N-N*X[b];
+      const arma::uvec & I=occupied_[b];
+      arma::mat MI(M[b].cols(I));
+      MI.rows(I)-=0.5*M[b](I,I);
+      L[b]=C_[b].cols(I);
+      R[b]=C_[b]*MI;
+    }
+    const std::vector<arma::mat> dF(response_(std::make_pair(C_, occ_), L, R));
+
+    arma::vec hx(pairs_.size());
+    for(size_t k=0;k<pairs_.size();k++) {
+      const pair_t & p=pairs_[k];
+      const arma::mat & F=Fmo_[p.b];
+      const arma::mat & Xb=X[p.b];
+      const arma::mat & Mb=M[p.b];
+      const double FX=arma::dot(F.row(p.a), Xb.col(p.i))-arma::dot(Xb.row(p.a), F.col(p.i));
+      const double FM=arma::dot(F.row(p.a), Mb.col(p.i))-arma::dot(Mb.row(p.a), F.col(p.i));
+      const double G=arma::dot(C_[p.b].col(p.a), dF[p.b]*C_[p.b].col(p.i));
+      hx(k)=p.dn*FX+FM+2.0*p.dn*G;
+    }
+    return hx;
+  }
+
+  /**
+   * Finite-difference Hessian-vector product: central difference of the
+   * gradient along x.
    * The gradients at the displaced orbitals are with respect to
    * rotations from those orbitals; converting them to the rotations from
    * the current orbitals adds [X, G], where X and G are the generators of
    * x and of the current gradient (G_ai = g_ai/2). This term vanishes at
    * convergence and makes the product that of the symmetric Hessian.
    */
-  arma::vec hessian_times(const double * x) const {
+  arma::vec hessian_times_fd(const double * x) const {
     double E;
     std::vector<arma::mat> Fp, Fm;
     evaluate(rotated(x, fdstep_), E, Fp);

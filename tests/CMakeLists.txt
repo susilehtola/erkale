@@ -103,6 +103,10 @@ run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
 if(ERKALE_TRUST_REGION)
   run_complex_orbs(complex_orbs_h2_instability "-1.0027839")
   run_neo(neo_proton_tr "-75.98665")
+  run_complex_orbs(complex_orbs_n2_b3lyp_tr "-109.53324")
+  if(ERKALE_LIBXC_HAS_EPC)
+    run_neo(neo_dft_epc_tr "-75.84436")
+  endif()
 endif()
 
 # Generate list with genlist.sh

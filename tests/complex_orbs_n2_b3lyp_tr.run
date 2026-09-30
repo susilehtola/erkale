@@ -1,0 +1,15 @@
+# The trust-region solver from the guess (MaxIter 1), with analytic
+# Hessian-vector products including the XC response; it reaches the
+# energy of complex_orbs_n2_b3lyp.
+System N2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_b3lyp
+Multiplicity 1
+Restricted true
+ComplexBasis true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-8
+MaxIter 1
+TrustRegion true
+SaveChk complex_orbs_n2_b3lyp_tr.chk

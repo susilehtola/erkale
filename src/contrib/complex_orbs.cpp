@@ -325,6 +325,19 @@ int main_guarded(int argc, char **argv) {
         + 0.5 * confinement * r2mat.col(j);                  // harmonic confinement
   }
 
+  // Exact exchange of the (complex) orbitals C with occupations occ,
+  // including its admixture. The code in ERKALE has a different
+  // convention for complex integrals; the complex conjugate makes it
+  // compatible with this code.
+  std::function<arma::cx_mat(const arma::cx_mat &, const std::vector<double> &)> exchange = [&](const arma::cx_mat & C_c, const std::vector<double> & occv) {
+    arma::cx_mat K(Nbf, Nbf, arma::fill::zeros);
+    if(exc.kfull() != 0.0)
+      K -= exc.kfull() * arma::conj(jk.calcK(C_c, occv, S));
+    if(exc.kshort() != 0.0)
+      K -= exc.kshort() * arma::conj(jk.calcK_short(C_c, occv, S));
+    return K;
+  };
+
   std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
     arma::mat C;
     arma::vec occs;
@@ -334,15 +347,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
     arma::mat J = jk.calcJ(P);
 
-    // Exact exchange, including its admixture. The code in ERKALE has a
-    // different convention for complex integrals; the complex conjugate
-    // makes it compatible with this code.
-    const std::vector<double> occv = arma::conv_to<std::vector<double>>::from(occs);
-    arma::cx_mat K(Nbf, Nbf, arma::fill::zeros);
-    if(exc.kfull() != 0.0)
-      K -= exc.kfull() * arma::conj(jk.calcK(C_c, occv, S));
-    if(exc.kshort() != 0.0)
-      K -= exc.kshort() * arma::conj(jk.calcK_short(C_c, occv, S));
+    arma::cx_mat K = exchange(C_c, arma::conv_to<std::vector<double>>::from(occs));
 
     return std::make_tuple(P, J, K);
   };
@@ -366,6 +371,20 @@ int main_guarded(int argc, char **argv) {
     return P;
   };
 
+  // An AO Fock matrix (plus the field terms in the basis of the blocks, if
+  // given) in the orthonormal bases of the symmetry blocks
+  std::function<std::vector<arma::mat>(const arma::cx_mat &, const arma::mat &)> to_blocks = [&](const arma::cx_mat & F, const arma::mat & field) {
+    arma::cx_mat DFD;
+    if(complexbas)
+      DFD = D.t()*F*D + field;
+    else
+      DFD = (F + field)*std::complex<double>(1.0,0.0);
+    std::vector<arma::mat> blocks(X.size());
+    for (size_t m=0; m<X.size(); m++)
+      blocks[m] = X[m].t() * arma::real(DFD(m_indices[m], m_indices[m])) * X[m];
+    return blocks;
+  };
+
   OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
@@ -382,15 +401,7 @@ int main_guarded(int argc, char **argv) {
 
     // Form the Fock matrices
     arma::cx_mat F = T + V + J + 0.5*K + Vxc;
-    arma::cx_mat DFD;
-    if(complexbas)
-      DFD = D.t()*F*D + Bterms;
-    else
-      DFD = (F + Bterms)*std::complex<double>(1.0,0.0);
-    for (size_t m=0; m<X.size(); m++)
-      fock[m] = arma::real(DFD(m_indices[m], m_indices[m]));
-    for (size_t m=0; m<X.size(); m++)
-      fock[m] = X[m].t() * fock[m] * X[m];
+    fock = to_blocks(F, Bterms);
 
     // Compute energy terms
     double Ekin = arma::trace(P * T);
@@ -461,21 +472,10 @@ int main_guarded(int argc, char **argv) {
     // Form the Fock matrices
     arma::cx_mat Fa = T + V + Ja + Jb + Ka + Vxca + Ba;
     arma::cx_mat Fb = T + V + Ja + Jb + Kb + Vxcb + Bb;
-    arma::cx_mat DFDa, DFDb;
-    if(complexbas) {
-      DFDa = D.t() * Fa * D + Bterms;
-      DFDb = D.t() * Fb * D + Bterms;
-    } else {
-      DFDa = (Fa + Bterms)*std::complex<double>(1.0,0.0);
-      DFDb = (Fb + Bterms)*std::complex<double>(1.0,0.0);
-    }
+    const std::vector<arma::mat> focka = to_blocks(Fa, Bterms), fockb = to_blocks(Fb, Bterms);
     for (size_t m=0; m<X.size(); m++) {
-      fock[m] = arma::real(DFDa(m_indices[m], m_indices[m]));
-      fock[X.size() + m] = arma::real(DFDb(m_indices[m], m_indices[m]));
-    }
-    for (size_t m=0; m<X.size(); m++) {
-      fock[m] = X[m].t() * fock[m] * X[m];
-      fock[X.size() + m] = X[m].t() * fock[X.size() + m] * X[m];
+      fock[m] = focka[m];
+      fock[X.size() + m] = fockb[m];
     }
 
     // Compute energy terms
@@ -610,7 +610,89 @@ int main_guarded(int argc, char **argv) {
   // rotations stay within the symmetry blocks.
   if(trustregion || stability) {
     const int otr_verbose = verbosity >= 10 ? 4 : (verbosity >= 5 ? 3 : 2);
-    TrustRegionSCF tr(fock_builder, scfsolver.get_solution());
+
+    // Fock response to the transition densities D_b = L_b R_b^T + R_b L_b^T
+    // in the symmetry blocks, for analytic Hessian-vector products. The
+    // Coulomb and exact-exchange parts are linear in the density; the
+    // exchange of D follows from that of L+R and L-R. The XC part is a
+    // central difference of the XC potential alone.
+    const double xc_step = 1e-4;
+    // AO coefficients (in the complex basis, if used) of columns given in
+    // the blocks b0, ..., b0+X.size()-1
+    std::function<arma::cx_mat(const std::vector<arma::mat> &, size_t)> ao_columns = [&](const std::vector<arma::mat> & B, size_t b0) {
+      size_t ncol=0;
+      for (size_t m=0; m<X.size(); m++)
+        ncol += B[b0+m].n_cols;
+      arma::mat C(Nbf, ncol, arma::fill::zeros);
+      size_t ic=0;
+      for (size_t m=0; m<X.size(); m++) {
+        const size_t n=B[b0+m].n_cols;
+        if(n)
+          C.submat(m_indices[m], arma::regspace<arma::uvec>(ic, ic+n-1)) = X[m]*B[b0+m];
+        ic += n;
+      }
+      return arma::cx_mat(D*C);
+    };
+    // Real transition density and its exact exchange
+    std::function<void(const arma::cx_mat &, const arma::cx_mat &, arma::mat &, arma::cx_mat &)> transition = [&](const arma::cx_mat & Lc, const arma::cx_mat & Rc, arma::mat & Dr, arma::cx_mat & dK) {
+      Dr = arma::real(Lc*Rc.t() + Rc*Lc.t());
+      const std::vector<double> ones(Lc.n_cols, 1.0);
+      dK = 0.5*(exchange(Lc+Rc, ones) - exchange(Lc-Rc, ones));
+    };
+    // Real density of the blocks b0, ..., b0+X.size()-1
+    std::function<arma::mat(const TrustRegionSCF::DensityMatrix &, size_t)> block_density = [&](const TrustRegionSCF::DensityMatrix & dm, size_t b0) {
+      std::vector<arma::mat> orbs(dm.first.begin()+b0, dm.first.begin()+b0+X.size());
+      std::vector<arma::vec> occs(dm.second.begin()+b0, dm.second.begin()+b0+X.size());
+      arma::mat C;
+      arma::vec occ;
+      std::tie(C, occ) = collect_orbitals(orbs, occs);
+      const arma::cx_mat C_c = D*C;
+      return arma::mat(arma::real(C_c*arma::diagmat(occ)*C_c.t()));
+    };
+    const arma::mat nofield(Nbf, Nbf, arma::fill::zeros);
+    TrustRegionSCF::ResponseBuilder response;
+    if(!unrestricted)
+      response = [&](const TrustRegionSCF::DensityMatrix & dm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
+        arma::mat Dr;
+        arma::cx_mat dK;
+        transition(ao_columns(L, 0), ao_columns(R, 0), Dr, dK);
+        arma::cx_mat dF = jk.calcJ(Dr) + 0.5*dK;
+        if(exc.active()) {
+          const arma::mat P = block_density(dm, 0);
+          arma::mat Vp, Vm;
+          exc.eval(P + xc_step*Dr, Vp);
+          exc.eval(P - xc_step*Dr, Vm);
+          dF += arma::cx_mat((Vp - Vm)/(2.0*xc_step), nofield);
+        }
+        return to_blocks(dF, nofield);
+      };
+    else
+      response = [&](const TrustRegionSCF::DensityMatrix & dm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
+        arma::mat Dra, Drb;
+        arma::cx_mat dKa, dKb;
+        transition(ao_columns(L, 0), ao_columns(R, 0), Dra, dKa);
+        transition(ao_columns(L, X.size()), ao_columns(R, X.size()), Drb, dKb);
+        const arma::mat dJ = jk.calcJ(Dra + Drb);
+        arma::cx_mat dFa = dJ + dKa, dFb = dJ + dKb;
+        if(exc.active()) {
+          const arma::mat Pa = block_density(dm, 0), Pb = block_density(dm, X.size());
+          arma::mat Vpa, Vpb, Vma, Vmb;
+          exc.eval(Pa + xc_step*Dra, Pb + xc_step*Drb, Vpa, Vpb);
+          exc.eval(Pa - xc_step*Dra, Pb - xc_step*Drb, Vma, Vmb);
+          dFa += arma::cx_mat((Vpa - Vma)/(2.0*xc_step), nofield);
+          dFb += arma::cx_mat((Vpb - Vmb)/(2.0*xc_step), nofield);
+        }
+        std::vector<arma::mat> blocks = to_blocks(dFa, nofield);
+        const std::vector<arma::mat> blocksb = to_blocks(dFb, nofield);
+        blocks.insert(blocks.end(), blocksb.begin(), blocksb.end());
+        return blocks;
+      };
+    // occ-RI-K assumes the exchanged orbitals are the occupied ones, which
+    // L+R and L-R are not: use finite differences then
+    if(jk.is_occ_rik())
+      response = TrustRegionSCF::ResponseBuilder();
+
+    TrustRegionSCF tr(fock_builder, scfsolver.get_solution(), response);
     if(trustregion) {
       printf("\nTrust-region optimization with OpenTrustRegion\n");
       fflush(stdout);
