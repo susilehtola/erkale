@@ -514,11 +514,6 @@ public:
   /// Print out basis set
   void print(bool verbose=false) const;
 
-  /// Calculate transformation matrix from cartesians to spherical harmonics
-  arma::mat cart_to_sph_trans() const;
-  /// Calculate transfomration matrix from spherical harmonics to cartesians
-  arma::mat sph_to_cart_trans() const;
-
   /// Calculate overlap matrix
   arma::mat overlap() const;
   /// Calculate overlap matrix in Coulomb metric
