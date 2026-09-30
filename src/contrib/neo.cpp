@@ -493,16 +493,24 @@ int main_guarded(int argc, char **argv) {
   arma::mat frozen_Pe(T.n_rows, T.n_cols, arma::fill::zeros);
   arma::mat frozen_Pp(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
 
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
-    arma::mat P(C*arma::diagmat(occs)*C.t());
-    arma::mat J=dfit.calcJ(P);
-    // Exact exchange, including its admixture: kfull K + kshort K_sr
-    const std::vector<double> occv(arma::conv_to<std::vector<double>>::from(occs));
+  // Electronic exact exchange of the orbitals C with occupations occ,
+  // including its admixture: kfull K + kshort K_sr
+  std::function<arma::mat(const arma::mat &, const std::vector<double> &)> electronic_exchange = [&](const arma::mat & C, const std::vector<double> & occv) {
     arma::mat K(C.n_rows,C.n_rows,arma::fill::zeros);
     if(exc.kfull() != 0.0)
       K-=exc.kfull()*dfit.calcK(C,occv);
     if(exc.kshort() != 0.0)
       K-=exc.kshort()*dfit_sr.calcK(C,occv);
+    return K;
+  };
+  // Proton-proton exchange of two particles of charge q
+  std::function<arma::mat(const arma::mat &, const std::vector<double> &)> protonic_exchange = [&](const arma::mat & C, const std::vector<double> & occv) {
+    return arma::mat(-proton_charge*proton_charge*pfit.calcK(C,occv));
+  };
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
+    arma::mat P(C*arma::diagmat(occs)*C.t());
+    arma::mat J=dfit.calcJ(P);
+    arma::mat K=electronic_exchange(C,arma::conv_to<std::vector<double>>::from(occs));
     return std::make_pair(J,K);
   };
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&](const arma::mat & C, const arma::vec & occs) {
@@ -512,7 +520,7 @@ int main_guarded(int argc, char **argv) {
       // The interaction of two particles of charge q
       const double q2=proton_charge*proton_charge;
       J=q2*pfit.calcJ(P);
-      K=-q2*pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+      K=protonic_exchange(C,arma::conv_to<std::vector<double>>::from(occs));
     } else {
       J.zeros(P.n_rows, P.n_cols);
       K.zeros(P.n_rows, P.n_cols);
@@ -1329,7 +1337,91 @@ int main_guarded(int argc, char **argv) {
     // the coupled electron-proton solution
     if(trustregion || stability) {
       const int otr_verbose = verbosity >= 10 ? 4 : (verbosity >= 5 ? 3 : 2);
-      TrustRegionSCF tr(fock_builder, dm);
+
+      // Fock response to the transition densities D_b = L_b R_b^T + R_b L_b^T,
+      // for analytic Hessian-vector products. The Coulomb and exact-exchange
+      // terms are linear in the densities, and the exchange of D follows from
+      // that of L+R and L-R. The XC and EPC parts are central differences of
+      // their potentials alone, with the electronic and protonic densities
+      // displaced together so that the electron-proton coupling is included.
+      const double xc_step = 1e-4;
+      // Transition density in the AO basis, with its exchange
+      std::function<void(const arma::mat &, const arma::mat &, const arma::mat &, const std::function<arma::mat(const arma::mat &, const std::vector<double> &)> &, arma::mat &, arma::mat &)> transition = [&](const arma::mat & Xb, const arma::mat & L, const arma::mat & R, const std::function<arma::mat(const arma::mat &, const std::vector<double> &)> & exchange, arma::mat & D, arma::mat & K) {
+        const arma::mat La(Xb*L), Ra(Xb*R);
+        D = La*Ra.t() + Ra*La.t();
+        const std::vector<double> ones(L.n_cols, 1.0);
+        K = 0.5*(exchange(La+Ra, ones) - exchange(La-Ra, ones));
+      };
+      // Density of block b in the AO basis
+      std::function<arma::mat(const TrustRegionSCF::DensityMatrix &, size_t, const arma::mat &)> density = [&](const TrustRegionSCF::DensityMatrix & rdm, size_t b, const arma::mat & Xb) {
+        const arma::mat C(Xb*rdm.first[b]);
+        return arma::mat(C*arma::diagmat(rdm.second[b])*C.t());
+      };
+      // Proton-proton Coulomb and exchange of a protonic transition density
+      std::function<arma::mat(const arma::mat &, const arma::mat &)> proton_pp = [&](const arma::mat & Dp, const arma::mat & Kp) {
+        if(!vpp)
+          return arma::mat(Dp.n_rows, Dp.n_cols, arma::fill::zeros);
+        return arma::mat(proton_charge*proton_charge*pfit.calcJ(Dp) + Kp);
+      };
+      // Central differences of the EPC potentials
+      std::function<void(const arma::mat &, const arma::mat &, const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> epc_response = [&](const arma::mat & Pe, const arma::mat & Pp, const arma::mat & De, const arma::mat & Dp, arma::mat & dVe, arma::mat & dVp) {
+        arma::mat Vep, Vpp, Vem, Vpm;
+        ep_correlation(Pe + xc_step*De, Pp + xc_step*Dp, Vep, Vpp, true, true);
+        ep_correlation(Pe - xc_step*De, Pp - xc_step*Dp, Vem, Vpm, true, true);
+        dVe = (Vep - Vem)/(2.0*xc_step);
+        dVp = (Vpp - Vpm)/(2.0*xc_step);
+      };
+      TrustRegionSCF::ResponseBuilder response;
+      if(M==1)
+        response = [&](const TrustRegionSCF::DensityMatrix & rdm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
+          arma::mat De, Ke, Dp, Kp;
+          transition(X, L[0], R[0], electronic_exchange, De, Ke);
+          transition(Xp, L[1], R[1], protonic_exchange, Dp, Kp);
+          arma::mat dFe = dfit.calcJ(De) + 0.5*Ke + proton_electron_coulomb(Dp);
+          arma::mat dFp = proton_pp(Dp, Kp) + electron_proton_coulomb(De);
+          const arma::mat Pe(density(rdm, 0, X)), Pp(density(rdm, 1, Xp));
+          if(exc.active()) {
+            arma::mat Vp, Vm;
+            exc.eval(Pe + xc_step*De, Vp);
+            exc.eval(Pe - xc_step*De, Vm);
+            dFe += (Vp - Vm)/(2.0*xc_step);
+          }
+          if(do_epc) {
+            arma::mat dVe, dVp;
+            epc_response(Pe, Pp, De, Dp, dVe, dVp);
+            dFe += dVe;
+            dFp += dVp;
+          }
+          return std::vector<arma::mat>({X.t()*dFe*X, Xp.t()*dFp*Xp});
+        };
+      else
+        response = [&](const TrustRegionSCF::DensityMatrix & rdm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
+          arma::mat Da, Ka, Db, Kb, Dp, Kp;
+          transition(X, L[0], R[0], electronic_exchange, Da, Ka);
+          transition(X, L[1], R[1], electronic_exchange, Db, Kb);
+          transition(Xp, L[2], R[2], protonic_exchange, Dp, Kp);
+          const arma::mat Je = dfit.calcJ(Da + Db) + proton_electron_coulomb(Dp);
+          arma::mat dFa = Je + Ka, dFb = Je + Kb;
+          arma::mat dFp = proton_pp(Dp, Kp) + electron_proton_coulomb(Da + Db);
+          const arma::mat Pa(density(rdm, 0, X)), Pb(density(rdm, 1, X)), Pp(density(rdm, 2, Xp));
+          if(exc.active()) {
+            arma::mat Vpa, Vpb, Vma, Vmb;
+            exc.eval(Pa + xc_step*Da, Pb + xc_step*Db, Vpa, Vpb);
+            exc.eval(Pa - xc_step*Da, Pb - xc_step*Db, Vma, Vmb);
+            dFa += (Vpa - Vma)/(2.0*xc_step);
+            dFb += (Vpb - Vmb)/(2.0*xc_step);
+          }
+          if(do_epc) {
+            arma::mat dVe, dVp;
+            epc_response(Pa + Pb, Pp, Da + Db, Dp, dVe, dVp);
+            dFa += dVe;
+            dFb += dVe;
+            dFp += dVp;
+          }
+          return std::vector<arma::mat>({X.t()*dFa*X, X.t()*dFb*X, Xp.t()*dFp*Xp});
+        };
+
+      TrustRegionSCF tr(fock_builder, dm, response);
       if(trustregion) {
         printf("\nTrust-region optimization with OpenTrustRegion\n");
         fflush(stdout);
@@ -1347,6 +1439,10 @@ int main_guarded(int argc, char **argv) {
       auto ret = fock_builder(dm);
       Escf = ret.first;
       fock = ret.second;
+      if(trustregion) {
+        printf("Converged to energy % .10f!\n", Escf);
+        fflush(stdout);
+      }
     }
 #endif
     size_t Nmat = fock.size();

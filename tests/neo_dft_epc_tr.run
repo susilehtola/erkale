@@ -1,0 +1,12 @@
+# neo_dft_epc finished by the trust-region solver, with analytic
+# Hessian-vector products including the XC and EPC responses
+System H2O.xyz
+Basis cc-pVDZ
+ProtonBasis PB4-D
+QuantumProtons 2
+Method lda_x-lda_c_vwn
+EPCFunctional lda_c_epc17_2
+DFTGrid 75 -302
+MaxIter 3
+TrustRegion true
+SaveChk neo_dft_epc_tr.chk
