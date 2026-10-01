@@ -981,20 +981,15 @@ arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double t
   int nth=1;
 #endif
 
-  // Total density, hoisted so the JFDigestor holds a reference rather
-  // than each thread copying a temporary.
-  arma::mat Psum(Pa+Pb);
-
   // Get workers
   std::vector< std::vector<ForceDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
   for(int i=0;i<nth;i++) {
-    p[i].resize(3);
-    p[i][0]=new JFDigestor(Psum);
-    p[i][1]=new KFDigestor(Pa,kfrac,false);
-    p[i][2]=new KFDigestor(Pb,kfrac,false);
+    p[i].resize(2);
+    p[i][0]=new KFDigestor(Pa,kfrac,false);
+    p[i][1]=new KFDigestor(Pb,kfrac,false);
   }
 
   // Do calculation
