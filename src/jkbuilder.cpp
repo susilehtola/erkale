@@ -673,8 +673,12 @@ class JKBackend {
                         const std::vector<double> & occa, const std::vector<double> & occb,
                         double kfull, double kshort, double omega, double /*tol*/) const override {
       arma::vec f = dfit.is_cholesky() ? dfit.forceJ_cholesky(*basisp, Ptot) : dfit.forceJ(Ptot);
-      if(kfull != 0.0) { f += dfit.forceK(*basisp, Ca, occa, kfull); f += dfit.forceK(*basisp, Cb, occb, kfull); }
-      if(omega != 0.0) { f += dfit_rs.forceK(*basisp, Ca, occa, kshort); f += dfit_rs.forceK(*basisp, Cb, occb, kshort); }
+      // forceK is normalized to the restricted convention E_K = -(1/4) tr(P K)
+      // with occupations 2. The spin-resolved exchange energy is
+      // E_K = -(1/2) sum_s tr(P_s K_s) with occupations 1, so each spin
+      // channel's force is twice what forceK returns.
+      if(kfull != 0.0) { f += dfit.forceK(*basisp, Ca, occa, 2.0*kfull); f += dfit.forceK(*basisp, Cb, occb, 2.0*kfull); }
+      if(omega != 0.0) { f += dfit_rs.forceK(*basisp, Ca, occa, 2.0*kshort); f += dfit_rs.forceK(*basisp, Cb, occb, 2.0*kshort); }
       return f;
     }
 

@@ -60,6 +60,11 @@ endfunction()
 add_test(build_basictests  "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target basictests)
 add_test(NAME basictests COMMAND basictests)
 
+# Analytic SCF forces against finite differences of the total energy
+add_test(build_forcetest "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target forcetest)
+add_test(NAME forcetest COMMAND forcetest)
+set_property(TEST forcetest APPEND PROPERTY ENVIRONMENT "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
+
 # To run any tests we need to check that ERKALE and the test comparison binary have been built
 add_test(build_erkale     "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale)
 add_test(build_chkcompare "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target chkcompare)
