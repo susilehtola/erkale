@@ -395,8 +395,10 @@ int main_guarded(int argc, char **argv) {
       bool direct=false;
       double erithr=1e-10;
       double linthr=1e-6;
-      bool bmat=true;
-      dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
+      // Pivoted Cholesky threshold for the metric, the default of
+      // FittingCholeskyThreshold
+      double cholthr=1e-8;
+      dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, cholthr);
 
       // Get the 3c integrals matrix
       arma::mat I3c;
@@ -597,8 +599,10 @@ int main_guarded(int argc, char **argv) {
         bool direct=false;
         double erithr=1e-10;
         double linthr=1e-6;
-        bool bmat=false;
-        dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
+        // Pivoted Cholesky threshold for the metric, the default of
+        // FittingCholeskyThreshold
+        double cholthr=1e-8;
+        dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, cholthr);
 
         // This matrix should be orthonormal, since the contracted functions are orthonormalized
         arma::mat ab(dfit.ab());
@@ -800,8 +804,10 @@ int main_guarded(int argc, char **argv) {
     bool direct=false;
     double erithr=1e-10;
     double linthr=1e-6;
-    bool bmat=true;
-    dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
+    // Pivoted Cholesky threshold for the metric, the default of
+    // FittingCholeskyThreshold
+    double cholthr=1e-8;
+    dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, cholthr);
     dfit.fitting_error();
 
   } else if(stricmp(cmd,"genbas")==0) {
