@@ -6,44 +6,52 @@
 
 namespace xckernel {
 namespace detail_xck_lda_r_o2 {
-static constexpr double c0[] = {
+static constexpr double c0_0[] = {
     1.0
 };
-static constexpr int32_t o0[] = {
+static constexpr int32_t o0_0[] = {
     0,3
 };
-static constexpr uint16_t f0[] = {
+static constexpr uint16_t f0_0[] = {
     1,2,0
 };
 static constexpr int64_t NFLD = 2;
 } // namespace detail_xck_lda_r_o2
 
-/* fields: host-computed per-point operands (type T); xc: the
- * functional-derivative arrays (type Txc; Libxc computes in double
- * regardless of T). work: caller scratch of
- * xckernel::work_size(npts, nbf) elements or nullptr
- * (heap-allocated internally; pass a buffer in device code). */
+/* Scratch (elements of T) the kernel needs: pass at least this
+ * much as `work`, or nullptr to allocate it internally. */
+inline int64_t xck_lda_r_o2_work(int64_t npts, int64_t nbf) {
+    const int64_t blk = npts < grid_block ? npts : grid_block;
+    return blk * (1 + nbf * 1) + 0 * npts + 1;
+}
+
+/* fields: the per-point tower operands (type T), in the order
+ * of xck_lda_r_o2_scal_names; xc: the functional-derivative arrays
+ * (type Txc; Libxc computes in double whatever T is). */
 template <typename T, typename Txc = T>
-int xck_lda_r_o2_t(int64_t npts, int64_t nbf,
-             const T* chi, const T* dchi, const T* lapl_chi,
-             const T* hess_chi,
-             const T* const* fields, const Txc* const* xc,
-             T* out, T* work = nullptr) {
+int xck_lda_r_o2_t(int64_t npts,
+        int64_t nbf,
+        const T* chi,
+        const T* const* fields,
+        const Txc* const* xc,
+        T* out,
+        T* work = nullptr) {
     const int64_t blk = npts < grid_block ? npts : grid_block;
     T* c = work;
     bool own = false;
     if (!c) {
-        c = new (std::nothrow) T[work_size(npts, nbf)];
+        c = new (std::nothrow) T[xck_lda_r_o2_work(npts, nbf)];
         own = true;
     }
     if (!c) return 1;
     T* W = c + blk;
     const T* Wc = W;
+    const T* fi[2] = {fields[0], fields[1]};
     for (int64_t g0 = 0; g0 < npts; g0 += blk) {
         const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_lda_r_o2::c0, detail_xck_lda_r_o2::o0, detail_xck_lda_r_o2::f0, detail_xck_lda_r_o2::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, chi + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + g0, npts, Wc, bk, out);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_lda_r_o2::c0_0, detail_xck_lda_r_o2::o0_0, detail_xck_lda_r_o2::f0_0, detail_xck_lda_r_o2::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
+        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out);
     }
     if (own) delete[] c;
     return 0;

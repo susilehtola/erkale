@@ -5,12 +5,12 @@ extern "C" {
 
 const char* xck_mgga_tau_st_o2_p_scal_names[33] = {
     "w",
-    "grad_rho_a_x",
-    "grad_rho_a_y",
-    "grad_rho_a_z",
-    "grad_rho_a_p1_x",
-    "grad_rho_a_p1_y",
-    "grad_rho_a_p1_z",
+    "rho_a_x",
+    "rho_a_y",
+    "rho_a_z",
+    "rho_a_p1_x",
+    "rho_a_p1_y",
+    "rho_a_p1_z",
     "rho_a_p1",
     "tau_a_p1",
     "vsigma_0",
@@ -42,16 +42,19 @@ extern const int xck_mgga_tau_st_o2_p_n_scal;
 const int xck_mgga_tau_st_o2_p_n_scal = 33;
 extern const int xck_mgga_tau_st_o2_p_n_fields;
 const int xck_mgga_tau_st_o2_p_n_fields = 9;
+extern const int xck_mgga_tau_st_o2_p_chi_order;
+const int xck_mgga_tau_st_o2_p_chi_order = 1;
 
-/* The C ABI keeps one homogeneous scal list (all double);
- * fields come first, functional-derivative arrays last, split at
- * xck_mgga_tau_st_o2_p_n_fields. */
-int xck_mgga_tau_st_o2_p(int64_t npts, int64_t nbf,
-           const double* chi, const double* dchi,
-           const double* lapl_chi, const double* hess_chi,
-           const double* const* scal, double* out) {
+/* One homogeneous scal list (all double): the per-point tower
+ * operands first, the functional-derivative arrays from
+ * xck_mgga_tau_st_o2_p_n_fields on. */
+int xck_mgga_tau_st_o2_p(int64_t npts,
+    int64_t nbf,
+    const double* chi,
+    const double* const* scal,
+    double* out) {
     return xckernel::xck_mgga_tau_st_o2_p_t<double, double>(
-        npts, nbf, chi, dchi, lapl_chi, hess_chi,
+        npts, nbf, chi,
         scal, scal + 9, out);
 }
 

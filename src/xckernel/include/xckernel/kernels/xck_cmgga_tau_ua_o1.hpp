@@ -6,146 +6,154 @@
 
 namespace xckernel {
 namespace detail_xck_cmgga_tau_ua_o1 {
-static constexpr double c0[] = {
+static constexpr double c0_0[] = {
     1.0,0.5,0.5,0.5
 };
-static constexpr int32_t o0[] = {
+static constexpr int32_t o0_0[] = {
     0,2,8,14,20
 };
-static constexpr uint16_t f0[] = {
+static constexpr uint16_t f0_0[] = {
     11,0,10,10,7,7,14,0,10,10,8,8,14,0,10,10,9,9,14,0
 };
-static constexpr double c1[] = {
+static constexpr double c0_1[] = {
     1.0,2.0,-0.5
 };
-static constexpr int32_t o1[] = {
+static constexpr int32_t o0_1[] = {
     0,3,6,10
 };
-static constexpr uint16_t f1[] = {
+static constexpr uint16_t f0_1[] = {
     4,13,0,1,12,0,10,7,14,0
 };
-static constexpr double c2[] = {
+static constexpr double c0_2[] = {
     1.0,2.0,-0.5
 };
-static constexpr int32_t o2[] = {
+static constexpr int32_t o0_2[] = {
     0,3,6,10
 };
-static constexpr uint16_t f2[] = {
+static constexpr uint16_t f0_2[] = {
     5,13,0,2,12,0,10,8,14,0
 };
-static constexpr double c3[] = {
+static constexpr double c0_3[] = {
     1.0,2.0,-0.5
 };
-static constexpr int32_t o3[] = {
+static constexpr int32_t o0_3[] = {
     0,3,6,10
 };
-static constexpr uint16_t f3[] = {
+static constexpr uint16_t f0_3[] = {
     6,13,0,3,12,0,10,9,14,0
 };
-static constexpr double c4[] = {
+static constexpr double c0_4[] = {
     1.0,2.0,0.5
 };
-static constexpr int32_t o4[] = {
+static constexpr int32_t o0_4[] = {
     0,3,6,10
 };
-static constexpr uint16_t f4[] = {
+static constexpr uint16_t f0_4[] = {
     4,13,0,1,12,0,10,7,14,0
 };
-static constexpr double c5[] = {
+static constexpr double c0_5[] = {
     0.5
 };
-static constexpr int32_t o5[] = {
+static constexpr int32_t o0_5[] = {
     0,2
 };
-static constexpr uint16_t f5[] = {
+static constexpr uint16_t f0_5[] = {
     14,0
 };
-static constexpr double c6[] = {
+static constexpr double c0_6[] = {
     1.0,2.0,0.5
 };
-static constexpr int32_t o6[] = {
+static constexpr int32_t o0_6[] = {
     0,3,6,10
 };
-static constexpr uint16_t f6[] = {
+static constexpr uint16_t f0_6[] = {
     5,13,0,2,12,0,10,8,14,0
 };
-static constexpr double c7[] = {
+static constexpr double c0_7[] = {
     0.5
 };
-static constexpr int32_t o7[] = {
+static constexpr int32_t o0_7[] = {
     0,2
 };
-static constexpr uint16_t f7[] = {
+static constexpr uint16_t f0_7[] = {
     14,0
 };
-static constexpr double c8[] = {
+static constexpr double c0_8[] = {
     1.0,2.0,0.5
 };
-static constexpr int32_t o8[] = {
+static constexpr int32_t o0_8[] = {
     0,3,6,10
 };
-static constexpr uint16_t f8[] = {
+static constexpr uint16_t f0_8[] = {
     6,13,0,3,12,0,10,9,14,0
 };
-static constexpr double c9[] = {
+static constexpr double c0_9[] = {
     0.5
 };
-static constexpr int32_t o9[] = {
+static constexpr int32_t o0_9[] = {
     0,2
 };
-static constexpr uint16_t f9[] = {
+static constexpr uint16_t f0_9[] = {
     14,0
 };
 static constexpr int64_t NFLD = 11;
 } // namespace detail_xck_cmgga_tau_ua_o1
 
-/* fields: host-computed per-point operands (type T); xc: the
- * functional-derivative arrays (type Txc; Libxc computes in double
- * regardless of T). work: caller scratch of
- * xckernel::work_size(npts, nbf) elements or nullptr
- * (heap-allocated internally; pass a buffer in device code). */
+/* Scratch (elements of T) the kernel needs: pass at least this
+ * much as `work`, or nullptr to allocate it internally. */
+inline int64_t xck_cmgga_tau_ua_o1_work(int64_t npts, int64_t nbf) {
+    const int64_t blk = npts < grid_block ? npts : grid_block;
+    return blk * (1 + nbf * 1) + 0 * npts + 1;
+}
+
+/* fields: the per-point tower operands (type T), in the order
+ * of xck_cmgga_tau_ua_o1_scal_names; xc: the functional-derivative arrays
+ * (type Txc; Libxc computes in double whatever T is). */
 template <typename T, typename Txc = T>
-int xck_cmgga_tau_ua_o1_t(int64_t npts, int64_t nbf,
-             const T* chi, const T* dchi, const T* lapl_chi,
-             const T* hess_chi,
-             const T* const* fields, const Txc* const* xc,
-             T* out, T* work = nullptr) {
+int xck_cmgga_tau_ua_o1_t(int64_t npts,
+        int64_t nbf,
+        const T* chi,
+        const T* const* fields,
+        const Txc* const* xc,
+        T* out,
+        T* work = nullptr) {
     const int64_t blk = npts < grid_block ? npts : grid_block;
     T* c = work;
     bool own = false;
     if (!c) {
-        c = new (std::nothrow) T[work_size(npts, nbf)];
+        c = new (std::nothrow) T[xck_cmgga_tau_ua_o1_work(npts, nbf)];
         own = true;
     }
     if (!c) return 1;
     T* W = c + blk;
     const T* Wc = W;
+    const T* fi[11] = {fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8], fields[9], fields[10]};
     for (int64_t g0 = 0; g0 < npts; g0 += blk) {
         const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_cmgga_tau_ua_o1::c0, detail_xck_cmgga_tau_ua_o1::o0, detail_xck_cmgga_tau_ua_o1::f0, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, chi + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c1, detail_xck_cmgga_tau_ua_o1::o1, detail_xck_cmgga_tau_ua_o1::f1, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, dchi + (int64_t)0*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c2, detail_xck_cmgga_tau_ua_o1::o2, detail_xck_cmgga_tau_ua_o1::f2, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, dchi + (int64_t)1*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c3, detail_xck_cmgga_tau_ua_o1::o3, detail_xck_cmgga_tau_ua_o1::f3, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, dchi + (int64_t)2*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, chi + g0, npts, Wc, bk, out);
-        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c4, detail_xck_cmgga_tau_ua_o1::o4, detail_xck_cmgga_tau_ua_o1::f4, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, chi + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_cmgga_tau_ua_o1::c5, detail_xck_cmgga_tau_ua_o1::o5, detail_xck_cmgga_tau_ua_o1::f5, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, dchi + (int64_t)0*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, dchi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out);
-        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c6, detail_xck_cmgga_tau_ua_o1::o6, detail_xck_cmgga_tau_ua_o1::f6, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, chi + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_cmgga_tau_ua_o1::c7, detail_xck_cmgga_tau_ua_o1::o7, detail_xck_cmgga_tau_ua_o1::f7, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, dchi + (int64_t)1*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, dchi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, out);
-        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c8, detail_xck_cmgga_tau_ua_o1::o8, detail_xck_cmgga_tau_ua_o1::f8, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, chi + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_cmgga_tau_ua_o1::c9, detail_xck_cmgga_tau_ua_o1::o9, detail_xck_cmgga_tau_ua_o1::f9, detail_xck_cmgga_tau_ua_o1::NFLD, fields, xc, c);
-        accumulate<T>(bk, nbf, c, dchi + (int64_t)2*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, dchi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, out);
+        stage_a<T, Txc>(g0, bk, 4, detail_xck_cmgga_tau_ua_o1::c0_0, detail_xck_cmgga_tau_ua_o1::o0_0, detail_xck_cmgga_tau_ua_o1::f0_0, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
+        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c0_1, detail_xck_cmgga_tau_ua_o1::o0_1, detail_xck_cmgga_tau_ua_o1::f0_1, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W, 0);
+        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c0_2, detail_xck_cmgga_tau_ua_o1::o0_2, detail_xck_cmgga_tau_ua_o1::f0_2, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 0);
+        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c0_3, detail_xck_cmgga_tau_ua_o1::o0_3, detail_xck_cmgga_tau_ua_o1::f0_3, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 0);
+        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out);
+        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c0_4, detail_xck_cmgga_tau_ua_o1::o0_4, detail_xck_cmgga_tau_ua_o1::f0_4, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_cmgga_tau_ua_o1::c0_5, detail_xck_cmgga_tau_ua_o1::o0_5, detail_xck_cmgga_tau_ua_o1::f0_5, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W, 0);
+        gemm_nt(nbf, bk, chi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, out);
+        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c0_6, detail_xck_cmgga_tau_ua_o1::o0_6, detail_xck_cmgga_tau_ua_o1::f0_6, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_cmgga_tau_ua_o1::c0_7, detail_xck_cmgga_tau_ua_o1::o0_7, detail_xck_cmgga_tau_ua_o1::f0_7, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 0);
+        gemm_nt(nbf, bk, chi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, out);
+        stage_a<T, Txc>(g0, bk, 3, detail_xck_cmgga_tau_ua_o1::c0_8, detail_xck_cmgga_tau_ua_o1::o0_8, detail_xck_cmgga_tau_ua_o1::f0_8, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_cmgga_tau_ua_o1::c0_9, detail_xck_cmgga_tau_ua_o1::o0_9, detail_xck_cmgga_tau_ua_o1::f0_9, detail_xck_cmgga_tau_ua_o1::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 0);
+        gemm_nt(nbf, bk, chi + (int64_t)3*nbf*npts + g0, npts, Wc, bk, out);
     }
     if (own) delete[] c;
     return 0;

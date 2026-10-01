@@ -5,19 +5,19 @@ extern "C" {
 
 const char* xck_cmgga_tau_st_o2_p_scal_names[41] = {
     "w",
-    "grad_rho_a_x",
-    "grad_rho_a_y",
-    "grad_rho_a_z",
-    "jp_a_x",
-    "jp_a_y",
-    "jp_a_z",
+    "rho_a_x",
+    "rho_a_y",
+    "rho_a_z",
+    "jpx_a",
+    "jpy_a",
+    "jpz_a",
     "inv_rho_a",
-    "grad_rho_a_p1_x",
-    "grad_rho_a_p1_y",
-    "grad_rho_a_p1_z",
-    "jp_a_p1_x",
-    "jp_a_p1_y",
-    "jp_a_p1_z",
+    "rho_a_p1_x",
+    "rho_a_p1_y",
+    "rho_a_p1_z",
+    "jpx_a_p1",
+    "jpy_a_p1",
+    "jpz_a_p1",
     "rho_a_p1",
     "tau_a_p1",
     "vsigma_0",
@@ -50,16 +50,19 @@ extern const int xck_cmgga_tau_st_o2_p_n_scal;
 const int xck_cmgga_tau_st_o2_p_n_scal = 41;
 extern const int xck_cmgga_tau_st_o2_p_n_fields;
 const int xck_cmgga_tau_st_o2_p_n_fields = 16;
+extern const int xck_cmgga_tau_st_o2_p_chi_order;
+const int xck_cmgga_tau_st_o2_p_chi_order = 1;
 
-/* The C ABI keeps one homogeneous scal list (all double);
- * fields come first, functional-derivative arrays last, split at
- * xck_cmgga_tau_st_o2_p_n_fields. */
-int xck_cmgga_tau_st_o2_p(int64_t npts, int64_t nbf,
-           const double* chi, const double* dchi,
-           const double* lapl_chi, const double* hess_chi,
-           const double* const* scal, double* out) {
+/* One homogeneous scal list (all double): the per-point tower
+ * operands first, the functional-derivative arrays from
+ * xck_cmgga_tau_st_o2_p_n_fields on. */
+int xck_cmgga_tau_st_o2_p(int64_t npts,
+    int64_t nbf,
+    const double* chi,
+    const double* const* scal,
+    double* out) {
     return xckernel::xck_cmgga_tau_st_o2_p_t<double, double>(
-        npts, nbf, chi, dchi, lapl_chi, hess_chi,
+        npts, nbf, chi,
         scal, scal + 16, out);
 }
 

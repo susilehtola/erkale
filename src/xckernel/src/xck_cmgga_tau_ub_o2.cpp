@@ -5,32 +5,32 @@ extern "C" {
 
 const char* xck_cmgga_tau_ub_o2_scal_names[56] = {
     "w",
-    "grad_rho_a_x",
-    "grad_rho_a_y",
-    "grad_rho_a_z",
-    "grad_rho_b_x",
-    "grad_rho_b_y",
-    "grad_rho_b_z",
-    "jp_a_x",
-    "jp_a_y",
-    "jp_a_z",
-    "jp_b_x",
-    "jp_b_y",
-    "jp_b_z",
+    "rho_a_x",
+    "rho_a_y",
+    "rho_a_z",
+    "rho_b_x",
+    "rho_b_y",
+    "rho_b_z",
+    "jpx_a",
+    "jpy_a",
+    "jpz_a",
+    "jpx_b",
+    "jpy_b",
+    "jpz_b",
     "inv_rho_a",
     "inv_rho_b",
-    "grad_rho_a_p1_x",
-    "grad_rho_a_p1_y",
-    "grad_rho_a_p1_z",
-    "grad_rho_b_p1_x",
-    "grad_rho_b_p1_y",
-    "grad_rho_b_p1_z",
-    "jp_a_p1_x",
-    "jp_a_p1_y",
-    "jp_a_p1_z",
-    "jp_b_p1_x",
-    "jp_b_p1_y",
-    "jp_b_p1_z",
+    "rho_a_p1_x",
+    "rho_a_p1_y",
+    "rho_a_p1_z",
+    "rho_b_p1_x",
+    "rho_b_p1_y",
+    "rho_b_p1_z",
+    "jpx_a_p1",
+    "jpy_a_p1",
+    "jpz_a_p1",
+    "jpx_b_p1",
+    "jpy_b_p1",
+    "jpz_b_p1",
     "rho_a_p1",
     "rho_b_p1",
     "tau_a_p1",
@@ -65,16 +65,19 @@ extern const int xck_cmgga_tau_ub_o2_n_scal;
 const int xck_cmgga_tau_ub_o2_n_scal = 56;
 extern const int xck_cmgga_tau_ub_o2_n_fields;
 const int xck_cmgga_tau_ub_o2_n_fields = 31;
+extern const int xck_cmgga_tau_ub_o2_chi_order;
+const int xck_cmgga_tau_ub_o2_chi_order = 1;
 
-/* The C ABI keeps one homogeneous scal list (all double);
- * fields come first, functional-derivative arrays last, split at
- * xck_cmgga_tau_ub_o2_n_fields. */
-int xck_cmgga_tau_ub_o2(int64_t npts, int64_t nbf,
-           const double* chi, const double* dchi,
-           const double* lapl_chi, const double* hess_chi,
-           const double* const* scal, double* out) {
+/* One homogeneous scal list (all double): the per-point tower
+ * operands first, the functional-derivative arrays from
+ * xck_cmgga_tau_ub_o2_n_fields on. */
+int xck_cmgga_tau_ub_o2(int64_t npts,
+    int64_t nbf,
+    const double* chi,
+    const double* const* scal,
+    double* out) {
     return xckernel::xck_cmgga_tau_ub_o2_t<double, double>(
-        npts, nbf, chi, dchi, lapl_chi, hess_chi,
+        npts, nbf, chi,
         scal, scal + 31, out);
 }
 
