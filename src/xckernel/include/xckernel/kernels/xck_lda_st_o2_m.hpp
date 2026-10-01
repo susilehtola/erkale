@@ -51,7 +51,7 @@ int xck_lda_st_o2_m_t(int64_t npts,
         const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
         stage_a<T, Txc>(g0, bk, 2, detail_xck_lda_st_o2_m::c0_0, detail_xck_lda_st_o2_m::o0_0, detail_xck_lda_st_o2_m::f0_0, detail_xck_lda_st_o2_m::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out);
+        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
     }
     if (own) delete[] c;
     return 0;
