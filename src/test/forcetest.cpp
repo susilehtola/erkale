@@ -128,8 +128,6 @@ int main(int argc, char **argv) {
     {"hyb_gga_xc_wb97x", "RI",       1, 2, tolri},
   };
 
-
-
   int nfail=0;
   printf("%-18s %-9s %3s %4s %14s %14s %10s\n","method","jk","Q","mult","-F.d","dE/dlambda","error");
   for(size_t ic=0;ic<cases.size();ic++) {
