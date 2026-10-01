@@ -23,6 +23,8 @@
 #include "basis.h"
 #include "basislibrary.h"
 #include "checkpoint.h"
+#include "crossbasis.h"
+#include "jkbuilder.h"
 #include "elements.h"
 #include "dftfuncs.h"
 #include "dftgrid.h"
@@ -64,6 +66,8 @@ enum guess_t parse_guess(const std::string & val) {
     return GWH_GUESS;
   else if(stricmp(val,"HUCKEL")==0)
     return HUCKEL_GUESS;
+  else if(stricmp(val,"ProjFree")==0)
+    return PROJFREE_GUESS;
   else
     throw std::runtime_error("Guess type not supported.\n");
 }
@@ -1500,6 +1504,129 @@ dft_t parse_dft(bool init) {
   return dft;
 }
 
+// Projection-free initial guess on a change of basis (P. Norman and
+// H. J. Aa. Jensen, Chem. Phys. Lett. 531, 229 (2012)): the Fock matrix in
+// the new basis of the density loaded in the old basis, instead of
+// projecting the orbitals between the bases. The Coulomb and exchange
+// matrices are density fitted with mixed old- and new-basis integrals,
+// which costs about one density-fitted Fock build, and the XC matrix is
+// assembled in the new basis from the old density on the grid.
+namespace {
+  /// Exact-exchange admixture of the method
+  void projfree_exchange_params(bool hf, const dft_t & dft, double & kfull, double & kshort, double & omega) {
+    kfull=1.0;
+    kshort=0.0;
+    omega=0.0;
+    if(!hf) {
+      if(dft.x_func>0)
+        range_separation(dft.x_func, omega, kfull, kshort);
+      else
+        kfull=0.0;
+    }
+  }
+
+  /// Auxiliary basis of the guess: that of the calculation in RI, the
+  /// CD-derived one otherwise
+  BasisSet projfree_aux(const BasisSet & basis, bool exchange) {
+    if(JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting)
+      return JKBuilder::fitting_basis(basis, settings.get_string("FittingBasis"), settings.get_double("CholeskyThr"), settings.get_int("FittingLmaxInc"), exchange);
+    return basis.cholesky_aux_basis(settings.get_double("CholeskyThr"), settings.get_int("FittingLmaxInc"));
+  }
+
+  /// Natural orbitals of a density in the old basis, scaled by the square
+  /// roots of their occupations
+  arma::mat projfree_orbitals(const BasisSet & oldbas, const arma::mat & P) {
+    arma::mat C;
+    arma::vec occ;
+    form_NOs(P, oldbas.overlap(), C, occ);
+    const arma::uvec occd(arma::find(occ > sqrt(DBL_EPSILON)));
+    return C.cols(occd)*arma::diagmat(arma::sqrt(occ(occd)));
+  }
+
+  /// Coulomb matrix and exact exchange (kfull K + kshort K_sr, one per
+  /// density) in the new basis of the densities P in the old basis
+  void projfree_jk(const BasisSet & basis, const BasisSet & oldbas, const std::vector<arma::mat> & P, bool hf, const dft_t & dft, arma::mat & J, std::vector<arma::mat> & K) {
+    double kfull, kshort, omega;
+    projfree_exchange_params(hf, dft, kfull, kshort, omega);
+    const bool exchange(kfull!=0.0 || kshort!=0.0);
+    const BasisSet aux(projfree_aux(basis, exchange));
+    const double fitthr(settings.get_double("FittingThreshold"));
+
+    arma::mat Ptot(P[0]);
+    for(size_t k=1;k<P.size();k++)
+      Ptot+=P[k];
+    J=cross_basis_J_df(basis, oldbas, aux, Ptot, fitthr);
+
+    K.assign(P.size(), arma::zeros<arma::mat>(basis.Nbf(), basis.Nbf()));
+    if(!exchange)
+      return;
+    std::vector<arma::mat> C(P.size());
+    for(size_t k=0;k<P.size();k++)
+      C[k]=projfree_orbitals(oldbas, P[k]);
+    if(kfull!=0.0) {
+      const std::vector<arma::mat> Kf(cross_basis_K_df(basis, oldbas, aux, C, fitthr));
+      for(size_t k=0;k<P.size();k++)
+        K[k]+=kfull*Kf[k];
+    }
+    if(kshort!=0.0) {
+      const std::vector<arma::mat> Ks(cross_basis_K_df(basis, oldbas, aux, C, fitthr, omega, 0.0, 1.0));
+      for(size_t k=0;k<P.size();k++)
+        K[k]+=kshort*Ks[k];
+    }
+  }
+
+  /// Integration grid in the new basis for the guess; an adaptive grid
+  /// adapts to the old densities
+  void projfree_grid(DFTGrid & grid, const dft_t & dft, const BasisSet & oldbas, const std::vector<arma::mat> & P) {
+    if(dft.adaptive) {
+      if(P.size()==1)
+        grid.construct(P[0], dft.gridtol, dft.x_func, dft.c_func, &oldbas);
+      else
+        grid.construct(P[0], P[1], dft.gridtol, dft.x_func, dft.c_func, &oldbas);
+    } else
+      grid.construct(dft.nrad, dft.lmax, dft.x_func, dft.c_func);
+  }
+
+  /// Restricted: Fock matrix of the total density P in the old basis
+  arma::mat projfree_fock(const BasisSet & basis, const arma::mat & Hcore, const BasisSet & oldbas, const arma::mat & P, bool hf, const dft_t & dft) {
+    arma::mat J;
+    std::vector<arma::mat> K;
+    projfree_jk(basis, oldbas, {P}, hf, dft, J, K);
+    // Restricted exchange is half that of the total density
+    arma::mat F(Hcore + J - 0.5*K[0]);
+
+    // The nonlocal VV10 correlation is left out of the guess
+    if(!hf) {
+      DFTGrid grid(&basis, false, dft.lobatto);
+      projfree_grid(grid, dft, oldbas, {P});
+      arma::mat XC;
+      double Exc, Nel;
+      grid.eval_Fxc(dft.x_func, dft.c_func, P, XC, Exc, Nel, &oldbas);
+      F+=XC;
+    }
+    return F;
+  }
+
+  /// Unrestricted: Fock matrices of the spin densities Pa, Pb in the old basis
+  void projfree_fock(const BasisSet & basis, const arma::mat & Hcore, const BasisSet & oldbas, const arma::mat & Pa, const arma::mat & Pb, bool hf, const dft_t & dft, arma::mat & Fa, arma::mat & Fb) {
+    arma::mat J;
+    std::vector<arma::mat> K;
+    projfree_jk(basis, oldbas, {Pa, Pb}, hf, dft, J, K);
+    Fa=Hcore + J - K[0];
+    Fb=Hcore + J - K[1];
+
+    if(!hf) {
+      DFTGrid grid(&basis, false, dft.lobatto);
+      projfree_grid(grid, dft, oldbas, {Pa, Pb});
+      arma::mat XCa, XCb;
+      double Exc, Nel;
+      grid.eval_Fxc(dft.x_func, dft.c_func, Pa, Pb, XCa, XCb, Exc, Nel, nullptr, true, true, &oldbas);
+      Fa+=XCa;
+      Fb+=XCb;
+    }
+  }
+}
+
 void calculate(const BasisSet & basis, bool force) {
   // Checkpoint files to load and save
   std::string loadname=settings.get_string("LoadChk");
@@ -1553,13 +1680,16 @@ void calculate(const BasisSet & basis, bool force) {
   bool oldrestr;
   arma::vec Eold, Eaold, Ebold;
   arma::mat Cold, Caold, Cbold;
-  arma::mat Pold;
+  arma::mat Pold, Paold, Pbold;
 
   arma::cx_mat CW, CWa, CWb;
   bool doCW=false;
 
   // Which guess to use
   enum guess_t guess=parse_guess(settings.get_string("Guess"));
+  if(guess==PROJFREE_GUESS && !doload)
+    throw std::runtime_error("The ProjFree guess builds the Fock matrix of a loaded density: give the old calculation in LoadChk.\n");
+  const bool projfree=(guess==PROJFREE_GUESS);
 
   // Amount of electrons
   int Nel_alpha=-1;
@@ -1590,6 +1720,11 @@ void calculate(const BasisSet & basis, bool force) {
 	doCW=true;
       }
     } else {
+      // Spin densities, for the projection-free guess
+      if(projfree) {
+        load.read("Pa",Paold);
+        load.read("Pb",Pbold);
+      }
       // Load energies and orbitals
       load.read("Ca",Caold);
       load.read("Ea",Eaold);
@@ -1614,7 +1749,7 @@ void calculate(const BasisSet & basis, bool force) {
     memset(&sol.en, 0, sizeof(energy_t));
 
     // Project old solution to new basis
-    if(doload) {
+    if(doload && !projfree) {
       // Restricted calculation wanted but loaded spin-polarized one
       if(!oldrestr) {
 	// Find out natural orbitals
@@ -1657,6 +1792,10 @@ void calculate(const BasisSet & basis, bool force) {
     double Kgwh(settings.get_double("Kgwh"));
 
     // Handle guesses
+    if(projfree) {
+      sol.H=projfree_fock(basis, solver.get_Hcore(), oldbas, Pold, hf || rohf, initdft);
+      solver.diagonalize(sol);
+    }
     if(!doload) {
       if(guess==CORE_GUESS) {
 	solver.core_guess(sol);
@@ -1974,7 +2113,7 @@ void calculate(const BasisSet & basis, bool force) {
     // Initialize energy
     memset(&sol.en, 0, sizeof(energy_t));
 
-    if(doload) {
+    if(doload && !projfree) {
       // Running polarized calculation but given restricted guess
       if(oldrestr) {
 	// Project solution to new basis
@@ -2017,6 +2156,14 @@ void calculate(const BasisSet & basis, bool force) {
     double Kgwh(settings.get_double("Kgwh"));
 
     // Handle guesses
+    if(projfree) {
+      // A restricted calculation has equal spin densities
+      if(oldrestr)
+        projfree_fock(basis, solver.get_Hcore(), oldbas, 0.5*Pold, 0.5*Pold, hf || rohf, initdft, sol.Ha, sol.Hb);
+      else
+        projfree_fock(basis, solver.get_Hcore(), oldbas, Paold, Pbold, hf || rohf, initdft, sol.Ha, sol.Hb);
+      solver.diagonalize(sol);
+    }
     if(!doload) {
       if(guess==CORE_GUESS) {
 	solver.core_guess(sol);

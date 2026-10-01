@@ -2933,6 +2933,31 @@ literal "false"
 .
 \end_layout
 
+\begin_layout Description
+ProjFree for the projection-free guess on a change of basis set 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Norman2012"
+literal "false"
+
+\end_inset
+
+, which requires 
+\series bold
+LoadChk
+\series default
+: instead of projecting the loaded orbitals onto the new basis, the Fock
+ matrix is built in the new basis directly from the loaded density in the
+ old basis, and diagonalized.
+ The Coulomb and exact-exchange matrices are density fitted with mixed
+ old- and new-basis three-index integrals (on the auxiliary basis of the
+ calculation with JKMethod RI, and on the CD-derived one otherwise), which
+ costs about one density-fitted Fock build, and the exchange-correlation
+ matrix is assembled in the new basis from the density of the old basis
+ on the integration grid; an adaptive grid is adapted to that density.
+ The nonlocal VV10 correlation is left out of the guess.
+\end_layout
+
 \end_deeper
 \begin_layout Description
 InputBohr Specifies that the geometry in the xyz file is in Bohr instead
@@ -2947,6 +2972,12 @@ Kgwh Scaling constant used in the generalized Wolfsberg–Helmholz (GWH)
 
 \begin_layout Description
 LoadChk Initialize calculation with orbitals from checkpoint file.
+ The orbitals are projected onto the current basis set, unless the
+ 
+\emph on
+ProjFree
+\emph default
+ guess is chosen.
 \end_layout
 
 \begin_layout Description

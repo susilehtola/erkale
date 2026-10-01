@@ -1,0 +1,15 @@
+# Water cation: unrestricted projection-free guess from the cc-pVTZ
+# spin densities of H2O+_tz_hf in the aug-cc-pVDZ basis
+System H2O.xyz
+Method HF
+Basis aug-cc-pVDZ
+Direct false
+IntegralThresh 1e-14
+Charge 1
+Multiplicity 2
+
+LoadChk H2O+_tz_hf.chk
+Guess ProjFree
+Logfile H2O+_projfree_hf.log
+SaveChk H2O+_projfree_hf.chk
+BasisRotate false
