@@ -433,10 +433,14 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
   settings.add_string("Result","File to save optimized geometry in","optimized.xyz");
   settings.set_string("Logfile","erkale_geom.log");
-  // Default to density fitting for geometry optimization: it gives reliable
-  // analytic forces (validated to the fit accuracy), whereas the global
-  // default (two-step Cholesky) has an unreliable exchange gradient for
-  // HF/hybrids. Overridable by setting JKMethod in the input.
+  // Default to density fitting for geometry optimization. The fixed
+  // atom-centered auxiliary basis gives a smooth energy surface, whereas
+  // the pivot selection of the global default (two-step Cholesky) changes
+  // discretely as the nuclei move; the resulting steps are, however, only
+  // of the order of the decomposition error (see SCF::do_force). Note that
+  // RI SCF energies carry ~1e-7 Eh of roundoff noise from the conditioning
+  // of the fitting metric, which can stall line searches at small forces.
+  // Overridable by setting JKMethod in the input.
   settings.set_string("JKMethod","RI");
   settings.add_bool("NumGrad","Use finite-difference gradient?",false);
   settings.add_int("Stencil","Order of finite-difference stencil for numgrad",2);
