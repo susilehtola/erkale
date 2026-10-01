@@ -111,16 +111,16 @@ int xck_gga_st_o2_p_t(int64_t npts,
         accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 0);
         stage_a<T, Txc>(g0, bk, 21, detail_xck_gga_st_o2_p::c0_3, detail_xck_gga_st_o2_p::o0_3, detail_xck_gga_st_o2_p::f0_3, detail_xck_gga_st_o2_p::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out);
+        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
         stage_a<T, Txc>(g0, bk, 21, detail_xck_gga_st_o2_p::c0_4, detail_xck_gga_st_o2_p::o0_4, detail_xck_gga_st_o2_p::f0_4, detail_xck_gga_st_o2_p::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, out);
+        gemm_nt(nbf, bk, chi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
         stage_a<T, Txc>(g0, bk, 21, detail_xck_gga_st_o2_p::c0_5, detail_xck_gga_st_o2_p::o0_5, detail_xck_gga_st_o2_p::f0_5, detail_xck_gga_st_o2_p::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, out);
+        gemm_nt(nbf, bk, chi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
         stage_a<T, Txc>(g0, bk, 21, detail_xck_gga_st_o2_p::c0_6, detail_xck_gga_st_o2_p::o0_6, detail_xck_gga_st_o2_p::f0_6, detail_xck_gga_st_o2_p::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)3*nbf*npts + g0, npts, Wc, bk, out);
+        gemm_nt(nbf, bk, chi + (int64_t)3*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
     }
     if (own) delete[] c;
     return 0;

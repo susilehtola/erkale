@@ -132,6 +132,34 @@ XCK_HD inline void combine(int64_t bk, int64_t n, int nt, const T* const* src,
     }
 }
 
+/* Zero the rows of functions off the atom: X(i,g) = 0 where !mask[i]. */
+template <typename T>
+XCK_HD inline void mask_rows(int64_t bk, int64_t n, const int8_t* mask,
+                             T* X) {
+    for (int64_t i = 0; i < n; ++i)
+        if (!mask[i])
+            for (int64_t g = 0; g < bk; ++g) X[i * bk + g] = T(0);
+}
+
+/* A per-point reduction over the functions on an atom:
+ * out(g) = sum_{i: mask[i]} sum_t c[t] A[t](i,g) B[t](i,g), rows of
+ * stride npts -- the perturbed fields of a nuclear displacement. */
+template <typename T>
+XCK_HD inline void masked_colsum(int64_t npts, int64_t n, const int8_t* mask,
+                                 int nt, const T* const* A,
+                                 const T* const* B, const double* c, T* out) {
+    for (int64_t g = 0; g < npts; ++g) out[g] = T(0);
+    for (int64_t i = 0; i < n; ++i) {
+        if (!mask[i]) continue;
+        for (int t = 0; t < nt; ++t) {
+            const T* a = A[t] + i * npts;
+            const T* b = B[t] + i * npts;
+            const T ct = T(c[t]);
+            for (int64_t g = 0; g < npts; ++g) out[g] += ct * a[g] * b[g];
+        }
+    }
+}
+
 /* Row-wise contraction: out(i) += sum_g A(i,g) B(i,g) -- the diagonal of
  * gemm_nt, for kernels with one free basis index (Fock diagonals and
  * nuclear-gradient rows). */

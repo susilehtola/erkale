@@ -14,7 +14,7 @@
 set -e
 
 XCKERNEL_REPO=${XCKERNEL_REPO:-https://github.com/susilehtola/libxckernel.git}
-XCKERNEL_COMMIT=${XCKERNEL_COMMIT:-f5761d7976d1a3809a5bc11cf615ca8e3dd6b542}
+XCKERNEL_COMMIT=${XCKERNEL_COMMIT:-59f3353623a92f3a93fcbce2facfeeaa3e537002}
 FAMILIES=lda,gga,mgga_tau,mgga_lapl,mgga,cmgga_tau
 MAX_ORDER=2
 
