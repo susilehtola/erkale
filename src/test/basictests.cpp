@@ -611,33 +611,36 @@ void check_xckernel() {
       throw std::runtime_error("check_xckernel: GGA diagonal kernel failed.\n");
     check(diag, arma::diagvec(ref), "GGA Fock diagonal");
   }
-  // The dispatcher must refuse a missing operand (here vsigma) and
-  // missing basis-function gradients
+  // The dispatcher must refuse a missing operand (here vsigma) and a
+  // collocation tower of too low an order, and otherwise match the
+  // direct call
   {
     xckernel_dispatch::operands_t ops;
     ops["w"]=w.memptr();
-    ops["grad_rho_x"]=grho.colptr(0);
-    ops["grad_rho_y"]=grho.colptr(1);
-    ops["grad_rho_z"]=grho.colptr(2);
+    ops["rho_x"]=grho.colptr(0);
+    ops["rho_y"]=grho.colptr(1);
+    ops["rho_z"]=grho.colptr(2);
     ops["vrho"]=vrho.memptr();
     arma::mat out(nbf, nbf, arma::fill::zeros);
-    bool refused=false;
-    try {
-      xckernel_dispatch::contract("xck_gga_r_o1", ng, nbf, chi.memptr(), dchi_all.memptr(), nullptr, ops, out.memptr());
-    } catch(std::logic_error &) {
-      refused=true;
-    }
-    if(!refused)
+    auto refused = [&](int order) {
+      try {
+        xckernel_dispatch::contract("xck_gga_r_o1", ng, nbf, {chi.memptr(), order}, ops, out.memptr());
+      } catch(std::logic_error &) {
+        return true;
+      }
+      return false;
+    };
+    if(!refused(1))
       throw std::runtime_error("check_xckernel: a kernel ran without its vsigma operand.\n");
     ops["vsigma"]=vsigma.memptr();
-    refused=false;
-    try {
-      xckernel_dispatch::contract("xck_gga_r_o1", ng, nbf, chi.memptr(), nullptr, nullptr, ops, out.memptr());
-    } catch(std::logic_error &) {
-      refused=true;
-    }
-    if(!refused)
+    if(!refused(0))
       throw std::runtime_error("check_xckernel: a GGA kernel ran without basis-function gradients.\n");
+    out.zeros();
+    xckernel_dispatch::contract("xck_gga_r_o1", ng, nbf, {chi.memptr(), 1}, ops, out.memptr());
+    arma::mat direct(nbf, nbf, arma::fill::zeros);
+    const double * scal[6]={w.memptr(), grho.colptr(0), grho.colptr(1), grho.colptr(2), vrho.memptr(), vsigma.memptr()};
+    xck_gga_r_o1(ng, nbf, chi.memptr(), scal, direct.memptr());
+    check(out, direct, "dispatched GGA Fock matrix");
   }
 }
 

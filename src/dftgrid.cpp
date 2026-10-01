@@ -2143,15 +2143,29 @@ std::string AngularGrid::xck_family() const {
   return "lda";
 }
 
-AngularGrid::xck_coll_t AngularGrid::xck_collocation() const {
-  // libxckernel stores the collocation grid index fastest, i.e. the
-  // transpose of the (Nbf x Ngrid) arrays here
+AngularGrid::xck_coll_t AngularGrid::xck_collocation(const std::string & variant) const {
   xck_coll_t coll;
-  coll.chi = bf_.t();
-  if(do_gga_)
-    coll.dchi = arma::join_rows(bf_x_.t(), bf_y_.t(), bf_z_.t());
-  if(do_mgga_l_)
-    coll.lapl = bf_lapl_.t();
+  coll.order = xckernel_dispatch::chi_order("xck_" + xck_family() + "_" + variant);
+  if(coll.order > 2)
+    throw std::logic_error("xck_collocation: third derivatives of the basis functions are not tabulated.\n");
+
+  // The tower stores the grid index fastest, i.e. the transposes of the
+  // (Nbf x Ngrid) tables here: components 1; x, y, z; xx, xy, xz, yy,
+  // yz, zz
+  const size_t nbf(bf_.n_rows);
+  std::vector<arma::mat> comps({bf_});
+  if(coll.order >= 1) {
+    comps.push_back(bf_x_);
+    comps.push_back(bf_y_);
+    comps.push_back(bf_z_);
+  }
+  if(coll.order >= 2)
+    // bf_hess_ holds the row-major 3x3 Hessian of function f in rows 9f..9f+8
+    for(arma::uword c : {0, 1, 2, 4, 5, 8})
+      comps.push_back(bf_hess_.rows(arma::regspace<arma::uvec>(c, 9, 9*nbf-1)));
+  coll.chi.set_size(grid_.size(), comps.size()*nbf);
+  for(size_t k=0;k<comps.size();k++)
+    coll.chi.cols(k*nbf, (k+1)*nbf-1) = comps[k].t();
   return coll;
 }
 
@@ -2181,10 +2195,10 @@ void AngularGrid::xck_ground_operands(std::map<std::string, arma::rowvec> & ops)
     const std::string xyz[] = {"_x", "_y", "_z"};
     for(int ic=0;ic<3;ic++) {
       if(polarized_) {
-        ops["grad_rho_a" + xyz[ic]] = grho_.row(ic);
-        ops["grad_rho_b" + xyz[ic]] = grho_.row(3+ic);
+        ops["rho_a" + xyz[ic]] = grho_.row(ic);
+        ops["rho_b" + xyz[ic]] = grho_.row(3+ic);
       } else
-        ops["grad_rho" + xyz[ic]] = grho_.row(ic);
+        ops["rho" + xyz[ic]] = grho_.row(ic);
     }
   }
 }
@@ -2196,18 +2210,28 @@ void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & sp
   const arma::mat Pvx(P*bf_);
   const std::string sfx(spin + "_p1");
 
+  // The perturbed density and its derivatives
   ops["rho" + sfx] = arma::sum(Pvx % bf_, 0);
   if(do_gga_) {
-    ops["grad_rho" + sfx + "_x"] = 2.0 * arma::sum(Pvx % bf_x_, 0);
-    ops["grad_rho" + sfx + "_y"] = 2.0 * arma::sum(Pvx % bf_y_, 0);
-    ops["grad_rho" + sfx + "_z"] = 2.0 * arma::sum(Pvx % bf_z_, 0);
-  }
-  if(do_mgga_t_ || do_mgga_l_) {
-    const arma::rowvec grad_v(arma::sum((P*bf_x_) % bf_x_ + (P*bf_y_) % bf_y_ + (P*bf_z_) % bf_z_, 0));
+    const arma::mat * bfd[3]={&bf_x_, &bf_y_, &bf_z_};
+    const std::string xyz[] = {"x", "y", "z"};
+    std::vector<arma::mat> Pvd(3);
+    for(int ic=0;ic<3;ic++) {
+      Pvd[ic] = P * *bfd[ic];
+      ops["rho" + sfx + "_" + xyz[ic]] = 2.0 * arma::sum(Pvx % *bfd[ic], 0);
+    }
     if(do_mgga_t_)
-      ops["tau" + sfx] = 0.5 * grad_v;
-    if(do_mgga_l_)
-      ops["lapl_rho" + sfx] = 2.0 * (arma::sum(Pvx % bf_lapl_, 0) + grad_v);
+      ops["tau" + sfx] = 0.5 * arma::sum(Pvd[0] % bf_x_ + Pvd[1] % bf_y_ + Pvd[2] % bf_z_, 0);
+    if(do_mgga_l_) {
+      // The diagonal second derivatives, from which the kernels form the
+      // laplacian: rho_aa = 2 [(P chi) chi_aa + (P chi_a) chi_a]
+      const size_t nbf(bf_.n_rows);
+      const arma::uword cdiag[3]={0, 4, 8};
+      for(int ic=0;ic<3;ic++) {
+        const arma::mat bfaa(bf_hess_.rows(arma::regspace<arma::uvec>(cdiag[ic], 9, 9*nbf-1)));
+        ops["rho" + sfx + "_" + xyz[ic] + xyz[ic]] = 2.0 * arma::sum(Pvx % bfaa + Pvd[ic] % *bfd[ic], 0);
+      }
+    }
   }
 }
 
@@ -2218,10 +2242,7 @@ void AngularGrid::xck_contract(const std::string & name, const xck_coll_t & coll
 
   arma::mat Hw(bf_ind_.n_elem, bf_ind_.n_elem, arma::fill::zeros);
   xckernel_dispatch::contract("xck_" + xck_family() + "_" + name, grid_.size(), bf_ind_.n_elem,
-                              coll.chi.memptr(),
-                              coll.dchi.n_elem ? coll.dchi.memptr() : nullptr,
-                              coll.lapl.n_elem ? coll.lapl.memptr() : nullptr,
-                              scal, Hw.memptr());
+                              {coll.chi.memptr(), coll.order}, scal, Hw.memptr());
   H(bf_ind_,bf_ind_) += Hw;
 }
 
@@ -2231,7 +2252,7 @@ void AngularGrid::eval_Fxc_xck(arma::mat & H) const {
 
   std::map<std::string, arma::rowvec> ops;
   xck_ground_operands(ops);
-  xck_contract("r_o1", xck_collocation(), ops, H);
+  xck_contract("r_o1", xck_collocation("r_o1"), ops, H);
 }
 
 void AngularGrid::eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha, bool beta) const {
@@ -2240,7 +2261,7 @@ void AngularGrid::eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha, bool 
 
   std::map<std::string, arma::rowvec> ops;
   xck_ground_operands(ops);
-  const xck_coll_t coll(xck_collocation());
+  const xck_coll_t coll(xck_collocation("ua_o1"));
   if(alpha)
     xck_contract("ua_o1", coll, ops, Ha);
   if(beta)
@@ -2253,7 +2274,7 @@ void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::
 
   std::map<std::string, arma::rowvec> ops;
   xck_ground_operands(ops);
-  const xck_coll_t coll(xck_collocation());
+  const xck_coll_t coll(xck_collocation("r_o2"));
   for(size_t i=0;i<Px.size();i++) {
     xck_pert_operands(Px[i], "", ops);
     xck_contract("r_o2", coll, ops, Hx[i]);
@@ -2266,7 +2287,7 @@ void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector
 
   std::map<std::string, arma::rowvec> ops;
   xck_ground_operands(ops);
-  const xck_coll_t coll(xck_collocation());
+  const xck_coll_t coll(xck_collocation("ua_o2"));
   for(size_t i=0;i<Pxa.size();i++) {
     xck_pert_operands(Pxa[i], "_a", ops);
     xck_pert_operands(Pxb[i], "_b", ops);
@@ -3326,7 +3347,9 @@ void AngularGrid::compute_bf() {
   // Evaluate the primary basis into a table and move the fields into the
   // members (the screening already populated pot_shells via
   // update_shell_list). The move is O(1) per array.
-  BFTable t = build_table(*basp_, pot_shells_, do_grad_, do_lapl_, do_hess_, do_lgrad_);
+  // The kernels of the laplacian functionals read the second
+  // derivatives of the basis functions
+  BFTable t = build_table(*basp_, pot_shells_, do_grad_, do_lapl_, do_hess_ || do_lapl_, do_lgrad_);
   shells_     = std::move(t.shells);
   bf_i0_      = std::move(t.bf_i0);
   bf_N_       = std::move(t.bf_N);
@@ -3348,12 +3371,13 @@ void AngularGrid::compute_bf() {
 
 BFTable AngularGrid::compute_bf_table(const BasisSet & basis) const {
   // Screen the second basis against this radial shell, then evaluate it
-  // on the existing grid points. Only the energy / Fock rungs are needed
-  // (no Hessian / laplacian-gradient force terms).
+  // on the existing grid points. Only the energy / Fock rungs are needed:
+  // the Hessian for the kernels of the laplacian functionals, but no
+  // force terms.
   std::vector<size_t> pshells;
   arma::uvec pbfind;
   update_shell_list_for(basis, pshells, pbfind);
-  return build_table(basis, pshells, do_grad_, do_lapl_, false, false);
+  return build_table(basis, pshells, do_grad_, do_lapl_, do_lapl_, false);
 }
 
 void AngularGrid::eval_SAP(const SAP & sap, arma::mat & Vo) const {

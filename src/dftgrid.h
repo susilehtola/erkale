@@ -313,9 +313,13 @@ class AngularGrid {
   std::string xck_family() const;
   /// Collocation in libxckernel's layout (grid index fastest)
   struct xck_coll_t {
-    arma::mat chi, dchi, lapl;
+    /// Cartesian derivative tower (Npts x Ncomp*Nbf) through order
+    arma::mat chi;
+    int order;
   };
-  xck_coll_t xck_collocation() const;
+  /// Collocation tower through the order the kernels of variant
+  /// (r_o1, ua_o2, ...) of the batch's family read
+  xck_coll_t xck_collocation(const std::string & variant) const;
   /// Ground-state operands: weights, density gradients and the first
   /// and second functional derivatives, by libxckernel name
   void xck_ground_operands(std::map<std::string, arma::rowvec> & ops) const;
