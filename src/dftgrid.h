@@ -328,6 +328,12 @@ class AngularGrid {
   /// spin suffix "" (restricted), "_a" or "_b"; in the basis of tab if
   /// given
   void xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops, const BFTable * tab=nullptr) const;
+  /// Run kernel name on the batch, returning the matrix over the nbf
+  /// functions of the batch
+  arma::mat xck_local(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, size_t nbf) const;
+  /// Fock-matrix diagonal of variant (r, ua, ub) on the batch, over the
+  /// batch's functions
+  arma::vec xck_diag(const std::string & variant, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops) const;
   /// Run kernel name on the batch and accumulate into H (full basis,
   /// that of tab if given)
   void xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H, const BFTable * tab=nullptr) const;
@@ -524,15 +530,12 @@ class AngularGrid {
   /// Calculate the GGA and meta-GGA type terms for the derivative
   void eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & S, double thr) const;
 
-  /// Evaluate Fock matrix, restricted calculation
+  /// Evaluate Fock matrix (libxckernel order 1), restricted calculation
   void eval_Fxc(arma::mat & H) const;
-  /// Evaluate Fock matrix, unrestricted calculation. alpha and beta
-  /// select the channels that are assembled.
+  /// Evaluate Fock matrix (libxckernel order 1), unrestricted
+  /// calculation. alpha and beta select the channels that are
+  /// assembled; with tab_b, channel b is in that second basis.
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
-  /// Evaluate Fock matrix with the libxckernel order-1 kernels, restricted
-  void eval_Fxc_xck(arma::mat & H) const;
-  /// Evaluate Fock matrices with the libxckernel order-1 kernels, unrestricted
-  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
   /// XC response (libxckernel order 2) to the symmetric perturbation
   /// densities Px, accumulated into Hx; restricted. Needs compute_xc
   /// with fxc.
@@ -546,8 +549,6 @@ class AngularGrid {
   void eval_diag_Fxc(arma::vec & H) const;
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
   void eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const;
-  /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
-  void eval_diag_Fxc_SIC(arma::vec & H) const;
 
   /// Evaluate force, restricted
   arma::vec eval_force_r() const;
@@ -588,8 +589,6 @@ class DFTGrid {
   const BasisSet * basp_;
   /// Verbose operation?
   bool verbose_;
-  /// Assemble the XC matrices with libxckernel?
-  bool xckernel_=false;
 
   /// Prune shells with no points
   void prune_shells();
@@ -655,10 +654,6 @@ class DFTGrid {
   /// select the matrices that are built (the energy always is); a matrix
   /// that is not built is left empty.
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true);
-
-  /// Assemble the XC matrices of eval_Fxc with the libxckernel
-  /// order-1 kernels instead of the hand-written contractions
-  void set_xckernel(bool xck);
 
   /**
    * XC response kernel: the first-order change of the restricted XC
