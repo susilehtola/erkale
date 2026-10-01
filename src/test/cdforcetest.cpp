@@ -1,13 +1,13 @@
 /*
- * White-box finite-difference check of DensityFit::forceJ_cholesky and
+ * White-box finite-difference check of DensityFit::forceJ and
  * DensityFit::forceK in two-step Cholesky (CD) mode.
  *
- * forceK / forceJ_cholesky compute the EXPLICIT (fixed-density) nuclear
+ * forceK / forceJ compute the EXPLICIT (fixed-density) nuclear
  * gradient of the fitted exchange / Coulomb energy. We verify them against a
  * finite difference of the very same energy, with the density (C, occ) frozen
  * and the CD tensor rebuilt at each displaced geometry:
  *
- *   E_J = (1/2) tr(P J),   J = calcJ(P)            -> forceJ_cholesky
+ *   E_J = (1/2) tr(P J),   J = calcJ(P)            -> forceJ
  *   E_K = -(1/4) tr(P K),  K = calcK(C, occ)       -> forceK
  *
  * calcK sums over all pivots, so the energy FD is insensitive to pivot
@@ -19,7 +19,7 @@
  * (lambda, kappa) mapped to the same pivot rank and the derivative
  * contractions accumulated it twice, whereas the value-side metric / 3-index
  * builds assign (once per pivot). forceK was off by ~2.4e-3 on H2O/cc-pVDZ HF
- * regardless of CholeskyThr. forceJ_cholesky shares the kernels but appeared
+ * regardless of CholeskyThr. forceJ shares the kernels but appeared
  * correct on C2v water, because by symmetry the total density has zero
  * fitting coefficient on the affected (same-shell off-diagonal) pivot
  * products -- use a distorted geometry to actually exercise the J path.
@@ -87,7 +87,7 @@ int main(int argc, char ** argv) {
   if(b0.Nbf()!=basis_chk.Nbf()){ fprintf(stderr,"basis mismatch\n"); return 1; }
 
   DensityFit dfit0; dfit0.fill_cholesky(b0,false,cholthr,cholshthr,intthr,fitcholthr,false);
-  const arma::vec fJ=dfit0.forceJ_cholesky(b0,P);
+  const arma::vec fJ=dfit0.forceJ(b0,P);
   const arma::vec fK=dfit0.forceK(b0,C,occs,1.0);
 
   const size_t npiv0=dfit0.find_cholesky_pivots(b0,cholthr,cholshthr,intthr,false).size();
@@ -106,7 +106,7 @@ int main(int argc, char ** argv) {
     double mm=0; for(size_t i=0;i<a.n_elem;i++) mm=std::max(mm,std::min(std::fabs(a(i)-f(i)),std::fabs(a(i)+f(i))));
     printf("%-34s sign-robust max mismatch = %.3e\n",tag,mm);
   };
-  report("forceJ_cholesky (control)",fJ,fdJ);
+  report("forceJ (control)",fJ,fdJ);
   report("forceK (suspect)",fK,fdK);
   return 0;
 }

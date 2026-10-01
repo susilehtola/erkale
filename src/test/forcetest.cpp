@@ -44,6 +44,8 @@ struct forcecase_t {
   int mult;
   // Allowed deviation |dE/dlambda + F.d| in Eh/bohr
   double tol;
+  // Integral-direct calculation?
+  bool direct=false;
 };
 
 // Distorted water, coordinates in bohr
@@ -109,31 +111,31 @@ int main(int argc, char **argv) {
   d/=arma::norm(d,2);
   const double h=1e-3;
 
-  // The RI energy carries ~1e-7 Eh of roundoff from the conditioning of the
-  // fitting metric, which limits the finite difference accuracy to ~1e-4.
-  // The bugs this guards against are orders of magnitude larger.
-  const double tol=1e-6, tolri=2e-4;
+  const double tol=1e-6;
   const std::vector<forcecase_t> cases={
     {"HF",               "4index",   0, 1, tol},
     {"HF",               "4index",   1, 2, tol},
     {"HF",               "Cholesky", 0, 1, tol},
     {"HF",               "Cholesky", 1, 2, tol},
-    {"HF",               "RI",       0, 1, tolri},
-    {"HF",               "RI",       1, 2, tolri},
+    {"HF",               "RI",       0, 1, tol},
+    {"HF",               "RI",       1, 2, tol},
     {"hyb_gga_xc_b3lyp", "Cholesky", 1, 2, tol},
-    {"hyb_gga_xc_b3lyp", "RI",       1, 2, tolri},
+    {"hyb_gga_xc_b3lyp", "RI",       1, 2, tol},
     {"hyb_gga_xc_wb97x", "4index",   0, 1, tol},
     {"hyb_gga_xc_wb97x", "4index",   1, 2, tol},
     {"hyb_gga_xc_wb97x", "Cholesky", 1, 2, tol},
-    {"hyb_gga_xc_wb97x", "RI",       1, 2, tolri},
+    {"hyb_gga_xc_wb97x", "RI",       1, 2, tol},
+    {"HF",               "RI",       1, 2, tol, true},
+    {"hyb_gga_xc_wb97x", "RI",       1, 2, tol, true},
   };
 
   int nfail=0;
-  printf("%-18s %-9s %3s %4s %14s %14s %10s\n","method","jk","Q","mult","-F.d","dE/dlambda","error");
+  printf("%-18s %-9s %-6s %3s %4s %14s %14s %10s\n","method","jk","direct","Q","mult","-F.d","dE/dlambda","error");
   for(size_t ic=0;ic<cases.size();ic++) {
     const forcecase_t & c(cases[ic]);
     settings.set_string("Method",c.method);
     settings.set_string("JKMethod",c.jkmethod);
+    settings.set_bool("Direct",c.direct);
     settings.set_int("Charge",c.charge);
     settings.set_int("Multiplicity",c.mult);
 
@@ -152,7 +154,7 @@ int main(int argc, char **argv) {
     const bool ok=err<c.tol;
     if(!ok)
       nfail++;
-    printf("%-18s %-9s %3i %4i % 14.8f % 14.8f %10.3e %s\n",c.method.c_str(),c.jkmethod.c_str(),c.charge,c.mult,analytic,numeric,err,ok ? "OK" : "FAIL");
+    printf("%-18s %-9s %-6s %3i %4i % 14.8f % 14.8f %10.3e %s\n",c.method.c_str(),c.jkmethod.c_str(),c.direct ? "yes" : "no",c.charge,c.mult,analytic,numeric,err,ok ? "OK" : "FAIL");
     fflush(stdout);
   }
 
