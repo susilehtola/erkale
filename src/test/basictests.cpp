@@ -29,6 +29,7 @@
 #include "../xckernel_dispatch.h"
 #include <xckernel.h>
 
+#include <array>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -743,6 +744,82 @@ void check_xckernel_dftgrid() {
   }
 }
 
+void check_derivative_tower() {
+  // The Cartesian derivative tower of the basis functions
+  // (GaussianShell::eval_tower), each component of order k > 0 against
+  // the central difference of a component of order k-1, for spherical
+  // and cartesian, segmented and generally contracted shells
+  const int maxorder=3;
+  // Components in PySCF's order
+  std::vector<std::array<int,3>> comps;
+  for(int k=0;k<=maxorder;k++)
+    for(int a=k;a>=0;a--)
+      for(int b=k-a;b>=0;b--)
+        comps.push_back({a, b, k-a-b});
+  auto index = [&](int a, int b, int c) {
+    for(size_t i=0;i<comps.size();i++)
+      if(comps[i][0]==a && comps[i][1]==b && comps[i][2]==c)
+        return i;
+    throw std::logic_error("check_derivative_tower: no such component.\n");
+  };
+
+  BasisSet basis;
+  nucleus_t nuc;
+  nuc.ind=0;
+  nuc.r.x=0.1; nuc.r.y=-0.2; nuc.r.z=0.3;
+  nuc.bsse=false;
+  nuc.symbol="C";
+  nuc.Z=6;
+  nuc.Q=0;
+  basis.add_nucleus(nuc);
+  const double z[3]={3.0, 0.9, 0.35};
+  const double a[2][3]={{0.3, 0.5, 0.4}, {-0.2, 0.3, 0.8}};
+  for(int am=0;am<=4;am++)
+    for(int lm=0;lm<=1;lm++)
+      for(int ic=0;ic<(am==2 ? 2 : 1);ic++) {
+        std::vector<contr_t> c(3);
+        for(int i=0;i<3;i++) {
+          c[i].z=z[i];
+          c[i].c=a[ic][i];
+        }
+        basis.add_shell(0, am, lm, c, false);
+      }
+  basis.finalize();
+
+  const double r[3]={0.45, -0.7, 0.85}, h=1e-3;
+  double maxd=0.0;
+  for(size_t ish=0;ish<basis.Nshells();ish++) {
+    arma::mat t;
+    basis.eval_tower(ish, r[0], r[1], r[2], maxorder, t);
+    if(t.n_cols != comps.size())
+      throw std::runtime_error("check_derivative_tower: wrong number of components.\n");
+    for(size_t k=1;k<comps.size();k++) {
+      // Differentiate the lower component along the first axis with a
+      // nonzero power
+      int d=0;
+      while(comps[k][d]==0)
+        d++;
+      std::array<int,3> low(comps[k]);
+      low[d]--;
+      const size_t il(index(low[0], low[1], low[2]));
+      auto lower = [&](double s) {
+        double rs[3]={r[0], r[1], r[2]};
+        rs[d]+=s;
+        arma::mat ts;
+        basis.eval_tower(ish, rs[0], rs[1], rs[2], maxorder-1, ts);
+        return arma::vec(ts.col(il));
+      };
+      const arma::vec d1((lower(h)-lower(-h))/(2*h)), d2((lower(0.5*h)-lower(-0.5*h))/h);
+      const arma::vec fd((4.0*d2-d1)/3.0);
+      maxd=std::max(maxd, arma::abs(t.col(k)-fd).max()/std::max(1.0, arma::abs(fd).max()));
+    }
+  }
+  printf("Derivative tower vs finite differences: %.1e\n", maxd);
+  fflush(stdout);
+  if(maxd>1e-8)
+    throw std::runtime_error("check_derivative_tower: the derivative tower disagrees with finite differences.\n");
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -762,6 +839,9 @@ int main(void) {
   // m labels of the functions for linear symmetry
   check_m_values();
   printf("Linear-symmetry m values OK.\n");
+  // Derivative tower of the basis functions
+  check_derivative_tower();
+  printf("Basis function derivative tower OK.\n");
   // Vendored XC kernels
   check_xckernel();
   printf("libxckernel kernels OK.\n");

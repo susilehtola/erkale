@@ -26,6 +26,8 @@
 #include <stdexcept>
 
 #include "basis.h"
+
+#include <array>
 #include "cintenv.h"
 #include "eriworker.h"
 #include "elements.h"
@@ -59,32 +61,6 @@ static arma::mat shell_transmat(int am) {
   if(am==1)
     T=T.rows(arma::uvec({2, 0, 1}));
   return T;
-}
-
-// Derivative operator
-inline double _der1(const double x[], int l, double zeta) {
-  double d=-2.0*zeta*x[l+1];
-  if(l>0)
-    d+=l*x[l-1];
-  return d;
-}
-
-// Second derivative operator
-inline double _der2(const double x[], int l, double zeta) {
-  double d=4.0*zeta*zeta*x[l+2] - 2.0*zeta*(2*l+1)*x[l];
-  if(l>1)
-    d+=l*(l-1)*x[l-2];
-  return d;
-}
-
-// Third derivative operator
-inline double _der3(const double x[], int l, double zeta) {
-  double d=-8.0*zeta*zeta*zeta*x[l+3] + 12.0*zeta*zeta*(l+1)*x[l+1];
-  if(l>0)
-    d-=6.0*zeta*l*l*x[l-1];
-  if(l>2)
-    d+=l*(l-1)*(l-2)*x[l-3];
-  return d;
 }
 
 bool operator==(const nucleus_t & lhs, const nucleus_t & rhs) {
@@ -706,6 +682,87 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
   return lval;
 }
 
+namespace {
+  /// Cartesian derivative components through order n, in PySCF's
+  /// order: (a,b,c) for each order, the powers of x decreasing, then
+  /// those of y
+  const std::vector<std::array<int,3>> & tower_components(int n) {
+    static std::vector<std::vector<std::array<int,3>>> cache;
+#ifdef _OPENMP
+#pragma omp critical(tower_components)
+#endif
+    {
+      while((int) cache.size()<=n) {
+        const int o((int) cache.size());
+        std::vector<std::array<int,3>> comps;
+        for(int k=0;k<=o;k++)
+          for(int a=k;a>=0;a--)
+            for(int b=k-a;b>=0;b--)
+              comps.push_back({a, b, k-a-b});
+        cache.push_back(comps);
+      }
+    }
+    return cache[n];
+  }
+}
+
+void GaussianShell::eval_tower(double x, double y, double z, int order, arma::mat & out) const {
+  if(order<0)
+    throw std::logic_error("eval_tower: negative derivative order.\n");
+  const double rel[3]={x - cen_.x, y - cen_.y, z - cen_.z};
+  const double rrelsq = rel[0]*rel[0] + rel[1]*rel[1] + rel[2]*rel[2];
+  const std::vector<std::array<int,3>> & comps(tower_components(order));
+  const size_t ncomp(comps.size());
+
+  // The Gaussian factorizes over the Cartesian directions, so the
+  // derivatives of x^l exp(-zeta x^2) are exp(-zeta x^2) u_k,l(x) with
+  // u_0,l = x^l and u_k+1,l = l u_k,l-1 - 2 zeta u_k,l+1.
+  const int lmax = am_ + order;
+  const size_t nl = lmax+1;
+  std::vector<double> pw(3*nl), u(3*(order+1)*nl);
+  for(int d=0;d<3;d++) {
+    pw[d*nl]=1.0;
+    for(int l=1;l<=lmax;l++)
+      pw[d*nl+l]=pw[d*nl+l-1]*rel[d];
+  }
+  auto U = [&](int d, int k, int l) -> double & { return u[(d*(order+1)+k)*nl+l]; };
+
+  // One block of columns per contraction: [ictr*ncomp, (ictr+1)*ncomp)
+  const size_t nctr = cf_.n_cols;
+  const size_t Ncart = cart_.size();
+  arma::mat buf(Ncart, ncomp*nctr, arma::fill::zeros);
+  for(size_t iexp=0; iexp<c_.size(); iexp++) {
+    const double zeta = c_[iexp].z;
+    const double e = std::exp(-zeta * rrelsq);
+    for(int d=0;d<3;d++) {
+      for(int l=0;l<=lmax;l++)
+        U(d,0,l)=pw[d*nl+l];
+      for(int k=0;k<order;k++)
+        for(int l=0;l<=lmax-k-1;l++)
+          U(d,k+1,l) = (l>0 ? l*U(d,k,l-1) : 0.0) - 2.0*zeta*U(d,k,l+1);
+    }
+    for(size_t icart=0; icart<Ncart; icart++) {
+      const int lmn[3]={cart_[icart].l, cart_[icart].m, cart_[icart].n};
+      for(size_t k=0;k<ncomp;k++) {
+        const double v = e*U(0,comps[k][0],lmn[0])*U(1,comps[k][1],lmn[1])*U(2,comps[k][2],lmn[2]);
+        for(size_t ic=0; ic<nctr; ic++)
+          buf(icart, ic*ncomp+k) += cf_(iexp, ic) * v;
+      }
+    }
+  }
+
+  // Per-cartesian normalization, then the spherical transformation;
+  // contraction ictr occupies the output rows [ictr*Nout, (ictr+1)*Nout)
+  for(size_t icart=0; icart<Ncart; icart++)
+    buf.row(icart) *= cart_[icart].relnorm;
+  const size_t Nout = uselm_ ? Nlm() : Ncart;
+  out.set_size(nctr*Nout, ncomp);
+  for(size_t ic=0; ic<nctr; ic++) {
+    const arma::mat blk(buf.cols(ic*ncomp, (ic+1)*ncomp-1));
+    out.rows(ic*Nout, (ic+1)*Nout-1) = uselm_ ? arma::mat(transmat_*blk) : blk;
+  }
+}
+
 void GaussianShell::eval_bf_derivs(double x, double y, double z,
                                    arma::vec & fval,
                                    arma::mat & gval,
@@ -714,171 +771,30 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
                                    arma::mat & lgval,
                                    bool do_grad, bool do_lapl,
                                    bool do_hess, bool do_lgrad) const {
-  // Evaluate the basis-function values plus any subset of gradient,
-  // laplacian, Hessian and gradient-of-laplacian in one pass. The
-  // five specialised eval_* siblings each rebuild xrel/yrel/zrel,
-  // the power arrays, and the per-primitive exp(-z * rrelsq); a
-  // fused pass amortises all of that across the requested outputs.
+  // Components of the derivative tower: 0 value; 1-3 x, y, z; 4-9 xx,
+  // xy, xz, yy, yz, zz; 10-19 xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz,
+  // yzz, zzz
+  const int order = do_lgrad ? 3 : ((do_lapl || do_hess) ? 2 : (do_grad ? 1 : 0));
+  arma::mat t;
+  eval_tower(x, y, z, order, t);
 
-  const double xrel = x - cen_.x;
-  const double yrel = y - cen_.y;
-  const double zrel = z - cen_.z;
-  const double rrelsq = xrel*xrel + yrel*yrel + zrel*zrel;
-
-  // Power-array degree needed:
-  //   func only           -> am
-  //   grad                -> am + 1   (_der1 reads xr[l+1])
-  //   lapl, hess          -> am + 2   (_der2 reads xr[l+2])
-  //   laplgrad            -> am + 3   (_der3 reads xr[l+3])
-  int xpow_max = am_;
-  if(do_grad) xpow_max = std::max(xpow_max, am_ + 1);
-  if(do_lapl || do_hess) xpow_max = std::max(xpow_max, am_ + 2);
-  if(do_lgrad) xpow_max = std::max(xpow_max, am_ + 3);
-  double xr[xpow_max+1], yr[xpow_max+1], zr[xpow_max+1];
-  xr[0] = 1.0; yr[0] = 1.0; zr[0] = 1.0;
-  if(xpow_max >= 1) {
-    xr[1] = xrel; yr[1] = yrel; zr[1] = zrel;
-    for(int i=2; i<=xpow_max; i++) {
-      xr[i] = xr[i-1]*xrel;
-      yr[i] = yr[i-1]*yrel;
-      zr[i] = zr[i-1]*zrel;
-    }
+  fval = t.col(0);
+  if(do_grad)
+    gval = t.cols(1, 3);
+  if(do_lapl)
+    lval = t.col(4) + t.col(7) + t.col(9);
+  if(do_hess) {
+    // Row-major 3x3 entries
+    static const int hidx[9]={4, 5, 6, 5, 7, 8, 6, 8, 9};
+    hval.set_size(t.n_rows, 9);
+    for(int c=0;c<9;c++)
+      hval.col(c) = t.col(hidx[c]);
   }
-
-  // Cartesian-basis accumulators (allocated only if requested). One
-  // block of columns per contraction: the derivative components of
-  // contraction ictr occupy columns [ictr*ncomp, (ictr+1)*ncomp). The
-  // primitive exp() and the derivative factors are computed once (they
-  // do not depend on the contraction); only the multiply-accumulate
-  // into the columns scales with the number of contractions.
-  const size_t nctr = cf_.n_cols;
-  const size_t Ncart = cart_.size();
-  arma::mat fbuf;  fbuf.zeros(Ncart, nctr);
-  arma::mat gbuf;  if(do_grad) gbuf.zeros(Ncart, 3*nctr);
-  arma::mat lbuf;  if(do_lapl) lbuf.zeros(Ncart, nctr);
-  arma::mat hbuf;  if(do_hess) hbuf.zeros(Ncart, 9*nctr);
-  arma::mat lgbuf; if(do_lgrad) lgbuf.zeros(Ncart, 3*nctr);
-
-  for(size_t iexp=0; iexp<c_.size(); iexp++) {
-    const double z_i = c_[iexp].z;
-    // Bare Gaussian: no contraction coefficient (one exp per primitive)
-    const double e_i = std::exp(-z_i * rrelsq);
-
-    for(size_t icart=0; icart<Ncart; icart++) {
-      const int l = cart_[icart].l;
-      const int m = cart_[icart].m;
-      const int n = cart_[icart].n;
-      const double xl = xr[l];
-      const double ym = yr[m];
-      const double zn = zr[n];
-
-      // Value term, bare
-      const double v = xl * ym * zn * e_i;
-      for(size_t ic=0; ic<nctr; ic++)
-        fbuf(icart, ic) += cf_(iexp, ic) * v;
-
-      // Derivative factors, computed once (independent of contraction)
-      const bool need_d1 = do_grad || do_hess || do_lgrad;
-      const bool need_d2 = do_lapl || do_hess || do_lgrad;
-      const bool need_d3 = do_lgrad;
-      const double d1x = need_d1 ? _der1(xr, l, z_i) : 0.0;
-      const double d1y = need_d1 ? _der1(yr, m, z_i) : 0.0;
-      const double d1z = need_d1 ? _der1(zr, n, z_i) : 0.0;
-      const double d2x = need_d2 ? _der2(xr, l, z_i) : 0.0;
-      const double d2y = need_d2 ? _der2(yr, m, z_i) : 0.0;
-      const double d2z = need_d2 ? _der2(zr, n, z_i) : 0.0;
-      const double d3x = need_d3 ? _der3(xr, l, z_i) : 0.0;
-      const double d3y = need_d3 ? _der3(yr, m, z_i) : 0.0;
-      const double d3z = need_d3 ? _der3(zr, n, z_i) : 0.0;
-
-      if(do_grad) {
-        const double gx = d1x * ym * zn * e_i;
-        const double gy = xl  * d1y * zn * e_i;
-        const double gz = xl  * ym * d1z * e_i;
-        for(size_t ic=0; ic<nctr; ic++) {
-          const double w = cf_(iexp, ic);
-          gbuf(icart, 3*ic+0) += w * gx;
-          gbuf(icart, 3*ic+1) += w * gy;
-          gbuf(icart, 3*ic+2) += w * gz;
-        }
-      }
-
-      if(do_lapl) {
-        const double lp = (d2x * ym * zn + xl * d2y * zn + xl * ym * d2z) * e_i;
-        for(size_t ic=0; ic<nctr; ic++)
-          lbuf(icart, ic) += cf_(iexp, ic) * lp;
-      }
-
-      if(do_hess) {
-        const double hxx = d2x * ym * zn * e_i;
-        const double hyy = xl * d2y * zn * e_i;
-        const double hzz = xl * ym * d2z * e_i;
-        const double hxy = d1x * d1y * zn * e_i;
-        const double hxz = d1x * ym  * d1z * e_i;
-        const double hyz = xl  * d1y * d1z * e_i;
-        for(size_t ic=0; ic<nctr; ic++) {
-          const double w = cf_(iexp, ic);
-          hbuf(icart, 9*ic+0) += w * hxx;
-          hbuf(icart, 9*ic+4) += w * hyy;
-          hbuf(icart, 9*ic+8) += w * hzz;
-          hbuf(icart, 9*ic+1) += w * hxy;
-          hbuf(icart, 9*ic+3) += w * hxy;
-          hbuf(icart, 9*ic+2) += w * hxz;
-          hbuf(icart, 9*ic+6) += w * hxz;
-          hbuf(icart, 9*ic+5) += w * hyz;
-          hbuf(icart, 9*ic+7) += w * hyz;
-        }
-      }
-
-      if(do_lgrad) {
-        const double lg0 = (d3x * ym * zn + d1x * d2y * zn + d1x * ym * d2z) * e_i;
-        const double lg1 = (d2x * d1y * zn + xl * d3y * zn + xl * d1y * d2z) * e_i;
-        const double lg2 = (d2x * ym * d1z + xl * d2y * d1z + xl * ym * d3z) * e_i;
-        for(size_t ic=0; ic<nctr; ic++) {
-          const double w = cf_(iexp, ic);
-          lgbuf(icart, 3*ic+0) += w * lg0;
-          lgbuf(icart, 3*ic+1) += w * lg1;
-          lgbuf(icart, 3*ic+2) += w * lg2;
-        }
-      }
-    }
-  }
-
-  // Plug in the per-cartesian normalisation constant (shared across contractions)
-  for(size_t icart=0; icart<Ncart; icart++) {
-    const double rn = cart_[icart].relnorm;
-    fbuf.row(icart) *= rn;
-    if(do_grad)  gbuf.row(icart)  *= rn;
-    if(do_lapl)  lbuf.row(icart)  *= rn;
-    if(do_hess)  hbuf.row(icart)  *= rn;
-    if(do_lgrad) lgbuf.row(icart) *= rn;
-  }
-
-  // Project each contraction's cartesian block to the output, stacking
-  // the contractions along the function (row) dimension: contraction
-  // ictr occupies output rows [ictr*Nout, (ictr+1)*Nout).
-  const size_t Nout = uselm_ ? Nlm() : Ncart;
-  fval.set_size(nctr*Nout);
-  if(do_grad)  gval.set_size(nctr*Nout, 3);
-  if(do_lapl)  lval.set_size(nctr*Nout);
-  if(do_hess)  hval.set_size(nctr*Nout, 9);
-  if(do_lgrad) lgval.set_size(nctr*Nout, 3);
-
-  for(size_t ic=0; ic<nctr; ic++) {
-    const size_t r0=ic*Nout, r1=r0+Nout-1;
-    if(uselm_) {
-      fval.subvec(r0,r1) = transmat_ * fbuf.col(ic);
-      if(do_grad)  gval.rows(r0,r1)  = transmat_ * gbuf.cols(3*ic,3*ic+2);
-      if(do_lapl)  lval.subvec(r0,r1) = transmat_ * lbuf.col(ic);
-      if(do_hess)  hval.rows(r0,r1)  = transmat_ * hbuf.cols(9*ic,9*ic+8);
-      if(do_lgrad) lgval.rows(r0,r1) = transmat_ * lgbuf.cols(3*ic,3*ic+2);
-    } else {
-      fval.subvec(r0,r1) = fbuf.col(ic);
-      if(do_grad)  gval.rows(r0,r1)  = gbuf.cols(3*ic,3*ic+2);
-      if(do_lapl)  lval.subvec(r0,r1) = lbuf.col(ic);
-      if(do_hess)  hval.rows(r0,r1)  = hbuf.cols(9*ic,9*ic+8);
-      if(do_lgrad) lgval.rows(r0,r1) = lgbuf.cols(3*ic,3*ic+2);
-    }
+  if(do_lgrad) {
+    lgval.set_size(t.n_rows, 3);
+    lgval.col(0) = t.col(10) + t.col(13) + t.col(15);
+    lgval.col(1) = t.col(11) + t.col(16) + t.col(18);
+    lgval.col(2) = t.col(12) + t.col(17) + t.col(19);
   }
 }
 
@@ -1910,6 +1826,10 @@ arma::mat BasisSet::eval_hess(size_t ish, double x, double y, double z) const {
 
 arma::mat BasisSet::eval_laplgrad(size_t ish, double x, double y, double z) const {
   return shells_[ish].eval_laplgrad(x,y,z);
+}
+
+void BasisSet::eval_tower(size_t ish, double x, double y, double z, int order, arma::mat & out) const {
+  shells_[ish].eval_tower(x, y, z, order, out);
 }
 
 void BasisSet::eval_bf_derivs(size_t ish, double x, double y, double z,
