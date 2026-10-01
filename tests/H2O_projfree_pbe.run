@@ -1,0 +1,14 @@
+# Water molecule: projection-free guess from the cc-pVTZ density of
+# H2O_tz_pbe in the aug-cc-pVDZ basis
+System H2O.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis aug-cc-pVDZ
+Direct false
+IntegralThresh 1e-14
+
+LoadChk H2O_tz_pbe.chk
+Guess ProjFree
+Logfile H2O_projfree_pbe.log
+SaveChk H2O_projfree_pbe.chk
+BasisRotate false
+DFTGrid 50 -194

@@ -11,7 +11,7 @@ add_library(liberkale
   broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
   checkpoint.cpp guess.cpp external/storage.cpp
   external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
-  trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfunctional.cpp chebyshev.cpp
+  trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfunctional.cpp crossbasis.cpp chebyshev.cpp
   density_fitting.cpp jkbuilder.cpp lebedev.cpp eriworker.cpp cintenv.cpp unitary.cpp
   pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
   stockholder.cpp b_tensor.cpp lbfgs.cpp gdm.cpp

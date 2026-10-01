@@ -501,15 +501,23 @@ void AngularGrid::update_density(const arma::mat & P0, bool force, const BFTable
   }
 }
 
-void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, bool force, const BFTable * tab_b) {
+void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, bool force, const BFTable * tab_b, const BFTable * tab_a) {
   if(!Pa0.n_elem || !Pb0.n_elem) {
     ERROR_INFO();
     throw std::runtime_error("Error - density matrix is empty!\n");
   }
 
-  // Channel a is the primary basis (members); channel b is the primary
-  // basis too in ordinary unrestricted DFT, or a second basis (tab_b)
-  // for multicomponent (NEO) XC, where channel b is the proton density.
+  // Each channel is evaluated in the primary basis (members) unless a
+  // second basis is given: tab_b alone is the proton density of
+  // multicomponent (NEO) XC; tab_a and tab_b together put both spin
+  // densities in another basis (the projection-free guess, where the
+  // loaded density is in the old basis).
+  const arma::mat  & BFa  = tab_a ? tab_a->bf      : bf_;
+  const arma::mat  & BFax = tab_a ? tab_a->bf_x    : bf_x_;
+  const arma::mat  & BFay = tab_a ? tab_a->bf_y    : bf_y_;
+  const arma::mat  & BFaz = tab_a ? tab_a->bf_z    : bf_z_;
+  const arma::mat  & BFal = tab_a ? tab_a->bf_lapl : bf_lapl_;
+  const arma::uvec & BFIa = tab_a ? tab_a->bf_ind  : bf_ind_;
   const arma::mat  & BFb  = tab_b ? tab_b->bf      : bf_;
   const arma::mat  & BFbx = tab_b ? tab_b->bf_x    : bf_x_;
   const arma::mat  & BFby = tab_b ? tab_b->bf_y    : bf_y_;
@@ -521,28 +529,28 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
   polarized_=true;
 
   // Update density vector
-  arma::mat Pa(Pa0.submat(bf_ind_,bf_ind_));
+  arma::mat Pa(Pa0.submat(BFIa,BFIa));
   arma::mat Pb(Pb0.submat(BFIb,BFIb));
 
-  Pav=Pa*bf_;
+  Pav=Pa*BFa;
   Pbv=Pb*BFb;
   if(force && do_lapl_) {
-    Palapl=Pa*bf_lapl_;
+    Palapl=Pa*BFal;
     Pblapl_=Pb*BFbl;
   }
 
   // Calculate density
   rho_.zeros(2,grid_.size());
-  rho_.row(0) = arma::sum(Pav % bf_, 0);
+  rho_.row(0) = arma::sum(Pav % BFa, 0);
   rho_.row(1) = arma::sum(Pbv % BFb, 0);
 
   // Calculate gradient
   if(do_grad_) {
     grho_.zeros(6,grid_.size());
     sigma_.zeros(3,grid_.size());
-    grho_.row(0) = 2.0 * arma::sum(Pav % bf_x_, 0);
-    grho_.row(1) = 2.0 * arma::sum(Pav % bf_y_, 0);
-    grho_.row(2) = 2.0 * arma::sum(Pav % bf_z_, 0);
+    grho_.row(0) = 2.0 * arma::sum(Pav % BFax, 0);
+    grho_.row(1) = 2.0 * arma::sum(Pav % BFay, 0);
+    grho_.row(2) = 2.0 * arma::sum(Pav % BFaz, 0);
     grho_.row(3) = 2.0 * arma::sum(Pbv % BFbx, 0);
     grho_.row(4) = 2.0 * arma::sum(Pbv % BFby, 0);
     grho_.row(5) = 2.0 * arma::sum(Pbv % BFbz, 0);
@@ -560,9 +568,9 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
       tau_.resize(2,grid_.size());
 
     // Update helpers
-    Pav_x=Pa*bf_x_;
-    Pav_y=Pa*bf_y_;
-    Pav_z_=Pa*bf_z_;
+    Pav_x=Pa*BFax;
+    Pav_y=Pa*BFay;
+    Pav_z_=Pa*BFaz;
 
     Pbv_x=Pb*BFbx;
     Pbv_y=Pb*BFby;
@@ -571,21 +579,21 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
     // Vectorised column-wise reductions across all grid points,
     // replacing the per-ip arma::dot loops above.
     if(do_tau_ && do_lapl_) {
-      const arma::rowvec lapa(arma::sum(Pav % bf_lapl_, 0));
+      const arma::rowvec lapa(arma::sum(Pav % BFal, 0));
       const arma::rowvec lapb(arma::sum(Pbv % BFbl, 0));
-      const arma::rowvec grada(arma::sum(Pav_x % bf_x_ + Pav_y % bf_y_ + Pav_z_ % bf_z_, 0));
+      const arma::rowvec grada(arma::sum(Pav_x % BFax + Pav_y % BFay + Pav_z_ % BFaz, 0));
       const arma::rowvec gradb(arma::sum(Pbv_x % BFbx + Pbv_y % BFby + Pbv_z_ % BFbz, 0));
       lapl_.row(0) = 2.0 * (lapa + grada);
       lapl_.row(1) = 2.0 * (lapb + gradb);
       tau_.row(0)  = 0.5 * grada;
       tau_.row(1)  = 0.5 * gradb;
     } else if(do_tau_) {
-      tau_.row(0) = 0.5 * arma::sum(Pav_x % bf_x_ + Pav_y % bf_y_ + Pav_z_ % bf_z_, 0);
+      tau_.row(0) = 0.5 * arma::sum(Pav_x % BFax + Pav_y % BFay + Pav_z_ % BFaz, 0);
       tau_.row(1) = 0.5 * arma::sum(Pbv_x % BFbx + Pbv_y % BFby + Pbv_z_ % BFbz, 0);
     } else if(do_lapl_) {
-      const arma::rowvec lapa(arma::sum(Pav % bf_lapl_, 0));
+      const arma::rowvec lapa(arma::sum(Pav % BFal, 0));
       const arma::rowvec lapb(arma::sum(Pbv % BFbl, 0));
-      const arma::rowvec grada(arma::sum(Pav_x % bf_x_ + Pav_y % bf_y_ + Pav_z_ % bf_z_, 0));
+      const arma::rowvec grada(arma::sum(Pav_x % BFax + Pav_y % BFay + Pav_z_ % BFaz, 0));
       const arma::rowvec gradb(arma::sum(Pbv_x % BFbx + Pbv_y % BFby + Pbv_z_ % BFbz, 0));
       lapl_.row(0) = 2.0 * (lapa + grada);
       lapl_.row(1) = 2.0 * (lapb + gradb);
@@ -2539,7 +2547,25 @@ void AngularGrid::next_grid() {
   }
 }
 
-angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_func) {
+void AngularGrid::update_density_from(const arma::mat & P, const BasisSet * dens_basis) {
+  if(!dens_basis) {
+    update_density(P);
+    return;
+  }
+  const BFTable tab(compute_bf_table(*dens_basis));
+  update_density(P, false, &tab);
+}
+
+void AngularGrid::update_density_from(const arma::mat & Pa, const arma::mat & Pb, const BasisSet * dens_basis) {
+  if(!dens_basis) {
+    update_density(Pa, Pb);
+    return;
+  }
+  const BFTable tab(compute_bf_table(*dens_basis));
+  update_density(Pa, Pb, false, &tab, &tab);
+}
+
+angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_func, const BasisSet * dens_basis) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
   // See Köster et al for specifics.
@@ -2564,7 +2590,7 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
   // Old and new diagonal elements of Hamiltonian
   arma::vec Hold, Hnew;
   // Compute density
-  update_density(P);
+  update_density_from(P, dens_basis);
   // Compute exchange and correlation.
   init_xc();
   // Compute the functionals
@@ -2588,7 +2614,7 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
     // Form the grid using the current settings
     form_grid();
     // Compute density
-    update_density(P);
+    update_density_from(P, dens_basis);
     // Compute exchange and correlation.
     init_xc();
     // Compute the functionals
@@ -2622,7 +2648,7 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
   return info_;
 }
 
-angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftoler, int x_func, int c_func) {
+angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftoler, int x_func, int c_func, const BasisSet * dens_basis) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
   // See Köster et al for specifics.
@@ -2645,7 +2671,7 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
   arma::vec Haold, Hanew, Hbold, Hbnew;
 
   // Compute density
-  update_density(Pa,Pb);
+  update_density_from(Pa, Pb, dens_basis);
 
   // Compute exchange and correlation.
   init_xc();
@@ -2673,7 +2699,7 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
     // Compute grid
     form_grid();
     // Compute density
-    update_density(Pa,Pb);
+    update_density_from(Pa, Pb, dens_basis);
 
     // Compute exchange and correlation.
     init_xc();
@@ -3311,7 +3337,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool
 }
 
 
-void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_func) {
+void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_func, const BasisSet * dens_basis) {
   // Add all atoms
   if(verbose_) {
     printf("Constructing adaptive XC grid with tolerance %e.\n",ftoler);
@@ -3364,7 +3390,7 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
 #endif
     for(size_t i=0;i<grids_.size();i++) {
       wrk_[ith].set_shell(grids_[i]);
-      grids_[i]=wrk_[ith].construct(P,ftoler/nrad[grids_[i].atind],x_func,c_func);
+      grids_[i]=wrk_[ith].construct(P,ftoler/nrad[grids_[i].atind],x_func,c_func,dens_basis);
     }
   }
 
@@ -3379,7 +3405,7 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
 
 }
 
-void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftoler, int x_func, int c_func) {
+void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftoler, int x_func, int c_func, const BasisSet * dens_basis) {
   // Add all atoms
   if(verbose_) {
     printf("Constructing adaptive XC grid with tolerance %e.\n",ftoler);
@@ -3431,7 +3457,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
 #endif
     for(size_t i=0;i<grids_.size();i++) {
       wrk_[ith].set_shell(grids_[i]);
-      grids_[i]=wrk_[ith].construct(Pa,Pb,ftoler/nrad[grids_[i].atind],x_func,c_func);
+      grids_[i]=wrk_[ith].construct(Pa,Pb,ftoler/nrad[grids_[i].atind],x_func,c_func,dens_basis);
     }
   }
 
@@ -4373,12 +4399,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // guess) the density is built from that basis on these points; the
       // XC matrix below is still assembled in the primary basis.
       Timer tp;
-      if(dens_basis) {
-        BFTable dtab(wrk_[ith].compute_bf_table(*dens_basis));
-        wrk_[ith].update_density(P, false, &dtab);
-      } else {
-        wrk_[ith].update_density(P);
-      }
+      wrk_[ith].update_density_from(P, dens_basis);
       // Update number of electrons
       Nel+=wrk_[ith].compute_Nel();
 
@@ -4429,13 +4450,15 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 }
 
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b, bool fock_a, bool fock_b) {
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b, bool fock_a, bool fock_b, const BasisSet * dens_basis) {
+  if(basis_b && dens_basis)
+    throw std::logic_error("eval_Fxc: basis_b and dens_basis are mutually exclusive.\n");
   // Clear Hamiltonian. Channel a is the primary basis; channel b is the
   // primary basis too in ordinary unrestricted DFT, or a second basis
   // (basis_b) for multicomponent (NEO) XC, where channel b is the proton
   // density and Hb is sized by the proton basis. Only the requested
   // matrices are built; without either, only the energy is computed.
-  const size_t Nb = basis_b ? basis_b->Nbf() : Pb.n_rows;
+  const size_t Nb = basis_b ? basis_b->Nbf() : basp_->Nbf();
   if(fock_a)
     Ha.zeros(basp_->Nbf(),basp_->Nbf());
   else
@@ -4484,16 +4507,24 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       wrk_[ith].form_grid();
 
       // Channel-b (proton) basis on these points, if a second basis is
-      // in play; otherwise channel b uses the primary basis.
+      // in play; otherwise channel b uses the primary basis. With
+      // dens_basis, both densities are evaluated in that basis but the
+      // matrices are assembled in the primary basis.
       BFTable dtab_b;
       const BFTable * tab_b = nullptr;
+      const BFTable * dtab_a = nullptr, * dtab_bd = nullptr;
       if(basis_b) {
         dtab_b = wrk_[ith].compute_bf_table(*basis_b);
         tab_b = &dtab_b;
+        dtab_bd = tab_b;
+      } else if(dens_basis) {
+        dtab_b = wrk_[ith].compute_bf_table(*dens_basis);
+        dtab_a = &dtab_b;
+        dtab_bd = &dtab_b;
       }
 
       // Update density
-      wrk_[ith].update_density(Pa,Pb,false,tab_b);
+      wrk_[ith].update_density(Pa,Pb,false,dtab_bd,dtab_a);
       // Update number of electrons
       Nel+=wrk_[ith].compute_Nel();
 
