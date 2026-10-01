@@ -958,6 +958,95 @@ void check_becke_weight_derivative() {
     throw std::runtime_error("check_becke_weight_derivative: analytic and finite-difference derivatives differ.\n");
 }
 
+void check_xc_force() {
+  // The XC nuclear force of DFTGrid (basis functions, grid points and
+  // partition weights moving with the nuclei) against the central
+  // difference of the XC energy at a fixed AO density matrix, for each
+  // functional family, restricted and unrestricted; and the
+  // translational sum rule.
+  BasisSet basis;
+  const double r[3][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}};
+  for(size_t inuc=0;inuc<3;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+    nuc.bsse=false;
+    nuc.symbol = inuc ? "H" : "O";
+    nuc.Z = inuc ? 1 : 8;
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    const double z[3]={inuc ? 5.0 : 30.0, inuc ? 1.0 : 5.0, inuc ? 0.25 : 1.0};
+    for(int am=0;am<=(inuc ? 1 : 2);am++)
+      for(int ip=0;ip<3;ip++) {
+        std::vector<contr_t> c(1);
+        c[0].z=z[ip]*(am+1);
+        c[0].c=1.0;
+        basis.add_shell(inuc, am, true, c, false);
+      }
+  }
+  basis.finalize();
+  const arma::mat R0(basis.nuclear_coords());
+
+  const arma::mat S(basis.overlap());
+  arma::arma_rng::set_seed(5);
+  auto density = [&](size_t nocc) {
+    arma::mat C(arma::randn<arma::mat>(S.n_rows, nocc));
+    C=C*arma::inv(arma::chol(C.t()*S*C));
+    return arma::mat(C*C.t());
+  };
+  const arma::mat Pa(density(5)), Pb(density(4));
+
+  struct func_t { const char * name; int x, c; };
+  const func_t funcs[] = {
+    {"lda", XC_LDA_X, XC_LDA_C_PW},
+    {"gga", XC_GGA_X_PBE, XC_GGA_C_PBE},
+    {"mgga_tau", XC_MGGA_X_TPSS, XC_MGGA_C_TPSS},
+    {"mgga_lapl", XC_MGGA_XC_CC06, 0},
+    {"mgga", XC_MGGA_X_BR89_EXPLICIT, XC_MGGA_C_TPSS},
+  };
+  const double h=1e-4;
+  for(const func_t & f : funcs)
+    for(bool pol : {false, true}) {
+      // XC energy with the nuclei at R
+      auto energy = [&](const arma::mat & R) {
+        BasisSet bas(basis);
+        bas.set_nuclear_coords(R);
+        DFTGrid grid(&bas, false);
+        grid.construct(40, 17, f.x, f.c);
+        arma::mat H, Hb;
+        double Exc, Nel;
+        if(pol)
+          grid.eval_Fxc(f.x, f.c, Pa, Pb, H, Hb, Exc, Nel);
+        else
+          grid.eval_Fxc(f.x, f.c, Pa+Pb, H, Exc, Nel);
+        return Exc;
+      };
+      DFTGrid grid(&basis, false);
+      grid.construct(40, 17, f.x, f.c);
+      const arma::vec F(pol ? grid.eval_force(f.x, f.c, Pa, Pb) : grid.eval_force(f.x, f.c, Pa+Pb));
+
+      arma::vec fd(F.n_elem);
+      for(size_t i=0;i<F.n_elem;i++) {
+        auto E = [&](double t) {
+          arma::mat R(R0);
+          R(i/3, i%3)+=t;
+          return energy(R);
+        };
+        const double d1=(E(h)-E(-h))/(2*h), d2=(E(0.5*h)-E(-0.5*h))/h;
+        fd(i)=-(4.0*d2-d1)/3.0;
+      }
+      // Translational invariance: the forces sum to zero in each direction
+      double sumrule=0.0;
+      for(int d=0;d<3;d++)
+        sumrule=std::max(sumrule, std::abs(arma::sum(F(arma::regspace<arma::uvec>(d, 3, F.n_elem-1)))));
+      const double d=arma::abs(F-fd).max()/arma::abs(fd).max();
+      printf("XC force %-9s %s: vs finite difference %.1e, translational sum %.1e (max force %.1e)\n", f.name, pol ? "u" : "r", d, sumrule, arma::abs(fd).max());
+      fflush(stdout);
+      if(d > 1e-6 || sumrule > 1e-8*arma::abs(fd).max())
+        throw std::runtime_error(std::string("check_xc_force: the ") + f.name + " force disagrees with the energy.\n");
+    }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -988,6 +1077,9 @@ int main(void) {
   // Nuclear derivative of the quadrature weights
   check_becke_weight_derivative();
   printf("Becke weight derivative OK.\n");
+  // XC forces with grid response
+  check_xc_force();
+  printf("XC forces OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection
