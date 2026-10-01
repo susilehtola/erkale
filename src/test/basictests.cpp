@@ -25,6 +25,8 @@
 #include "../eriworker.h"
 #include "../xyzutils.h"
 #include <xckernel.h>
+#include "../dftgrid.h"
+#include "../elements.h"
 
 #include <cstdio>
 #include <fstream>
@@ -609,6 +611,89 @@ void check_xckernel() {
   }
 }
 
+void check_becke_weight_derivative() {
+  // The analytic nuclear derivative of the Becke-Stratmann quadrature
+  // weights, against central differences: the quadrature of a smooth
+  // function attached to the points, which ride on their parent atoms,
+  // changes only through the weights.
+  BasisSet basis;
+  const double r[4][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}, {0.3, -1.9, 1.2}};
+  const int Z[4]={8, 1, 1, 7};
+  for(size_t inuc=0;inuc<4;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+    nuc.bsse=false;
+    nuc.symbol=element_symbols[Z[inuc]];
+    nuc.Z=Z[inuc];
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    std::vector<contr_t> c(1);
+    c[0].z=1.0;
+    c[0].c=1.0;
+    basis.add_shell(inuc, 0, true, c, false);
+  }
+  basis.finalize();
+  const arma::mat R0(basis.nuclear_coords());
+
+  // Smooth function of the position of the point relative to its atom
+  auto h = [](const arma::vec & d) {
+    return std::exp(-0.3*arma::dot(d,d))*(1.0 + 0.4*d(0) - 0.2*d(1)*d(2));
+  };
+  // Quadrature of h on a shell of atom A, and its weight derivative
+  auto shell = [&](const BasisSet & bas, size_t A, double rad, arma::vec & dQ) {
+    angshell_t sh;
+    sh.atind=A;
+    sh.cen=bas.nuclear_coords(A);
+    sh.R=rad;
+    sh.w=1.0;
+    sh.l=17;
+    sh.tol=0.0;
+    sh.np=0;
+    sh.nfunc=0;
+    AngularGrid grid;
+    grid.basis(bas);
+    grid.set_shell(sh);
+    grid.form_grid();
+    const std::vector<gridpoint_t> pts(grid.grid());
+    arma::vec hv(pts.size());
+    double Q=0.0;
+    for(size_t ip=0;ip<pts.size();ip++) {
+      hv(ip)=h(coords_to_vec(pts[ip].r-sh.cen));
+      Q+=pts[ip].w_*hv(ip);
+    }
+    dQ=grid.becke_weight_derivative()*hv;
+    return Q;
+  };
+
+  const double step=1e-4;
+  double maxd=0.0, maxref=0.0;
+  for(size_t A=0;A<4;A++)
+    for(double rad : {0.4, 1.0, 1.7, 2.8}) {
+      arma::vec dQ, dum;
+      shell(basis, A, rad, dQ);
+      arma::vec fd(dQ.n_elem);
+      for(size_t i=0;i<dQ.n_elem;i++) {
+        // Richardson-extrapolated central difference
+        auto Q = [&](double t) {
+          arma::mat Rt(R0);
+          Rt(i/3, i%3)+=t;
+          BasisSet bas(basis);
+          bas.set_nuclear_coords(Rt);
+          return shell(bas, A, rad, dum);
+        };
+        const double d1=(Q(step)-Q(-step))/(2*step), d2=(Q(0.5*step)-Q(-0.5*step))/step;
+        fd(i)=(4.0*d2-d1)/3.0;
+      }
+      maxd=std::max(maxd, arma::abs(dQ-fd).max());
+      maxref=std::max(maxref, arma::abs(fd).max());
+    }
+  printf("Becke weight derivative: max deviation %.1e (max derivative %.1e)\n", maxd, maxref);
+  fflush(stdout);
+  if(maxd > 1e-8*maxref)
+    throw std::runtime_error("check_becke_weight_derivative: analytic and finite-difference derivatives differ.\n");
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -631,6 +716,9 @@ int main(void) {
   // Vendored XC kernels
   check_xckernel();
   printf("libxckernel kernels OK.\n");
+  // Nuclear derivative of the quadrature weights
+  check_becke_weight_derivative();
+  printf("Becke weight derivative OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection

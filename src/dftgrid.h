@@ -394,6 +394,13 @@ class AngularGrid {
    * al. (2004) paper.
    */
   void becke_weights(double a=0.7);
+  /**
+   * Derivative of the weights of the points on the shell with respect
+   * to the nuclear coordinates (3 Nat x Npoints), through the
+   * partition (becke_weights): the weight class of the nuclear gradient
+   * of a quadrature. The points ride on their parent atom.
+   */
+  arma::mat becke_weight_derivative(double a=0.7) const;
   /// Compute Hirshfeld weight for grid points
   void hirshfeld_weights(const Hirshfeld & hirsh);
 
