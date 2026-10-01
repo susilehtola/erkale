@@ -614,9 +614,8 @@ int main_guarded(int argc, char **argv) {
     // Fock response to the transition densities D_b = L_b R_b^T + R_b L_b^T
     // in the symmetry blocks, for analytic Hessian-vector products. The
     // Coulomb and exact-exchange parts are linear in the density; the
-    // exchange of D follows from that of L+R and L-R. The XC part is a
-    // central difference of the XC potential alone.
-    const double xc_step = 1e-4;
+    // exchange of D follows from that of L+R and L-R. The XC part is the
+    // libxckernel second-derivative contraction.
     // AO coefficients (in the complex basis, if used) of columns given in
     // the blocks b0, ..., b0+X.size()-1
     std::function<arma::cx_mat(const std::vector<arma::mat> &, size_t)> ao_columns = [&](const std::vector<arma::mat> & B, size_t b0) {
@@ -657,13 +656,8 @@ int main_guarded(int argc, char **argv) {
         arma::cx_mat dK;
         transition(ao_columns(L, 0), ao_columns(R, 0), Dr, dK);
         arma::cx_mat dF = jk.calcJ(Dr) + 0.5*dK;
-        if(exc.active()) {
-          const arma::mat P = block_density(dm, 0);
-          arma::mat Vp, Vm;
-          exc.eval(P + xc_step*Dr, Vp);
-          exc.eval(P - xc_step*Dr, Vm);
-          dF += arma::cx_mat((Vp - Vm)/(2.0*xc_step), nofield);
-        }
+        if(exc.active())
+          dF += arma::cx_mat(exc.response(block_density(dm, 0), Dr), nofield);
         return to_blocks(dF, nofield);
       };
     else
@@ -675,12 +669,10 @@ int main_guarded(int argc, char **argv) {
         const arma::mat dJ = jk.calcJ(Dra + Drb);
         arma::cx_mat dFa = dJ + dKa, dFb = dJ + dKb;
         if(exc.active()) {
-          const arma::mat Pa = block_density(dm, 0), Pb = block_density(dm, X.size());
-          arma::mat Vpa, Vpb, Vma, Vmb;
-          exc.eval(Pa + xc_step*Dra, Pb + xc_step*Drb, Vpa, Vpb);
-          exc.eval(Pa - xc_step*Dra, Pb - xc_step*Drb, Vma, Vmb);
-          dFa += arma::cx_mat((Vpa - Vma)/(2.0*xc_step), nofield);
-          dFb += arma::cx_mat((Vpb - Vmb)/(2.0*xc_step), nofield);
+          arma::mat dVa, dVb;
+          exc.response(block_density(dm, 0), block_density(dm, X.size()), Dra, Drb, dVa, dVb);
+          dFa += arma::cx_mat(dVa, nofield);
+          dFb += arma::cx_mat(dVb, nofield);
         }
         std::vector<arma::mat> blocks = to_blocks(dFa, nofield);
         const std::vector<arma::mat> blocksb = to_blocks(dFb, nofield);

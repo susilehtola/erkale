@@ -24,6 +24,7 @@
 #include <armadillo>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 /**
  * Electronic exchange-correlation for the stand-alone SCF programs
@@ -132,6 +133,27 @@ class ElectronicXC {
       Vxcb.zeros(Pb.n_rows, Pb.n_cols);
     }
     return Exc;
+  }
+
+  /// Restricted: first-order change of the XC matrix at the density P
+  /// for the symmetric perturbation D
+  arma::mat response(const arma::mat & P, const arma::mat & D) {
+    if(!active())
+      return arma::zeros<arma::mat>(P.n_rows, P.n_cols);
+    return grid_.eval_Kxc(x_func_, c_func_, P, {D})[0];
+  }
+  /// Unrestricted: first-order change of the XC matrices at (Pa, Pb)
+  /// for the perturbation (Da, Db)
+  void response(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Da, const arma::mat & Db, arma::mat & dVa, arma::mat & dVb) {
+    if(!active()) {
+      dVa.zeros(Pa.n_rows, Pa.n_cols);
+      dVb.zeros(Pb.n_rows, Pb.n_cols);
+      return;
+    }
+    std::vector<arma::mat> Ka, Kb;
+    grid_.eval_Kxc(x_func_, c_func_, Pa, Pb, {Da}, {Db}, Ka, Kb);
+    dVa = Ka[0];
+    dVb = Kb[0];
   }
 };
 

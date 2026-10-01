@@ -2153,7 +2153,13 @@ namespace {
   }
 }
 
-AngularGrid::xck_coll_t AngularGrid::xck_collocation(const std::string & variant) const {
+AngularGrid::xck_coll_t AngularGrid::xck_collocation(const std::string & variant, const BFTable * tab) const {
+  const arma::mat & BF  = tab ? tab->bf      : bf_;
+  const arma::mat & BFx = tab ? tab->bf_x    : bf_x_;
+  const arma::mat & BFy = tab ? tab->bf_y    : bf_y_;
+  const arma::mat & BFz = tab ? tab->bf_z    : bf_z_;
+  const arma::mat & BFh = tab ? tab->bf_hess : bf_hess_;
+
   xck_coll_t coll;
   coll.order = xckernel_dispatch::chi_order("xck_" + xck_family() + "_" + variant);
   if(coll.order > 2)
@@ -2162,17 +2168,18 @@ AngularGrid::xck_coll_t AngularGrid::xck_collocation(const std::string & variant
   // The tower stores the grid index fastest, i.e. the transposes of the
   // (Nbf x Ngrid) tables here: components 1; x, y, z; xx, xy, xz, yy,
   // yz, zz
-  const size_t nbf(bf_.n_rows);
-  std::vector<arma::mat> comps({bf_});
+  const size_t nbf(BF.n_rows);
+  std::vector<arma::mat> comps({BF});
   if(coll.order >= 1) {
-    comps.push_back(bf_x_);
-    comps.push_back(bf_y_);
-    comps.push_back(bf_z_);
+    comps.push_back(BFx);
+    comps.push_back(BFy);
+    comps.push_back(BFz);
   }
   if(coll.order >= 2)
-    // bf_hess_ holds the row-major 3x3 Hessian of function f in rows 9f..9f+8
+    // The Hessian table holds the row-major 3x3 Hessian of function f in
+    // rows 9f..9f+8
     for(arma::uword c : {0, 1, 2, 4, 5, 8})
-      comps.push_back(strided_rows(bf_hess_, c, 9, nbf));
+      comps.push_back(strided_rows(BFh, c, 9, nbf));
   coll.chi.set_size(grid_.size(), comps.size()*nbf);
   for(size_t k=0;k<comps.size();k++)
     coll.chi.cols(k*nbf, (k+1)*nbf-1) = comps[k].t();
@@ -2213,17 +2220,24 @@ void AngularGrid::xck_ground_operands(std::map<std::string, arma::rowvec> & ops)
   }
 }
 
-void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const {
+void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops, const BFTable * tab) const {
+  const arma::mat  & BF  = tab ? tab->bf      : bf_;
+  const arma::mat  & BFx = tab ? tab->bf_x    : bf_x_;
+  const arma::mat  & BFy = tab ? tab->bf_y    : bf_y_;
+  const arma::mat  & BFz = tab ? tab->bf_z    : bf_z_;
+  const arma::mat  & BFh = tab ? tab->bf_hess : bf_hess_;
+  const arma::uvec & BFI = tab ? tab->bf_ind  : bf_ind_;
+
   // The gradient expressions below assume a symmetric matrix
-  arma::mat P(Px(bf_ind_,bf_ind_));
+  arma::mat P(Px(BFI,BFI));
   P = 0.5*(P + P.t());
-  const arma::mat Pvx(P*bf_);
+  const arma::mat Pvx(P*BF);
   const std::string sfx(spin + "_p1");
 
   // The perturbed density and its derivatives
-  ops["rho" + sfx] = arma::sum(Pvx % bf_, 0);
+  ops["rho" + sfx] = arma::sum(Pvx % BF, 0);
   if(do_gga_) {
-    const arma::mat * bfd[3]={&bf_x_, &bf_y_, &bf_z_};
+    const arma::mat * bfd[3]={&BFx, &BFy, &BFz};
     const std::string xyz[] = {"x", "y", "z"};
     std::vector<arma::mat> Pvd(3);
     for(int ic=0;ic<3;ic++) {
@@ -2231,29 +2245,33 @@ void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & sp
       ops["rho" + sfx + "_" + xyz[ic]] = 2.0 * arma::sum(Pvx % *bfd[ic], 0);
     }
     if(do_mgga_t_)
-      ops["tau" + sfx] = 0.5 * arma::sum(Pvd[0] % bf_x_ + Pvd[1] % bf_y_ + Pvd[2] % bf_z_, 0);
+      ops["tau" + sfx] = 0.5 * arma::sum(Pvd[0] % BFx + Pvd[1] % BFy + Pvd[2] % BFz, 0);
     if(do_mgga_l_) {
       // The diagonal second derivatives, from which the kernels form the
       // laplacian: rho_aa = 2 [(P chi) chi_aa + (P chi_a) chi_a]
-      const size_t nbf(bf_.n_rows);
+      const size_t nbf(BF.n_rows);
       const arma::uword cdiag[3]={0, 4, 8};
       for(int ic=0;ic<3;ic++) {
-        const arma::mat bfaa(strided_rows(bf_hess_, cdiag[ic], 9, nbf));
+        const arma::mat bfaa(strided_rows(BFh, cdiag[ic], 9, nbf));
         ops["rho" + sfx + "_" + xyz[ic] + xyz[ic]] = 2.0 * arma::sum(Pvx % bfaa + Pvd[ic] % *bfd[ic], 0);
       }
     }
   }
 }
 
-void AngularGrid::xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H) const {
+void AngularGrid::xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H, const BFTable * tab) const {
+  const arma::uvec & BFI = tab ? tab->bf_ind : bf_ind_;
+  // No functions of this basis on the batch: no contribution
+  if(!BFI.n_elem)
+    return;
   xckernel_dispatch::operands_t scal;
   for(const auto & kv : ops)
     scal[kv.first] = kv.second.memptr();
 
-  arma::mat Hw(bf_ind_.n_elem, bf_ind_.n_elem, arma::fill::zeros);
-  xckernel_dispatch::contract("xck_" + xck_family() + "_" + name, grid_.size(), bf_ind_.n_elem,
+  arma::mat Hw(BFI.n_elem, BFI.n_elem, arma::fill::zeros);
+  xckernel_dispatch::contract("xck_" + xck_family() + "_" + name, grid_.size(), BFI.n_elem,
                               {coll.chi.memptr(), coll.order}, scal, Hw.memptr());
-  H(bf_ind_,bf_ind_) += Hw;
+  H(BFI,BFI) += Hw;
 }
 
 void AngularGrid::eval_Fxc_xck(arma::mat & H) const {
@@ -2291,18 +2309,23 @@ void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::
   }
 }
 
-void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb) const {
+void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b) const {
   if(!polarized_)
     throw std::runtime_error("Refusing to compute unrestricted XC response with restricted density.\n");
+  // The kernels contract both channels with one collocation, except at
+  // LDA level where the matrix of a channel involves only its own basis
+  if(tab_b && do_gga_)
+    throw std::runtime_error("The XC response in two bases is only available for LDA functionals.\n");
 
   std::map<std::string, arma::rowvec> ops;
   xck_ground_operands(ops);
   const xck_coll_t coll(xck_collocation("ua_o2"));
+  const xck_coll_t coll_b(tab_b ? xck_collocation("ub_o2", tab_b) : xck_coll_t());
   for(size_t i=0;i<Pxa.size();i++) {
     xck_pert_operands(Pxa[i], "_a", ops);
-    xck_pert_operands(Pxb[i], "_b", ops);
+    xck_pert_operands(Pxb[i], "_b", ops, tab_b);
     xck_contract("ua_o2", coll, ops, Hxa[i]);
-    xck_contract("ub_o2", coll, ops, Hxb[i]);
+    xck_contract("ub_o2", tab_b ? coll_b : coll, ops, Hxb[i], tab_b);
   }
 }
 
@@ -4829,13 +4852,14 @@ std::vector<arma::mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat
   return Hx;
 }
 
-void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb) {
+void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b) {
   if(Pxa.size() != Pxb.size())
     throw std::logic_error("eval_Kxc: inconsistent numbers of alpha and beta perturbations.\n");
 
   const size_t Nbf(basp_->Nbf());
+  const size_t Nbf_b(basis_b ? basis_b->Nbf() : Nbf);
   Hxa.assign(Pxa.size(), arma::zeros<arma::mat>(Nbf,Nbf));
-  Hxb.assign(Pxb.size(), arma::zeros<arma::mat>(Nbf,Nbf));
+  Hxb.assign(Pxb.size(), arma::zeros<arma::mat>(Nbf_b,Nbf_b));
 
 #ifdef _OPENMP
   const int maxt=omp_get_max_threads();
@@ -4859,14 +4883,20 @@ void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma:
     for(size_t i=0;i<grids_.size();i++) {
       wrk_[ith].set_shell(grids_[i]);
       wrk_[ith].form_grid();
-      wrk_[ith].update_density(Pa,Pb);
+      BFTable dtab_b;
+      const BFTable * tab_b = nullptr;
+      if(basis_b) {
+        dtab_b = wrk_[ith].compute_bf_table(*basis_b);
+        tab_b = &dtab_b;
+      }
+      wrk_[ith].update_density(Pa,Pb,false,tab_b);
 
       wrk_[ith].init_xc(true);
       if(x_func>0)
         wrk_[ith].compute_xc(x_func,true,true);
       if(c_func>0)
         wrk_[ith].compute_xc(c_func,true,true);
-      wrk_[ith].eval_Kxc(Pxa,Pxb,Hath,Hbth);
+      wrk_[ith].eval_Kxc(Pxa,Pxb,Hath,Hbth,tab_b);
 
       wrk_[ith].free();
     }
