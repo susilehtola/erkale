@@ -61,6 +61,22 @@ inline double f_s(double mu, double a) {
   return 0.5*(1.0-f_p(f_p(f_q(mu,a))));
 }
 
+/* Derivatives of the partitioning functions */
+inline double df_p(double mu) {
+  return 1.5*(1.0-mu*mu);
+}
+
+inline double df_q(double mu, double a) {
+  if(mu<=-a || mu>=a)
+    return 0.0;
+  return df_p(mu/a)/a;
+}
+
+inline double df_s(double mu, double a) {
+  const double q(f_q(mu,a));
+  return -0.5*df_p(f_p(q))*df_p(q)*df_q(mu,a);
+}
+
 bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
   // Sort in decreasing order
   return lhs.d > rhs.d;
@@ -321,6 +337,91 @@ void AngularGrid::becke_weights(double a) {
     // The Becke weight is
     grid_[ip].w_*=atom_weight(info_.atind)/arma::sum(atom_weight);
   }
+}
+
+arma::mat AngularGrid::becke_weight_derivative(double a) const {
+  const size_t Nat=basp_->Nnuc();
+  const size_t A=info_.atind;
+  arma::mat dw(3*Nat, grid_.size(), arma::fill::zeros);
+  if(Nat<2)
+    return dw;
+
+  // Nuclear coordinates (3 x Nat) and distances
+  const arma::mat R(basp_->nuclear_coords().t());
+  const arma::mat nucdist(basp_->nuclear_distances());
+  // Points within this radius of their atom have unit weight, as in
+  // becke_weights
+  double Rin=DBL_MAX;
+  for(size_t i=0;i<Nat;i++)
+    if(i!=A && nucdist(A,i)<Rin)
+      Rin=nucdist(A,i);
+  const double scrthr=std::pow(0.5*(1-a)*Rin,2);
+
+  arma::vec dist(Nat), P(Nat);
+  arma::mat e(3,Nat), mu(Nat,Nat), s(Nat,Nat), ds(Nat,Nat), dP(3,Nat);
+  for(size_t ip=0;ip<grid_.size();ip++) {
+    const arma::vec r(coords_to_vec(grid_[ip].r));
+    if(arma::accu(arma::square(r-R.col(A))) < scrthr)
+      continue;
+
+    // Distances to and unit vectors from the nuclei
+    for(size_t c=0;c<Nat;c++) {
+      e.col(c)=r-R.col(c);
+      dist(c)=arma::norm(e.col(c));
+      e.col(c)/=dist(c);
+    }
+    // Cell functions s(mu_cd) and their derivatives
+    for(size_t c=0;c<Nat;c++)
+      for(size_t d=0;d<Nat;d++) {
+        if(c==d) {
+          s(c,d)=1.0;
+          ds(c,d)=0.0;
+          continue;
+        }
+        mu(c,d)=(dist(c)-dist(d))/nucdist(c,d);
+        s(c,d)=f_s(mu(c,d),a);
+        ds(c,d)=df_s(mu(c,d),a);
+      }
+    // Cell weights P_c = prod_{d != c} s(mu_cd)
+    for(size_t c=0;c<Nat;c++)
+      P(c)=arma::prod(s.row(c));
+    const double Z(arma::sum(P));
+    const double W(P(A)/Z);
+    if(W==0.0)
+      continue;
+    // Weight without the partition factor
+    const double w0(grid_[ip].w_/W);
+
+    // Nucleus b != A moves, the point stays: only the factors s(mu_cb)
+    // and s(mu_bd) depend on R_b. Where a factor vanishes, so does its
+    // derivative, and P_c = 0 has no derivative.
+    for(size_t b=0;b<Nat;b++) {
+      if(b==A)
+        continue;
+      dP.zeros();
+      for(size_t c=0;c<Nat;c++) {
+        if(P(c)==0.0)
+          continue;
+        if(c==b) {
+          // d mu_bd / d R_b = -e_b / R_bd - mu_bd (R_b - R_d) / R_bd^2
+          for(size_t d=0;d<Nat;d++)
+            if(d!=b)
+              dP.col(c)+=P(c)*ds(b,d)/s(b,d)*(-e.col(b)/nucdist(b,d) - mu(b,d)*(R.col(b)-R.col(d))/std::pow(nucdist(b,d),2));
+        } else {
+          // d mu_cb / d R_b = e_b / R_cb + mu_cb (R_c - R_b) / R_cb^2
+          dP.col(c)=P(c)*ds(c,b)/s(c,b)*(e.col(b)/nucdist(c,b) + mu(c,b)*(R.col(c)-R.col(b))/std::pow(nucdist(c,b),2));
+        }
+      }
+      dw.rows(3*b,3*b+2).col(ip)=w0*(dP.col(A)/Z - P(A)*arma::sum(dP,1)/(Z*Z));
+    }
+    // The point rides on its atom: moving everything leaves the weight
+    // unchanged
+    for(size_t b=0;b<Nat;b++)
+      if(b!=A)
+        dw.rows(3*A,3*A+2).col(ip)-=dw.rows(3*b,3*b+2).col(ip);
+  }
+
+  return dw;
 }
 
 void AngularGrid::hirshfeld_weights(const Hirshfeld & hirsh) {
