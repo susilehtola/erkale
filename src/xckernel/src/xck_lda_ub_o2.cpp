@@ -14,16 +14,19 @@ extern const int xck_lda_ub_o2_n_scal;
 const int xck_lda_ub_o2_n_scal = 5;
 extern const int xck_lda_ub_o2_n_fields;
 const int xck_lda_ub_o2_n_fields = 3;
+extern const int xck_lda_ub_o2_chi_order;
+const int xck_lda_ub_o2_chi_order = 0;
 
-/* The C ABI keeps one homogeneous scal list (all double);
- * fields come first, functional-derivative arrays last, split at
- * xck_lda_ub_o2_n_fields. */
-int xck_lda_ub_o2(int64_t npts, int64_t nbf,
-           const double* chi, const double* dchi,
-           const double* lapl_chi, const double* hess_chi,
-           const double* const* scal, double* out) {
+/* One homogeneous scal list (all double): the per-point tower
+ * operands first, the functional-derivative arrays from
+ * xck_lda_ub_o2_n_fields on. */
+int xck_lda_ub_o2(int64_t npts,
+    int64_t nbf,
+    const double* chi,
+    const double* const* scal,
+    double* out) {
     return xckernel::xck_lda_ub_o2_t<double, double>(
-        npts, nbf, chi, dchi, lapl_chi, hess_chi,
+        npts, nbf, chi,
         scal, scal + 3, out);
 }
 

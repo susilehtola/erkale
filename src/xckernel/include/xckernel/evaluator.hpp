@@ -114,6 +114,39 @@ XCK_HD inline void gemm_nt(int64_t n, int64_t k, const T* A, int64_t lda,
     }
 }
 
+/* A fixed linear combination of operands, formed once and then used like
+ * any other: dst(i,g) = sum_t wt[t] src[t](i,g), sources with row stride
+ * lds, dst with row stride bk. Forms the Laplacians the engine works with
+ * from the derivative-tower components the host passes. */
+template <typename T>
+XCK_HD inline void combine(int64_t bk, int64_t n, int nt, const T* const* src,
+                           const double* wt, int64_t lds, T* dst) {
+    for (int64_t i = 0; i < n; ++i) {
+        T* d = dst + i * bk;
+        const T* s0 = src[0] + i * lds;
+        for (int64_t g = 0; g < bk; ++g) d[g] = T(wt[0]) * s0[g];
+        for (int t = 1; t < nt; ++t) {
+            const T* st = src[t] + i * lds;
+            for (int64_t g = 0; g < bk; ++g) d[g] += T(wt[t]) * st[g];
+        }
+    }
+}
+
+/* Row-wise contraction: out(i) += sum_g A(i,g) B(i,g) -- the diagonal of
+ * gemm_nt, for kernels with one free basis index (Fock diagonals and
+ * nuclear-gradient rows). */
+template <typename T>
+XCK_HD inline void rowdot(int64_t n, int64_t k, const T* A, int64_t lda,
+                          const T* B, int64_t ldb, T* out) {
+    for (int64_t i = 0; i < n; ++i) {
+        const T* Ai = A + i * lda;
+        const T* Bi = B + i * ldb;
+        T s = T(0);
+        for (int64_t g = 0; g < k; ++g) s += Ai[g] * Bi[g];
+        out[i] += s;
+    }
+}
+
 #ifdef XCKERNEL_USE_BLAS
 namespace detail {
 inline bool blas_fits(int64_t n, int64_t k, int64_t lda, int64_t ldb) {

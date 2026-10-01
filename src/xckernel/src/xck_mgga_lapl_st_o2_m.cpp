@@ -3,15 +3,17 @@
 
 extern "C" {
 
-const char* xck_mgga_lapl_st_o2_m_scal_names[32] = {
+const char* xck_mgga_lapl_st_o2_m_scal_names[34] = {
     "w",
-    "grad_rho_a_x",
-    "grad_rho_a_y",
-    "grad_rho_a_z",
-    "grad_rho_a_p1_x",
-    "grad_rho_a_p1_y",
-    "grad_rho_a_p1_z",
-    "lapl_rho_a_p1",
+    "rho_a_x",
+    "rho_a_y",
+    "rho_a_z",
+    "rho_a_p1_x",
+    "rho_a_p1_y",
+    "rho_a_p1_z",
+    "rho_a_p1_xx",
+    "rho_a_p1_yy",
+    "rho_a_p1_zz",
     "rho_a_p1",
     "vsigma_0",
     "vsigma_1",
@@ -38,20 +40,23 @@ const char* xck_mgga_lapl_st_o2_m_scal_names[32] = {
     "v2sigmalapl_4",
 };
 extern const int xck_mgga_lapl_st_o2_m_n_scal;
-const int xck_mgga_lapl_st_o2_m_n_scal = 32;
+const int xck_mgga_lapl_st_o2_m_n_scal = 34;
 extern const int xck_mgga_lapl_st_o2_m_n_fields;
-const int xck_mgga_lapl_st_o2_m_n_fields = 9;
+const int xck_mgga_lapl_st_o2_m_n_fields = 11;
+extern const int xck_mgga_lapl_st_o2_m_chi_order;
+const int xck_mgga_lapl_st_o2_m_chi_order = 2;
 
-/* The C ABI keeps one homogeneous scal list (all double);
- * fields come first, functional-derivative arrays last, split at
- * xck_mgga_lapl_st_o2_m_n_fields. */
-int xck_mgga_lapl_st_o2_m(int64_t npts, int64_t nbf,
-           const double* chi, const double* dchi,
-           const double* lapl_chi, const double* hess_chi,
-           const double* const* scal, double* out) {
+/* One homogeneous scal list (all double): the per-point tower
+ * operands first, the functional-derivative arrays from
+ * xck_mgga_lapl_st_o2_m_n_fields on. */
+int xck_mgga_lapl_st_o2_m(int64_t npts,
+    int64_t nbf,
+    const double* chi,
+    const double* const* scal,
+    double* out) {
     return xckernel::xck_mgga_lapl_st_o2_m_t<double, double>(
-        npts, nbf, chi, dchi, lapl_chi, hess_chi,
-        scal, scal + 9, out);
+        npts, nbf, chi,
+        scal, scal + 11, out);
 }
 
 } // extern C
