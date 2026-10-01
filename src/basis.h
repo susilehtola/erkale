@@ -510,6 +510,9 @@ public:
                       arma::mat & lgval,
                       bool do_grad, bool do_lapl,
                       bool do_hess, bool do_lgrad) const;
+  /// Evaluate the Cartesian derivative tower of shell ish at (x,y,z)
+  /// through the given order (see GaussianShell::eval_tower)
+  void eval_tower(size_t ish, double x, double y, double z, int order, arma::mat & out) const;
 
   /// Print out basis set
   void print(bool verbose=false) const;
@@ -773,6 +776,13 @@ public:
                       arma::mat & lgval,
                       bool do_grad, bool do_lapl,
                       bool do_hess, bool do_lgrad) const;
+  /**
+   * Evaluate the Cartesian derivative tower of the functions at
+   * (x,y,z) through the given order: out is (Nbf, Ncomp) with the
+   * components 1, x, y, z, xx, xy, xz, yy, yz, zz, xxx, xxy, ... (the
+   * powers of x decreasing, then those of y; PySCF's eval_ao order).
+   */
+  void eval_tower(double x, double y, double z, int order, arma::mat & out) const;
 
   /// Norms of the functions of the shell in ERKALE's normalization,
   /// evaluated in closed form: the functions sit on a single center, so

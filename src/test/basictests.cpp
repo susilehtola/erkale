@@ -24,8 +24,12 @@
 #include "../cintenv.h"
 #include "../eriworker.h"
 #include "../xyzutils.h"
+#include "../dftgrid.h"
+#include "../xcfunctional.h"
+#include "../xckernel_dispatch.h"
 #include <xckernel.h>
 
+#include <array>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -607,6 +611,216 @@ void check_xckernel() {
       throw std::runtime_error("check_xckernel: GGA diagonal kernel failed.\n");
     check(diag, arma::diagvec(ref), "GGA Fock diagonal");
   }
+  // The dispatcher must refuse a missing operand (here vsigma) and a
+  // collocation tower of too low an order, and otherwise match the
+  // direct call
+  {
+    xckernel_dispatch::operands_t ops;
+    ops["w"]=w.memptr();
+    ops["rho_x"]=grho.colptr(0);
+    ops["rho_y"]=grho.colptr(1);
+    ops["rho_z"]=grho.colptr(2);
+    ops["vrho"]=vrho.memptr();
+    arma::mat out(nbf, nbf, arma::fill::zeros);
+    auto refused = [&](int order) {
+      try {
+        xckernel_dispatch::contract("xck_gga_r_o1", ng, nbf, {chi.memptr(), order}, ops, out.memptr());
+      } catch(std::logic_error &) {
+        return true;
+      }
+      return false;
+    };
+    if(!refused(1))
+      throw std::runtime_error("check_xckernel: a kernel ran without its vsigma operand.\n");
+    ops["vsigma"]=vsigma.memptr();
+    if(!refused(0))
+      throw std::runtime_error("check_xckernel: a GGA kernel ran without basis-function gradients.\n");
+    out.zeros();
+    xckernel_dispatch::contract("xck_gga_r_o1", ng, nbf, {chi.memptr(), 1}, ops, out.memptr());
+    arma::mat direct(nbf, nbf, arma::fill::zeros);
+    const double * scal[6]={w.memptr(), grho.colptr(0), grho.colptr(1), grho.colptr(2), vrho.memptr(), vsigma.memptr()};
+    xck_gga_r_o1(ng, nbf, chi.memptr(), scal, direct.memptr());
+    check(out, direct, "dispatched GGA Fock matrix");
+  }
+}
+
+/// Relative difference of two matrices
+static double reldiff(const arma::mat & a, const arma::mat & b) {
+  return arma::abs(a-b).max()/arma::abs(b).max();
+}
+
+void check_xckernel_dftgrid() {
+  // The libxckernel path of DFTGrid on a water-like molecule with a
+  // random density, for each functional family: the order-1 kernels must
+  // reproduce the hand-written XC matrices, and the order-2 response
+  // must equal the central finite difference of the XC matrix.
+  BasisSet basis;
+  const double r[3][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}};
+  for(size_t inuc=0;inuc<3;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+    nuc.bsse=false;
+    nuc.symbol = inuc ? "H" : "O";
+    nuc.Z = inuc ? 1 : 8;
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    const double z[3]={inuc ? 5.0 : 30.0, inuc ? 1.0 : 5.0, inuc ? 0.25 : 1.0};
+    for(int am=0;am<=(inuc ? 1 : 2);am++)
+      for(int ip=0;ip<3;ip++) {
+        std::vector<contr_t> c(1);
+        c[0].z=z[ip]*(am+1);
+        c[0].c=1.0;
+        basis.add_shell(inuc, am, true, c, false);
+      }
+  }
+  basis.finalize();
+
+  // Random occupied orbitals, orthonormal in the overlap metric, and
+  // symmetric perturbations spanned by them: these decay like the
+  // density, so that the finite difference stays in the linear regime
+  // also in the tails
+  const arma::mat S(basis.overlap());
+  arma::arma_rng::set_seed(7);
+  auto orbitals = [&](size_t nocc) {
+    arma::mat C(arma::randn<arma::mat>(S.n_rows, nocc));
+    return arma::mat(C*arma::inv(arma::chol(C.t()*S*C)));
+  };
+  auto perturbation = [&](const arma::mat & C) {
+    arma::mat M(arma::randn<arma::mat>(C.n_cols, C.n_cols));
+    return arma::mat(C*(M+M.t())*C.t());
+  };
+  const arma::mat Ca(orbitals(5)), Cb(orbitals(4));
+  const arma::mat Pa(Ca*Ca.t()), Pb(Cb*Cb.t());
+  const arma::mat P(2.0*Pa);
+  const arma::mat Xa(perturbation(Ca)), Xb(perturbation(Cb));
+
+  struct func_t { const char * name; int x, c; };
+  const func_t funcs[] = {
+    {"lda", XC_LDA_X, XC_LDA_C_PW},
+    {"gga", XC_GGA_X_PBE, XC_GGA_C_PBE},
+    {"mgga_tau", XC_MGGA_X_TPSS, XC_MGGA_C_TPSS},
+    {"mgga_lapl", XC_MGGA_XC_CC06, 0},
+    {"mgga", XC_MGGA_X_BR89_EXPLICIT, XC_MGGA_C_TPSS},
+  };
+  // A larger step crosses Libxc's sigma <= 8 rho tau clamp in the
+  // single-orbital tails, where the functional is not differentiable
+  const double h=1e-5;
+  for(const func_t & f : funcs) {
+    DFTGrid grid(&basis, false);
+    grid.construct(40, 17, f.x, f.c);
+    double Exc, Nel;
+
+    // Order 1, restricted and unrestricted
+    arma::mat H, Hx, Ha, Hb, Hxa, Hxb;
+    grid.set_xckernel(false);
+    grid.eval_Fxc(f.x, f.c, P, H, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, Pa, Pb, Ha, Hb, Exc, Nel);
+    grid.set_xckernel(true);
+    grid.eval_Fxc(f.x, f.c, P, Hx, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, Pa, Pb, Hxa, Hxb, Exc, Nel);
+    grid.set_xckernel(false);
+    const double d1 = std::max(reldiff(Hx, H), std::max(reldiff(Hxa, Ha), reldiff(Hxb, Hb)));
+
+    // Order 2, restricted: dH/dP . Xa
+    const arma::mat K(grid.eval_Kxc(f.x, f.c, P, {Xa})[0]);
+    arma::mat Hp, Hm;
+    grid.eval_Fxc(f.x, f.c, P+h*Xa, Hp, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, P-h*Xa, Hm, Exc, Nel);
+    double d2 = reldiff(K, (Hp-Hm)/(2*h));
+
+    // Order 2, unrestricted: perturb both channels at once
+    std::vector<arma::mat> Ka, Kb;
+    grid.eval_Kxc(f.x, f.c, Pa, Pb, {Xa}, {Xb}, Ka, Kb);
+    arma::mat Hap, Hbp, Ham, Hbm;
+    grid.eval_Fxc(f.x, f.c, Pa+h*Xa, Pb+h*Xb, Hap, Hbp, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, Pa-h*Xa, Pb-h*Xb, Ham, Hbm, Exc, Nel);
+    d2 = std::max(d2, std::max(reldiff(Ka[0], (Hap-Ham)/(2*h)), reldiff(Kb[0], (Hbp-Hbm)/(2*h))));
+
+    printf("libxckernel %-9s: order 1 vs hand-written %.1e, order 2 vs finite difference %.1e\n", f.name, d1, d2);
+    fflush(stdout);
+    if(d1 > 1e-10 || d2 > 1e-6) {
+      std::ostringstream oss;
+      oss << "check_xckernel_dftgrid: the " << f.name << " kernels disagree with the reference.\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
+}
+
+void check_derivative_tower() {
+  // The Cartesian derivative tower of the basis functions
+  // (GaussianShell::eval_tower), each component of order k > 0 against
+  // the central difference of a component of order k-1, for spherical
+  // and cartesian, segmented and generally contracted shells
+  const int maxorder=3;
+  // Components in PySCF's order
+  std::vector<std::array<int,3>> comps;
+  for(int k=0;k<=maxorder;k++)
+    for(int a=k;a>=0;a--)
+      for(int b=k-a;b>=0;b--)
+        comps.push_back({a, b, k-a-b});
+  auto index = [&](int a, int b, int c) {
+    for(size_t i=0;i<comps.size();i++)
+      if(comps[i][0]==a && comps[i][1]==b && comps[i][2]==c)
+        return i;
+    throw std::logic_error("check_derivative_tower: no such component.\n");
+  };
+
+  BasisSet basis;
+  nucleus_t nuc;
+  nuc.ind=0;
+  nuc.r.x=0.1; nuc.r.y=-0.2; nuc.r.z=0.3;
+  nuc.bsse=false;
+  nuc.symbol="C";
+  nuc.Z=6;
+  nuc.Q=0;
+  basis.add_nucleus(nuc);
+  const double z[3]={3.0, 0.9, 0.35};
+  const double a[2][3]={{0.3, 0.5, 0.4}, {-0.2, 0.3, 0.8}};
+  for(int am=0;am<=4;am++)
+    for(int lm=0;lm<=1;lm++)
+      for(int ic=0;ic<(am==2 ? 2 : 1);ic++) {
+        std::vector<contr_t> c(3);
+        for(int i=0;i<3;i++) {
+          c[i].z=z[i];
+          c[i].c=a[ic][i];
+        }
+        basis.add_shell(0, am, lm, c, false);
+      }
+  basis.finalize();
+
+  const double r[3]={0.45, -0.7, 0.85}, h=1e-3;
+  double maxd=0.0;
+  for(size_t ish=0;ish<basis.Nshells();ish++) {
+    arma::mat t;
+    basis.eval_tower(ish, r[0], r[1], r[2], maxorder, t);
+    if(t.n_cols != comps.size())
+      throw std::runtime_error("check_derivative_tower: wrong number of components.\n");
+    for(size_t k=1;k<comps.size();k++) {
+      // Differentiate the lower component along the first axis with a
+      // nonzero power
+      int d=0;
+      while(comps[k][d]==0)
+        d++;
+      std::array<int,3> low(comps[k]);
+      low[d]--;
+      const size_t il(index(low[0], low[1], low[2]));
+      auto lower = [&](double s) {
+        double rs[3]={r[0], r[1], r[2]};
+        rs[d]+=s;
+        arma::mat ts;
+        basis.eval_tower(ish, rs[0], rs[1], rs[2], maxorder-1, ts);
+        return arma::vec(ts.col(il));
+      };
+      const arma::vec d1((lower(h)-lower(-h))/(2*h)), d2((lower(0.5*h)-lower(-0.5*h))/h);
+      const arma::vec fd((4.0*d2-d1)/3.0);
+      maxd=std::max(maxd, arma::abs(t.col(k)-fd).max()/std::max(1.0, arma::abs(fd).max()));
+    }
+  }
+  printf("Derivative tower vs finite differences: %.1e\n", maxd);
+  fflush(stdout);
+  if(maxd>1e-8)
+    throw std::runtime_error("check_derivative_tower: the derivative tower disagrees with finite differences.\n");
 }
 
 int main(void) {
@@ -628,9 +842,14 @@ int main(void) {
   // m labels of the functions for linear symmetry
   check_m_values();
   printf("Linear-symmetry m values OK.\n");
+  // Derivative tower of the basis functions
+  check_derivative_tower();
+  printf("Basis function derivative tower OK.\n");
   // Vendored XC kernels
   check_xckernel();
   printf("libxckernel kernels OK.\n");
+  check_xckernel_dftgrid();
+  printf("libxckernel DFTGrid path OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection
