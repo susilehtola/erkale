@@ -320,32 +320,15 @@ void SCF::set_fitting(const BasisSet & fitbasv) {
 void SCF::do_force(bool val) {
   doforce=val;
 
-  // Two-step Cholesky selects orbital-pair pivots discretely, and the
-  // selection changes abruptly as the nuclei move. That makes the CD
-  // energy surface non-smooth, so the analytic gradient carries a
-  // noise floor (~1e-3 in fmax) that no threshold tightening removes:
-  // a geometry optimisation stalls on step size, not force, and the
-  // optimised geometry is biased (~mA bond lengths, ~0.1-0.3 deg). The
-  // per-geometry forces are fine -- it is the geometry-to-geometry
-  // discontinuity that breaks optimisation. CDFit (a smooth
-  // atom-centred Gaussian aux basis) or a regular DF basis do not have
-  // this problem. is_cholesky() is true only for two-step CD; CDFit
-  // routes through DensityFit::fill and reports false.
-  if(val && densityfit && jk.is_cholesky()) {
-    static bool warned=false;
-    if(!warned) {
-      warned=true;
-      const char * msg =
-        "Warning: forces with two-step Cholesky (CholeskyAlgorithm TwoStep) are\n"
-        "unreliable -- the discrete, geometry-dependent pivot selection makes the\n"
-        "energy surface non-smooth, so geometry optimisation stalls and the optimised\n"
-        "geometry is biased. Use CholeskyAlgorithm CDFit or a Gaussian density-fitting\n"
-        "basis for gradient work; TwoStep is fine for single-point energies.\n";
-      fprintf(stderr, "%s", msg);
-      printf("%s", msg);
-      fflush(stdout);
-    }
-  }
+  // Two-step Cholesky selects orbital-pair pivots discretely, so the
+  // selection can change as the nuclei move and the CD energy surface has
+  // small steps. They are of the order of the decomposition error: on
+  // UHF H2O+/def2-SVP with the default CholeskyThr=1e-7, E_CD - E_exact
+  // is a smooth ~1e-8 Eh with steps of ~1e-10 Eh, and the analytic CD
+  // force differs from the exact one by ~1e-8 Eh/bohr. This is far below
+  // geometry convergence thresholds, and below the ~1e-7 Eh SCF energy
+  // noise of RI. (A ~1e-3 force floor previously attributed to the pivot
+  // selection was the unrestricted exchange force bug, since fixed.)
 }
 
 size_t SCF::get_maxiter() const {
