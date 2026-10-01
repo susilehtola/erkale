@@ -25,6 +25,7 @@
 #include "../eriworker.h"
 #include "../xyzutils.h"
 #include "../dftgrid.h"
+#include "../elements.h"
 #include "../xcfunctional.h"
 #include "../xckernel_dispatch.h"
 #include <xckernel.h>
@@ -652,9 +653,9 @@ static double reldiff(const arma::mat & a, const arma::mat & b) {
 
 void check_xckernel_dftgrid() {
   // The libxckernel path of DFTGrid on a water-like molecule with a
-  // random density, for each functional family: the order-1 kernels must
-  // reproduce the hand-written XC matrices, and the order-2 response
-  // must equal the central finite difference of the XC matrix. Channel
+  // random density, for each functional family: the XC matrix (order 1)
+  // must be the derivative of the XC energy, and the response (order 2)
+  // the derivative of the XC matrix. Channel
   // b is also put on a second, compact basis on the hydrogens, as the
   // protons are in multicomponent (NEO) calculations.
   BasisSet basis, pbasis;
@@ -748,32 +749,31 @@ void check_xckernel_dftgrid() {
     DFTGrid grid(&basis, false);
     grid.construct(40, 17, f.x, f.c);
     double Exc, Nel;
-    // XC matrices: restricted at P, unrestricted at (Pa, Pb), and with
-    // channel b in the second basis at (Pa, Pp)
-    auto fock_r = [&](const arma::mat & D) {
+    // XC energies and matrices: restricted at P, unrestricted at
+    // (Pa, Pb), and with channel b in the second basis at (Pa, Pp)
+    auto fock_r = [&](const arma::mat & D, double & E) {
       arma::mat H;
-      grid.eval_Fxc(f.x, f.c, D, H, Exc, Nel);
+      grid.eval_Fxc(f.x, f.c, D, H, E, Nel);
       return mats_t({H});
     };
-    auto fock_u = [&](const arma::mat & Da, const arma::mat & Db, const BasisSet * bb) {
+    auto fock_u = [&](const arma::mat & Da, const arma::mat & Db, const BasisSet * bb, double & E) {
       arma::mat Ha, Hb;
-      grid.eval_Fxc(f.x, f.c, Da, Db, Ha, Hb, Exc, Nel, bb);
+      grid.eval_Fxc(f.x, f.c, Da, Db, Ha, Hb, E, Nel, bb);
       return mats_t({Ha, Hb});
     };
-    auto all_fock = [&]() {
-      mats_t H(fock_r(P)), Hu(fock_u(Pa, Pb, nullptr)), Hp(fock_u(Pa, Pp, &pbasis));
-      H.insert(H.end(), Hu.begin(), Hu.end());
-      H.insert(H.end(), Hp.begin(), Hp.end());
-      return H;
-    };
 
-    // Order 1 against the hand-written matrices
-    grid.set_xckernel(false);
-    const mats_t Hhand(all_fock());
-    grid.set_xckernel(true);
-    const mats_t Hxck(all_fock());
-    grid.set_xckernel(false);
-    const double d1 = maxdiff(Hxck, Hhand);
+    // Order 1 against the derivative of the energy along the
+    // perturbations: dE/dt = tr(H X) summed over the channels
+    const mats_t H(fock_r(P, Exc)), Hu(fock_u(Pa, Pb, nullptr, Exc)), Hp(fock_u(Pa, Pp, &pbasis, Exc));
+    const arma::vec dE_an({arma::trace(H[0]*Xa), arma::trace(Hu[0]*Xa)+arma::trace(Hu[1]*Xb), arma::trace(Hp[0]*Xa)+arma::trace(Hp[1]*Xp)});
+    const mats_t dE(derivative([&](double t) {
+      double Er, Eu, Ep;
+      fock_r(P+t*Xa, Er);
+      fock_u(Pa+t*Xa, Pb+t*Xb, nullptr, Eu);
+      fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis, Ep);
+      return mats_t({arma::mat({Er, Eu, Ep})});
+    }));
+    const double d1 = arma::abs(dE_an - arma::vectorise(dE[0])).max()/arma::abs(dE_an).max();
 
     // Order 2 against the derivative of the XC matrices
     mats_t K(grid.eval_Kxc(f.x, f.c, P, {Xa}));
@@ -782,16 +782,16 @@ void check_xckernel_dftgrid() {
     grid.eval_Kxc(f.x, f.c, Pa, Pp, {Xa}, {Xp}, Kpa, Kpb, &pbasis);
     K.insert(K.end(), {Ka[0], Kb[0], Kpa[0], Kpb[0]});
     const mats_t dH(derivative([&](double t) {
-      mats_t H(fock_r(P+t*Xa)), Hu(fock_u(Pa+t*Xa, Pb+t*Xb, nullptr)), Hp(fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis));
-      H.insert(H.end(), Hu.begin(), Hu.end());
-      H.insert(H.end(), Hp.begin(), Hp.end());
-      return H;
+      mats_t Ht(fock_r(P+t*Xa, Exc)), Hut(fock_u(Pa+t*Xa, Pb+t*Xb, nullptr, Exc)), Hpt(fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis, Exc));
+      Ht.insert(Ht.end(), Hut.begin(), Hut.end());
+      Ht.insert(Ht.end(), Hpt.begin(), Hpt.end());
+      return Ht;
     }));
     const double d2 = maxdiff(K, dH);
 
-    printf("libxckernel %-9s: order 1 vs hand-written %.1e, order 2 vs finite difference %.1e\n", f.name, d1, d2);
+    printf("libxckernel %-9s: order 1 vs energy derivative %.1e, order 2 vs Fock derivative %.1e\n", f.name, d1, d2);
     fflush(stdout);
-    if(d1 > 1e-10 || d2 > 1e-7) {
+    if(d1 > 1e-7 || d2 > 1e-7) {
       std::ostringstream oss;
       oss << "check_xckernel_dftgrid: the " << f.name << " kernels disagree with the reference.\n";
       throw std::runtime_error(oss.str());
@@ -875,6 +875,178 @@ void check_derivative_tower() {
     throw std::runtime_error("check_derivative_tower: the derivative tower disagrees with finite differences.\n");
 }
 
+void check_becke_weight_derivative() {
+  // The analytic nuclear derivative of the Becke-Stratmann quadrature
+  // weights, against central differences: the quadrature of a smooth
+  // function attached to the points, which ride on their parent atoms,
+  // changes only through the weights.
+  BasisSet basis;
+  const double r[4][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}, {0.3, -1.9, 1.2}};
+  const int Z[4]={8, 1, 1, 7};
+  for(size_t inuc=0;inuc<4;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+    nuc.bsse=false;
+    nuc.symbol=element_symbols[Z[inuc]];
+    nuc.Z=Z[inuc];
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    std::vector<contr_t> c(1);
+    c[0].z=1.0;
+    c[0].c=1.0;
+    basis.add_shell(inuc, 0, true, c, false);
+  }
+  basis.finalize();
+  const arma::mat R0(basis.nuclear_coords());
+
+  // Smooth function of the position of the point relative to its atom
+  auto h = [](const arma::vec & d) {
+    return std::exp(-0.3*arma::dot(d,d))*(1.0 + 0.4*d(0) - 0.2*d(1)*d(2));
+  };
+  // Quadrature of h on a shell of atom A, and its weight derivative
+  auto shell = [&](const BasisSet & bas, size_t A, double rad, arma::vec & dQ) {
+    angshell_t sh;
+    sh.atind=A;
+    sh.cen=bas.nuclear_coords(A);
+    sh.R=rad;
+    sh.w=1.0;
+    sh.l=17;
+    sh.tol=0.0;
+    sh.np=0;
+    sh.nfunc=0;
+    AngularGrid grid;
+    grid.basis(bas);
+    grid.set_shell(sh);
+    grid.form_grid();
+    const std::vector<gridpoint_t> pts(grid.grid());
+    arma::vec hv(pts.size());
+    double Q=0.0;
+    for(size_t ip=0;ip<pts.size();ip++) {
+      hv(ip)=h(coords_to_vec(pts[ip].r-sh.cen));
+      Q+=pts[ip].w_*hv(ip);
+    }
+    dQ=grid.becke_weight_derivative()*hv;
+    return Q;
+  };
+
+  const double step=1e-4;
+  double maxd=0.0, maxref=0.0;
+  for(size_t A=0;A<4;A++)
+    for(double rad : {0.4, 1.0, 1.7, 2.8}) {
+      arma::vec dQ, dum;
+      shell(basis, A, rad, dQ);
+      arma::vec fd(dQ.n_elem);
+      for(size_t i=0;i<dQ.n_elem;i++) {
+        // Richardson-extrapolated central difference
+        auto Q = [&](double t) {
+          arma::mat Rt(R0);
+          Rt(i/3, i%3)+=t;
+          BasisSet bas(basis);
+          bas.set_nuclear_coords(Rt);
+          return shell(bas, A, rad, dum);
+        };
+        const double d1=(Q(step)-Q(-step))/(2*step), d2=(Q(0.5*step)-Q(-0.5*step))/step;
+        fd(i)=(4.0*d2-d1)/3.0;
+      }
+      maxd=std::max(maxd, arma::abs(dQ-fd).max());
+      maxref=std::max(maxref, arma::abs(fd).max());
+    }
+  printf("Becke weight derivative: max deviation %.1e (max derivative %.1e)\n", maxd, maxref);
+  fflush(stdout);
+  if(maxd > 1e-8*maxref)
+    throw std::runtime_error("check_becke_weight_derivative: analytic and finite-difference derivatives differ.\n");
+}
+
+void check_xc_force() {
+  // The XC nuclear force of DFTGrid (basis functions, grid points and
+  // partition weights moving with the nuclei) against the central
+  // difference of the XC energy at a fixed AO density matrix, for each
+  // functional family, restricted and unrestricted; and the
+  // translational sum rule.
+  BasisSet basis;
+  const double r[3][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}};
+  for(size_t inuc=0;inuc<3;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+    nuc.bsse=false;
+    nuc.symbol = inuc ? "H" : "O";
+    nuc.Z = inuc ? 1 : 8;
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    const double z[3]={inuc ? 5.0 : 30.0, inuc ? 1.0 : 5.0, inuc ? 0.25 : 1.0};
+    for(int am=0;am<=(inuc ? 1 : 2);am++)
+      for(int ip=0;ip<3;ip++) {
+        std::vector<contr_t> c(1);
+        c[0].z=z[ip]*(am+1);
+        c[0].c=1.0;
+        basis.add_shell(inuc, am, true, c, false);
+      }
+  }
+  basis.finalize();
+  const arma::mat R0(basis.nuclear_coords());
+
+  const arma::mat S(basis.overlap());
+  arma::arma_rng::set_seed(5);
+  auto density = [&](size_t nocc) {
+    arma::mat C(arma::randn<arma::mat>(S.n_rows, nocc));
+    C=C*arma::inv(arma::chol(C.t()*S*C));
+    return arma::mat(C*C.t());
+  };
+  const arma::mat Pa(density(5)), Pb(density(4));
+
+  struct func_t { const char * name; int x, c; };
+  const func_t funcs[] = {
+    {"lda", XC_LDA_X, XC_LDA_C_PW},
+    {"gga", XC_GGA_X_PBE, XC_GGA_C_PBE},
+    {"mgga_tau", XC_MGGA_X_TPSS, XC_MGGA_C_TPSS},
+    {"mgga_lapl", XC_MGGA_XC_CC06, 0},
+    {"mgga", XC_MGGA_X_BR89_EXPLICIT, XC_MGGA_C_TPSS},
+  };
+  const double h=1e-4;
+  for(const func_t & f : funcs)
+    for(bool pol : {false, true}) {
+      // XC energy with the nuclei at R
+      auto energy = [&](const arma::mat & R) {
+        BasisSet bas(basis);
+        bas.set_nuclear_coords(R);
+        DFTGrid grid(&bas, false);
+        grid.construct(40, 17, f.x, f.c);
+        arma::mat H, Hb;
+        double Exc, Nel;
+        if(pol)
+          grid.eval_Fxc(f.x, f.c, Pa, Pb, H, Hb, Exc, Nel);
+        else
+          grid.eval_Fxc(f.x, f.c, Pa+Pb, H, Exc, Nel);
+        return Exc;
+      };
+      DFTGrid grid(&basis, false);
+      grid.construct(40, 17, f.x, f.c);
+      const arma::vec F(pol ? grid.eval_force(f.x, f.c, Pa, Pb) : grid.eval_force(f.x, f.c, Pa+Pb));
+
+      arma::vec fd(F.n_elem);
+      for(size_t i=0;i<F.n_elem;i++) {
+        auto E = [&](double t) {
+          arma::mat R(R0);
+          R(i/3, i%3)+=t;
+          return energy(R);
+        };
+        const double d1=(E(h)-E(-h))/(2*h), d2=(E(0.5*h)-E(-0.5*h))/h;
+        fd(i)=-(4.0*d2-d1)/3.0;
+      }
+      // Translational invariance: the forces sum to zero in each direction
+      double sumrule=0.0;
+      for(int d=0;d<3;d++)
+        sumrule=std::max(sumrule, std::abs(arma::sum(F(arma::regspace<arma::uvec>(d, 3, F.n_elem-1)))));
+      const double d=arma::abs(F-fd).max()/arma::abs(fd).max();
+      printf("XC force %-9s %s: vs finite difference %.1e, translational sum %.1e (max force %.1e)\n", f.name, pol ? "u" : "r", d, sumrule, arma::abs(fd).max());
+      fflush(stdout);
+      if(d > 1e-6 || sumrule > 1e-8*arma::abs(fd).max())
+        throw std::runtime_error(std::string("check_xc_force: the ") + f.name + " force disagrees with the energy.\n");
+    }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -902,6 +1074,12 @@ int main(void) {
   printf("libxckernel kernels OK.\n");
   check_xckernel_dftgrid();
   printf("libxckernel DFTGrid path OK.\n");
+  // Nuclear derivative of the quadrature weights
+  check_becke_weight_derivative();
+  printf("Becke weight derivative OK.\n");
+  // XC forces with grid response
+  check_xc_force();
+  printf("XC forces OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection

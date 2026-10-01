@@ -191,8 +191,11 @@ struct BFTable {
   arma::uvec bf_ind, bf_potind;
   /// Function values (Nimportant x Npts) and derivatives
   arma::mat bf, bf_x, bf_y, bf_z, bf_lapl;
-  /// Hessian / gradient-of-laplacian (force terms; empty for a 2nd basis)
-  arma::mat bf_hess, bf_lx, bf_ly, bf_lz;
+  /// Hessian, (9 Nimportant x Npts) with the row-major 3x3 matrix of
+  /// function f in rows 9f..9f+8, and the third derivatives, (10
+  /// Nimportant x Npts) with xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz,
+  /// zzz of function f in rows 10f..10f+9
+  arma::mat bf_hess, bf_d3;
 };
 
 class AngularGrid {
@@ -237,14 +240,10 @@ class AngularGrid {
   /// Values of laplacians in grid points, (3*Nbf) * Ngrid
   arma::mat bf_lapl_;
 
-  /// Values of Hessians in grid points, (9*Nbf) * Ngrid; used for GGA force
+  /// Values of Hessians in grid points, (9*Nbf) * Ngrid (see BFTable)
   arma::mat bf_hess_;
-  /// Values of x gradient of laplacian; used for MGGA force
-  arma::mat bf_lx_;
-  /// Values of y gradient of laplacian; used for MGGA force
-  arma::mat bf_ly_;
-  /// Values of z gradient of laplacian; used for MGGA force
-  arma::mat bf_lz_;
+  /// Third derivatives in grid points, (10*Nbf) * Ngrid (see BFTable)
+  arma::mat bf_d3_;
 
   /// Density helper matrices: P_{uv} chi_v, and P_{uv} nabla(chi_v)
   arma::mat Pv, Pv_x, Pv_y, Pv_z_;
@@ -252,19 +251,16 @@ class AngularGrid {
   arma::mat Pav, Pav_x, Pav_y, Pav_z_;
   arma::mat Pbv, Pbv_x, Pbv_y, Pbv_z_;
 
-  /// Laplacian matrix; used for MGGA force
-  arma::mat Plapl, Palapl, Pblapl_;
-
   /// Is gradient needed?
   bool do_grad_;
   /// Is kinetic energy density needed?
   bool do_tau_;
   /// Is laplacian needed?
   bool do_lapl_;
-  /// Is Hessian needed? (For GGA force)
+  /// Are the second derivatives of the basis functions needed?
   bool do_hess_;
-  /// Is gradient of laplacian needed? (For MGGA force)
-  bool do_lgrad_;
+  /// Are the third derivatives of the basis functions needed?
+  bool do_d3_;
 
   /// Spin-polarized calculation?
   bool polarized_;
@@ -317,6 +313,10 @@ class AngularGrid {
     arma::mat chi;
     int order;
   };
+  /// Derivative components (Nbf x Npts) of the basis functions through
+  /// order: 1; x, y, z; xx, xy, xz, yy, yz, zz; xxx, xxy, ... in the
+  /// basis of tab if given
+  std::vector<arma::mat> bf_components(int order, const BFTable * tab=nullptr) const;
   /// Collocation tower through the order the kernels of variant
   /// (r_o1, ua_o2, ...) of the batch's family read, in the basis of tab
   /// if given
@@ -328,6 +328,24 @@ class AngularGrid {
   /// spin suffix "" (restricted), "_a" or "_b"; in the basis of tab if
   /// given
   void xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops, const BFTable * tab=nullptr) const;
+  /// Run kernel name on the batch, returning the matrix over the nbf
+  /// functions of the batch
+  arma::mat xck_local(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, size_t nbf) const;
+  /// Derivatives of the density P on the batch through order (and the
+  /// gradient of tau for tau functionals), named as tower components
+  /// with the spin suffix "" (restricted), "_a" or "_b"
+  void xck_density_tower(const arma::mat & P, int order, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const;
+  /// Collocation order of the gradient kernels of the batch's family
+  int xck_force_order() const;
+  /// Basis-class force of the gradient kernel variant (r, ua, ub) with
+  /// the density matrix D, added to f over the atoms of the functions
+  void xck_force_rows(const std::string & variant, const arma::mat & D, const std::map<std::string, arma::rowvec> & ops, arma::vec & f) const;
+  /// Grid-class force of the gradient kernel name, added to f on the
+  /// batch's atom
+  void xck_force_points(const std::string & name, const std::map<std::string, arma::rowvec> & ops, arma::vec & f) const;
+  /// Fock-matrix diagonal of variant (r, ua, ub) on the batch, over the
+  /// batch's functions
+  arma::vec xck_diag(const std::string & variant, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops) const;
   /// Run kernel name on the batch and accumulate into H (full basis,
   /// that of tab if given)
   void xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H, const BFTable * tab=nullptr) const;
@@ -360,7 +378,7 @@ class AngularGrid {
   /// of compute_bf, parameterised by basis / pot_shells / rung flags).
   /// Shared by compute_bf (primary, moved into the members) and
   /// compute_bf_table (a second basis).
-  BFTable build_table(const BasisSet & basis, const std::vector<size_t> & pot_shells_in, bool grad, bool lapl, bool hess, bool lgrad) const;
+  BFTable build_table(const BasisSet & basis, const std::vector<size_t> & pot_shells_in, bool grad, bool lapl, bool hess, bool d3) const;
   /// Collect weights from grid into w array
   void compute_weights();
 
@@ -390,7 +408,7 @@ class AngularGrid {
   /// Set necessity of computing gradient and laplacians, necessary for compute_bf!
   void set_grad_tau_lapl(bool grad, bool tau, bool lapl);
   /// Set necessity of computing Hessian and gradient of Laplacian
-  void set_hess_lgrad(bool hess, bool lgrad);
+  void set_hess_d3(bool hess, bool d3);
 
   /// Construct a fixed size grid
   angshell_t construct();
@@ -423,6 +441,13 @@ class AngularGrid {
    * al. (2004) paper.
    */
   void becke_weights(double a=0.7);
+  /**
+   * Derivative of the weights of the points on the shell with respect
+   * to the nuclear coordinates (3 Nat x Npoints), through the
+   * partition (becke_weights): the weight class of the nuclear gradient
+   * of a quadrature. The points ride on their parent atom.
+   */
+  arma::mat becke_weight_derivative(double a=0.7) const;
   /// Compute Hirshfeld weight for grid points
   void hirshfeld_weights(const Hirshfeld & hirsh);
 
@@ -442,9 +467,9 @@ class AngularGrid {
   arma::uvec screen_density() const;
 
   /// Update values of density, restricted calculation
-  void update_density(const arma::mat & P, bool lapl=false, const BFTable * tab=nullptr);
+  void update_density(const arma::mat & P, const BFTable * tab=nullptr);
   /// Update values of density, unrestricted calculation
-  void update_density(const arma::mat & Pa, const arma::mat & Pb, bool lapl=false, const BFTable * tab_b=nullptr);
+  void update_density(const arma::mat & Pa, const arma::mat & Pb, const BFTable * tab_b=nullptr);
   /// Update values of density, self-interaction correction
   void update_density(const arma::cx_vec & C);
 
@@ -524,15 +549,12 @@ class AngularGrid {
   /// Calculate the GGA and meta-GGA type terms for the derivative
   void eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & S, double thr) const;
 
-  /// Evaluate Fock matrix, restricted calculation
+  /// Evaluate Fock matrix (libxckernel order 1), restricted calculation
   void eval_Fxc(arma::mat & H) const;
-  /// Evaluate Fock matrix, unrestricted calculation. alpha and beta
-  /// select the channels that are assembled.
+  /// Evaluate Fock matrix (libxckernel order 1), unrestricted
+  /// calculation. alpha and beta select the channels that are
+  /// assembled; with tab_b, channel b is in that second basis.
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
-  /// Evaluate Fock matrix with the libxckernel order-1 kernels, restricted
-  void eval_Fxc_xck(arma::mat & H) const;
-  /// Evaluate Fock matrices with the libxckernel order-1 kernels, unrestricted
-  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
   /// XC response (libxckernel order 2) to the symmetric perturbation
   /// densities Px, accumulated into Hx; restricted. Needs compute_xc
   /// with fxc.
@@ -546,13 +568,20 @@ class AngularGrid {
   void eval_diag_Fxc(arma::vec & H) const;
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
   void eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const;
-  /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
-  void eval_diag_Fxc_SIC(arma::vec & H) const;
 
-  /// Evaluate force, restricted
-  arma::vec eval_force_r() const;
-  /// Evaluate force, unrestricted
-  arma::vec eval_force_u() const;
+  /**
+   * Nuclear forces (minus the gradient, 3 Nnuc) of the XC energy on the
+   * batch, from the libxckernel gradient kernels, after compute_xc for
+   * the density P (Pa, Pb) of update_density. The basis class moves the
+   * basis functions; the grid class the points of the batch with their
+   * atom; the weight class the Becke partition weights. The three add
+   * up to the gradient of the quadrature.
+   */
+  arma::vec eval_force_basis(const arma::mat & P) const;
+  arma::vec eval_force_basis(const arma::mat & Pa, const arma::mat & Pb) const;
+  arma::vec eval_force_grid(const arma::mat & P) const;
+  arma::vec eval_force_grid(const arma::mat & Pa, const arma::mat & Pb) const;
+  arma::vec eval_force_weight() const;
 
   /// Evaluate SAP
   void eval_SAP(const SAP & sap, arma::mat & Vo) const;
@@ -588,11 +617,12 @@ class DFTGrid {
   const BasisSet * basp_;
   /// Verbose operation?
   bool verbose_;
-  /// Assemble the XC matrices with libxckernel?
-  bool xckernel_=false;
 
   /// Prune shells with no points
   void prune_shells();
+  /// XC force of the restricted (one matrix) or unrestricted (two)
+  /// density, with grid response
+  arma::vec eval_force_any(int x_func, int c_func, const std::vector<arma::mat> & P);
 
  public:
   /// Dummy constructor
@@ -655,10 +685,6 @@ class DFTGrid {
   /// select the matrices that are built (the energy always is); a matrix
   /// that is not built is left empty.
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true);
-
-  /// Assemble the XC matrices of eval_Fxc with the libxckernel
-  /// order-1 kernels instead of the hand-written contractions
-  void set_xckernel(bool xck);
 
   /**
    * XC response kernel: the first-order change of the restricted XC
