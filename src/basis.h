@@ -500,16 +500,6 @@ public:
   arma::mat eval_hess(size_t ish, double x, double y, double z) const;
   /// Evaluate gradient of laplacian of shell ish at (x,y,z)
   arma::mat eval_laplgrad(size_t ish, double x, double y, double z) const;
-  /// Evaluate functions / gradient / laplacian / Hessian / gradient
-  /// of laplacian for shell ish at (x,y,z) in one pass.
-  void eval_bf_derivs(size_t ish, double x, double y, double z,
-                      arma::vec & fval,
-                      arma::mat & gval,
-                      arma::vec & lval,
-                      arma::mat & hval,
-                      arma::mat & lgval,
-                      bool do_grad, bool do_lapl,
-                      bool do_hess, bool do_lgrad) const;
   /// Evaluate the Cartesian derivative tower of shell ish at (x,y,z)
   /// through the given order (see GaussianShell::eval_tower)
   void eval_tower(size_t ish, double x, double y, double z, int order, arma::mat & out) const;

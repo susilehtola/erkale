@@ -1832,18 +1832,6 @@ void BasisSet::eval_tower(size_t ish, double x, double y, double z, int order, a
   shells_[ish].eval_tower(x, y, z, order, out);
 }
 
-void BasisSet::eval_bf_derivs(size_t ish, double x, double y, double z,
-                              arma::vec & fval,
-                              arma::mat & gval,
-                              arma::vec & lval,
-                              arma::mat & hval,
-                              arma::mat & lgval,
-                              bool do_grad, bool do_lapl,
-                              bool do_hess, bool do_lgrad) const {
-  shells_[ish].eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval,
-                             do_grad, do_lapl, do_hess, do_lgrad);
-}
-
 void BasisSet::convert_contractions() {
   for(size_t i=0;i<shells_.size();i++)
     shells_[i].convert_contraction();
