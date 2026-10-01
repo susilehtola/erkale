@@ -652,9 +652,9 @@ static double reldiff(const arma::mat & a, const arma::mat & b) {
 
 void check_xckernel_dftgrid() {
   // The libxckernel path of DFTGrid on a water-like molecule with a
-  // random density, for each functional family: the order-1 kernels must
-  // reproduce the hand-written XC matrices, and the order-2 response
-  // must equal the central finite difference of the XC matrix. Channel
+  // random density, for each functional family: the XC matrix (order 1)
+  // must be the derivative of the XC energy, and the response (order 2)
+  // the derivative of the XC matrix. Channel
   // b is also put on a second, compact basis on the hydrogens, as the
   // protons are in multicomponent (NEO) calculations.
   BasisSet basis, pbasis;
@@ -748,32 +748,31 @@ void check_xckernel_dftgrid() {
     DFTGrid grid(&basis, false);
     grid.construct(40, 17, f.x, f.c);
     double Exc, Nel;
-    // XC matrices: restricted at P, unrestricted at (Pa, Pb), and with
-    // channel b in the second basis at (Pa, Pp)
-    auto fock_r = [&](const arma::mat & D) {
+    // XC energies and matrices: restricted at P, unrestricted at
+    // (Pa, Pb), and with channel b in the second basis at (Pa, Pp)
+    auto fock_r = [&](const arma::mat & D, double & E) {
       arma::mat H;
-      grid.eval_Fxc(f.x, f.c, D, H, Exc, Nel);
+      grid.eval_Fxc(f.x, f.c, D, H, E, Nel);
       return mats_t({H});
     };
-    auto fock_u = [&](const arma::mat & Da, const arma::mat & Db, const BasisSet * bb) {
+    auto fock_u = [&](const arma::mat & Da, const arma::mat & Db, const BasisSet * bb, double & E) {
       arma::mat Ha, Hb;
-      grid.eval_Fxc(f.x, f.c, Da, Db, Ha, Hb, Exc, Nel, bb);
+      grid.eval_Fxc(f.x, f.c, Da, Db, Ha, Hb, E, Nel, bb);
       return mats_t({Ha, Hb});
     };
-    auto all_fock = [&]() {
-      mats_t H(fock_r(P)), Hu(fock_u(Pa, Pb, nullptr)), Hp(fock_u(Pa, Pp, &pbasis));
-      H.insert(H.end(), Hu.begin(), Hu.end());
-      H.insert(H.end(), Hp.begin(), Hp.end());
-      return H;
-    };
 
-    // Order 1 against the hand-written matrices
-    grid.set_xckernel(false);
-    const mats_t Hhand(all_fock());
-    grid.set_xckernel(true);
-    const mats_t Hxck(all_fock());
-    grid.set_xckernel(false);
-    const double d1 = maxdiff(Hxck, Hhand);
+    // Order 1 against the derivative of the energy along the
+    // perturbations: dE/dt = tr(H X) summed over the channels
+    const mats_t H(fock_r(P, Exc)), Hu(fock_u(Pa, Pb, nullptr, Exc)), Hp(fock_u(Pa, Pp, &pbasis, Exc));
+    const arma::vec dE_an({arma::trace(H[0]*Xa), arma::trace(Hu[0]*Xa)+arma::trace(Hu[1]*Xb), arma::trace(Hp[0]*Xa)+arma::trace(Hp[1]*Xp)});
+    const mats_t dE(derivative([&](double t) {
+      double Er, Eu, Ep;
+      fock_r(P+t*Xa, Er);
+      fock_u(Pa+t*Xa, Pb+t*Xb, nullptr, Eu);
+      fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis, Ep);
+      return mats_t({arma::mat({Er, Eu, Ep})});
+    }));
+    const double d1 = arma::abs(dE_an - arma::vectorise(dE[0])).max()/arma::abs(dE_an).max();
 
     // Order 2 against the derivative of the XC matrices
     mats_t K(grid.eval_Kxc(f.x, f.c, P, {Xa}));
@@ -782,16 +781,16 @@ void check_xckernel_dftgrid() {
     grid.eval_Kxc(f.x, f.c, Pa, Pp, {Xa}, {Xp}, Kpa, Kpb, &pbasis);
     K.insert(K.end(), {Ka[0], Kb[0], Kpa[0], Kpb[0]});
     const mats_t dH(derivative([&](double t) {
-      mats_t H(fock_r(P+t*Xa)), Hu(fock_u(Pa+t*Xa, Pb+t*Xb, nullptr)), Hp(fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis));
-      H.insert(H.end(), Hu.begin(), Hu.end());
-      H.insert(H.end(), Hp.begin(), Hp.end());
-      return H;
+      mats_t Ht(fock_r(P+t*Xa, Exc)), Hut(fock_u(Pa+t*Xa, Pb+t*Xb, nullptr, Exc)), Hpt(fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis, Exc));
+      Ht.insert(Ht.end(), Hut.begin(), Hut.end());
+      Ht.insert(Ht.end(), Hpt.begin(), Hpt.end());
+      return Ht;
     }));
     const double d2 = maxdiff(K, dH);
 
-    printf("libxckernel %-9s: order 1 vs hand-written %.1e, order 2 vs finite difference %.1e\n", f.name, d1, d2);
+    printf("libxckernel %-9s: order 1 vs energy derivative %.1e, order 2 vs Fock derivative %.1e\n", f.name, d1, d2);
     fflush(stdout);
-    if(d1 > 1e-10 || d2 > 1e-7) {
+    if(d1 > 1e-7 || d2 > 1e-7) {
       std::ostringstream oss;
       oss << "check_xckernel_dftgrid: the " << f.name << " kernels disagree with the reference.\n";
       throw std::runtime_error(oss.str());
