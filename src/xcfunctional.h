@@ -105,10 +105,12 @@ class XCFunctional {
             double * exc, double * vrho, double * vsigma,
             double * vlapl, double * vtau) const;
   /**
-   * Evaluate the second derivatives. out receives Libxc's arrays for the
-   * functional's rung, keyed by their Libxc names (v2rho2, v2rhosigma,
-   * ...), each stored ncomp x N with the spin component fastest, i.e.
-   * Libxc's flat layout. Throws if the functional has no fxc.
+   * Evaluate the second derivatives. out receives Libxc's arrays in the
+   * variables the functional depends on, keyed by their Libxc names
+   * (v2rho2, v2rhosigma, ...), each stored ncomp x N with the spin
+   * component fastest, i.e. Libxc's flat layout; the arrays of other
+   * variables vanish identically and are omitted. Throws if the
+   * functional has no fxc.
    */
   void eval_fxc(size_t N, const double * rho, const double * sigma,
                 const double * lapl, const double * tau,

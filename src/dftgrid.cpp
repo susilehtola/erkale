@@ -718,7 +718,7 @@ void AngularGrid::print_grid() const {
     printf("%5i % f % f % f %e\n",(int) ip+1,grid_[ip].r.x,grid_[ip].r.y,grid_[ip].r.z,grid_[ip].w_);
 }
 
-void AngularGrid::init_xc() {
+void AngularGrid::init_xc(bool fxc) {
   // Size of grid.
   const size_t N=grid_.size();
 
@@ -746,7 +746,32 @@ void AngularGrid::init_xc() {
     }
   }
 
+  // Second derivatives in the variables on the grid, Libxc's component
+  // counts; a functional that does not depend on a variable contributes
+  // nothing to its arrays
   v2_.clear();
+  if(fxc) {
+    auto alloc = [&](const char * name, size_t pol) {
+      v2_[name].zeros(polarized_ ? pol : 1, N);
+    };
+    alloc("v2rho2", 3);
+    if(do_grad_) {
+      alloc("v2rhosigma", 6);
+      alloc("v2sigma2", 6);
+    }
+    if(do_tau_) {
+      alloc("v2rhotau", 4);
+      alloc("v2sigmatau", 6);
+      alloc("v2tau2", 3);
+    }
+    if(do_lapl_) {
+      alloc("v2rholapl", 4);
+      alloc("v2sigmalapl", 6);
+      alloc("v2lapl2", 3);
+    }
+    if(do_tau_ && do_lapl_)
+      alloc("v2lapltau", 4);
+  }
 
   // Initial values
   do_gga_=false;
@@ -902,9 +927,8 @@ void AngularGrid::compute_xc(int func_id, bool pot, bool fxc) {
     for(const auto & kv : v2) {
       auto it = v2_.find(kv.first);
       if(it == v2_.end())
-        v2_[kv.first] = kv.second;
-      else
-        it->second += kv.second;
+        throw std::logic_error("The grid has no variables for the second derivative " + kv.first + "; call init_xc with fxc.\n");
+      it->second += kv.second;
     }
   }
 }
@@ -4751,7 +4775,7 @@ std::vector<arma::mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat
       wrk_[ith].form_grid();
       wrk_[ith].update_density(P);
 
-      wrk_[ith].init_xc();
+      wrk_[ith].init_xc(true);
       if(x_func>0)
         wrk_[ith].compute_xc(x_func,true,true);
       if(c_func>0)
@@ -4803,7 +4827,7 @@ void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       wrk_[ith].form_grid();
       wrk_[ith].update_density(Pa,Pb);
 
-      wrk_[ith].init_xc();
+      wrk_[ith].init_xc(true);
       if(x_func>0)
         wrk_[ith].compute_xc(x_func,true,true);
       if(c_func>0)

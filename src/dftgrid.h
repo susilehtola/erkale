@@ -456,8 +456,8 @@ class AngularGrid {
   /// Check potential data for NaNs
   void check_potential(FILE *f) const;
 
-  /// Initialize XC arrays
-  void init_xc();
+  /// Initialize XC arrays; fxc also the second-derivative arrays
+  void init_xc(bool fxc=false);
   /// Compute XC functional from density and add to total XC
   /// array. Pot toggles evaluation of potential, fxc that of the
   /// second derivatives (for eval_Kxc)

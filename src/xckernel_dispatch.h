@@ -30,9 +30,9 @@
  * Its per-point scalar operands are bound by the names the kernel
  * declares (w, grad_rho_x, rho_a_p1, vsigma_1, v2rhosigma_3, ...): the
  * caller fills an operand table and the dispatcher orders it into the
- * kernel's scal array. Missing functional-derivative arrays are taken
- * as zero (the kernels are linear in them); a missing field is an
- * error.
+ * kernel's scal array. Every operand the kernel declares, and every
+ * collocation array its family reads, must be supplied; anything
+ * missing is an error.
  */
 namespace xckernel_dispatch {
   /// Operand table: scalar operand name -> contiguous array of npts values
