@@ -68,6 +68,13 @@ public:
   /// caller binds the result to a local arma::mat and uses it within
   /// the call site.
   virtual arma::mat get_block(size_t ip) const = 0;
+  /// Metric still to be applied to the blocks. nullptr when the blocks
+  /// are final, B = X^T (a|mu nu); otherwise the blocks hold the raw
+  /// (a|mu nu) of naux() rows, and the consumer applies X^T to the
+  /// auxiliary index of the quantities it contracts the blocks into.
+  /// Direct density fitting uses the latter: applying X to every block
+  /// would cost O(Naux^2) per block and per occupied orbital.
+  virtual const arma::mat * metric() const { return nullptr; }
 };
 
 /// Holds the (Nbf, Naux, shellpairs, firsts, sizes) descriptor every
@@ -151,9 +158,10 @@ public:
 /**
  * Direct-mode block source for density fitting: each get_block(ip)
  * call computes the (alpha | mu nu) three-center integrals for the
- * ip-th orbital shellpair on demand, returning an owning
- * (Naux x Nmu*Nnu) matrix. No precomputed (alpha | mu nu) storage --
- * the whole point of direct mode.
+ * ip-th orbital shellpair on demand, returning a (Naux x Nmu*Nnu)
+ * view. The blocks are raw; the metric half-inverse is reported by
+ * metric() for the consumer to apply. No precomputed (alpha | mu nu)
+ * storage -- the whole point of direct mode.
  *
  * Holds an internal per-thread ERIWorker cache so concurrent
  * get_block() calls from an outer `#pragma omp parallel` region
@@ -255,6 +263,9 @@ class DirectDFBlocks : public BTensorBlocksBase {
   /// Orbital and auxiliary shells, owned copies (cheap).
   std::vector<GaussianShell> orb_shells_;
   std::vector<GaussianShell> aux_shells_;
+  /// Half-inverse X of the aux metric, shape (Naux x Naux_indep),
+  /// reported by metric(); the blocks are raw.
+  arma::mat X_;
 
   /// Range separation
   double omega_, alpha_, beta_;
@@ -281,11 +292,13 @@ public:
                  std::vector<std::pair<size_t, size_t>> sizes,
                  std::vector<GaussianShell> orb_shells,
                  std::vector<GaussianShell> aux_shells,
+                 arma::mat X,
                  const CintEnv & cenv,
                  double omega, double alpha, double beta);
   ~DirectDFBlocks() override = default;
 
   arma::mat get_block(size_t ip) const override;
+  const arma::mat * metric() const override { return &X_; }
 
  private:
   ERIWorker * thread_eri() const;

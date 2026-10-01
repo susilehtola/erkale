@@ -658,12 +658,12 @@ class JKBackend {
     arma::mat   calcK_short(const arma::mat & C, const std::vector<double> & occ, const arma::mat & S) const override { return k_orb_short(C, occ, S); }
     arma::cx_mat calcK_short(const arma::cx_mat & C, const std::vector<double> & occ, const arma::mat & S) const override { return k_orb_short(C, occ, S); }
 
-    // DF/CD gradients: algebraic Coulomb (forceJ / forceJ_cholesky) plus the
+    // DF/CD gradients: algebraic Coulomb plus the
     // scaled exchange gradient. The short-range dfit_rs is filled by the SCF
     // (init_rs) before forces, as in the unscreened case.
     arma::vec formForce(const arma::mat & P, const arma::mat & C, const std::vector<double> & occ,
                         double kfull, double kshort, double omega, double /*tol*/) const override {
-      arma::vec f = dfit.is_cholesky() ? dfit.forceJ_cholesky(*basisp, P) : dfit.forceJ(P);
+      arma::vec f = dfit.forceJ(*basisp, P);
       if(kfull != 0.0) f += dfit.forceK(*basisp, C, occ, kfull);
       if(omega != 0.0) f += dfit_rs.forceK(*basisp, C, occ, kshort);
       return f;
@@ -672,7 +672,7 @@ class JKBackend {
                         const arma::mat & Ca, const arma::mat & Cb,
                         const std::vector<double> & occa, const std::vector<double> & occb,
                         double kfull, double kshort, double omega, double /*tol*/) const override {
-      arma::vec f = dfit.is_cholesky() ? dfit.forceJ_cholesky(*basisp, Ptot) : dfit.forceJ(Ptot);
+      arma::vec f = dfit.forceJ(*basisp, Ptot);
       // forceK is normalized to the restricted convention E_K = -(1/4) tr(P K)
       // with occupations 2. The spin-resolved exchange energy is
       // E_K = -(1/2) sum_s tr(P_s K_s) with occupations 1, so each spin

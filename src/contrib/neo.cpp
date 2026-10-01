@@ -335,6 +335,9 @@ int main_guarded(int argc, char **argv) {
   BasisSetLibrary fitlib;
   BasisSet dfitbas;
   DensityFit dfit, pfit;
+  // Protonic fit for the e-p Coulomb when FiniteProton gives pfit a metric
+  // of its own (density fitting only)
+  DensityFit pfit_ep;
   size_t Npairs_p=0, Npairs_e=0;
   bool direct=settings.get_bool("Direct");
   double fitthr=settings.get_double("FittingThreshold");
@@ -369,6 +372,9 @@ int main_guarded(int argc, char **argv) {
   // Gaussian aux basis; the shared-pivot Cholesky shares a pivot basis. Without
   // one, e-p is evaluated exactly from four-center integrals.
   const bool factorized_ep = density_fitting || shared_cholesky;
+  // Protonic fit sharing the fitting basis of dfit, for the factorized e-p
+  // Coulomb
+  DensityFit & pfit_cross = (density_fitting && finiteproton) ? pfit_ep : pfit;
 
   if(density_fitting) {
     fitlib.load_basis(settings.get_string("FittingBasis"));
@@ -381,12 +387,22 @@ int main_guarded(int argc, char **argv) {
     settings.set_bool("UseLM",uselm);
     }
 
-    if(finiteproton)
-      pfit.set_range_separation(omega, alpha, beta);
     Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
-    if(Sp.n_elem)
-      // density fitting also used for e-p terms
-      Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
+    if(Sp.n_elem) {
+      // Density fitting is also used for the e-p terms, which pass the
+      // expansion of one species to the other: the two fits must share the
+      // orthonormal fitting basis, i.e. the electronic metric half-inverse.
+      if(finiteproton) {
+        // The finite protonic charge distribution screens the
+        // interaction: the p-p terms are fitted in the metric of the
+        // screened operator, and the e-p terms in the electronic one.
+        pfit.set_range_separation(omega, alpha, beta);
+        Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
+        pfit_ep.set_range_separation(omega, alpha, beta);
+        pfit_ep.fill(pbasis,dfitbas,direct,intthr,dfit.metric_half_inverse());
+      } else
+        Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,dfit.metric_half_inverse());
+    }
 
     printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.Naux(),(int) (dfit.Naux()-dfit.Naux_indep()));
     if(Sp.n_elem>0 and dfit.Naux() != pfit.Naux())
@@ -667,7 +683,7 @@ int main_guarded(int argc, char **argv) {
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_factorized = [&](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
     // The product of the charges of the electron and of the particle
-    arma::mat J=-proton_charge*pfit.calcJ_vector(c);
+    arma::mat J=-proton_charge*pfit_cross.calcJ_vector(c);
     return J;
   };
   std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_exact = [&](const arma::mat & Pe) {
@@ -678,8 +694,8 @@ int main_guarded(int argc, char **argv) {
     return factorized_ep ? electron_proton_coulomb_factorized(Pe) : electron_proton_coulomb_exact(Pe);
   };
 
-  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_factorized = [&dfit, &pfit, proton_charge](const arma::mat & Pp) {
-    arma::vec c(pfit.compute_expansion(Pp));
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_factorized = [&dfit, &pfit_cross, proton_charge](const arma::mat & Pp) {
+    arma::vec c(pfit_cross.compute_expansion(Pp));
     // The product of the charges of the electron and of the particle
     arma::mat J=-proton_charge*dfit.calcJ_vector(c);
     return J;
