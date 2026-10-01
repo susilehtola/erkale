@@ -52,14 +52,20 @@ namespace xckernel_dispatch {
   bool has_kernel(const std::string & name);
   /// Collocation order the kernel reads
   int chi_order(const std::string & name);
+  /// Order of the density-contracted collocation a gradient kernel reads
+  int Dchi_order(const std::string & name);
 
-  /// Matrix (nbf x nbf) and diagonal (nbf) kernels: o1, o2, o1_diag
+  /// Matrix-valued kernels: o1, o2 (nbf x nbf), o1_diag (nbf), fg (3 x nbf x nbf)
   void contract(const std::string & name, int64_t npts, int64_t nbf, const tower_t & chi,
                 const operands_t & ops, double * out);
-  /// Basis-class gradient rows (3 x nbf): chi and Dchi = D chi, the
-  /// latter through one order below the collocation
+  /// Basis-class gradient rows (3 x nbf) of a symmetric density matrix
+  /// D: chi and Dchi = D chi
   void contract_g1(const std::string & name, int64_t npts, int64_t nbf, const tower_t & chi,
                    const tower_t & Dchi, const operands_t & ops, double * out);
+  /// Basis-class gradient rows (3 x nbf) of a general density matrix M
+  /// (complex orbitals in a real basis): Dchi = M chi and DTchi = M^T chi
+  void contract_g1c(const std::string & name, int64_t npts, int64_t nbf, const tower_t & chi,
+                    const tower_t & Dchi, const tower_t & DTchi, const operands_t & ops, double * out);
   /// Grid-class gradient (3 x npts)
   void contract_gg(const std::string & name, int64_t npts, const operands_t & ops, double * out);
 }
