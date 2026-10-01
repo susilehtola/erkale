@@ -2143,6 +2143,16 @@ std::string AngularGrid::xck_family() const {
   return "lda";
 }
 
+namespace {
+  /// Rows c, c+stride, ... of a table holding stride rows per function:
+  /// one component of each of the nbf functions
+  arma::mat strided_rows(const arma::mat & T, arma::uword c, arma::uword stride, size_t nbf) {
+    if(!nbf)
+      return arma::mat(0, T.n_cols);
+    return T.rows(arma::regspace<arma::uvec>(c, stride, stride*nbf-1));
+  }
+}
+
 AngularGrid::xck_coll_t AngularGrid::xck_collocation(const std::string & variant) const {
   xck_coll_t coll;
   coll.order = xckernel_dispatch::chi_order("xck_" + xck_family() + "_" + variant);
@@ -2162,7 +2172,7 @@ AngularGrid::xck_coll_t AngularGrid::xck_collocation(const std::string & variant
   if(coll.order >= 2)
     // bf_hess_ holds the row-major 3x3 Hessian of function f in rows 9f..9f+8
     for(arma::uword c : {0, 1, 2, 4, 5, 8})
-      comps.push_back(bf_hess_.rows(arma::regspace<arma::uvec>(c, 9, 9*nbf-1)));
+      comps.push_back(strided_rows(bf_hess_, c, 9, nbf));
   coll.chi.set_size(grid_.size(), comps.size()*nbf);
   for(size_t k=0;k<comps.size();k++)
     coll.chi.cols(k*nbf, (k+1)*nbf-1) = comps[k].t();
@@ -2228,7 +2238,7 @@ void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & sp
       const size_t nbf(bf_.n_rows);
       const arma::uword cdiag[3]={0, 4, 8};
       for(int ic=0;ic<3;ic++) {
-        const arma::mat bfaa(bf_hess_.rows(arma::regspace<arma::uvec>(cdiag[ic], 9, 9*nbf-1)));
+        const arma::mat bfaa(strided_rows(bf_hess_, cdiag[ic], 9, nbf));
         ops["rho" + sfx + "_" + xyz[ic] + xyz[ic]] = 2.0 * arma::sum(Pvx % bfaa + Pvd[ic] % *bfd[ic], 0);
       }
     }
