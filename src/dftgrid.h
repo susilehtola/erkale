@@ -532,14 +532,14 @@ class AngularGrid {
   /// Evaluate Fock matrix with the libxckernel order-1 kernels, restricted
   void eval_Fxc_xck(arma::mat & H) const;
   /// Evaluate Fock matrices with the libxckernel order-1 kernels, unrestricted
-  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true) const;
+  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
   /// XC response (libxckernel order 2) to the symmetric perturbation
   /// densities Px, accumulated into Hx; restricted. Needs compute_xc
   /// with fxc.
   void eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const;
   /// XC response to the perturbation densities (Pxa[i], Pxb[i]),
   /// accumulated into (Hxa[i], Hxb[i]); unrestricted. With tab_b,
-  /// channel b is in that second basis (LDA only).
+  /// channel b is in that second basis.
   void eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b=nullptr) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
@@ -668,8 +668,9 @@ class DFTGrid {
   std::vector<arma::mat> eval_Kxc(int x_func, int c_func, const arma::mat & P, const std::vector<arma::mat> & Px);
   /// XC response kernel, unrestricted: the change of (Ha, Hb) at (Pa, Pb)
   /// for each perturbation (Pxa[i], Pxb[i]). With basis_b, channel b is
-  /// in that basis as in eval_Fxc (multicomponent EPC); this is limited
-  /// to LDA functionals, whose kernels need no basis-function gradients.
+  /// in that basis as in eval_Fxc (multicomponent EPC). The matrix of a
+  /// channel involves only that channel's basis functions; the other
+  /// channel enters through its density and derivatives on the grid.
   void eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b=nullptr);
 
   /**

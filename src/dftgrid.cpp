@@ -2283,7 +2283,7 @@ void AngularGrid::eval_Fxc_xck(arma::mat & H) const {
   xck_contract("r_o1", xck_collocation("r_o1"), ops, H);
 }
 
-void AngularGrid::eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha, bool beta) const {
+void AngularGrid::eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha, bool beta, const BFTable * tab_b) const {
   if(!polarized_)
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
 
@@ -2293,7 +2293,7 @@ void AngularGrid::eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha, bool 
   if(alpha)
     xck_contract("ua_o1", coll, ops, Ha);
   if(beta)
-    xck_contract("ub_o1", coll, ops, Hb);
+    xck_contract("ub_o1", tab_b ? xck_collocation("ub_o1", tab_b) : coll, ops, Hb, tab_b);
 }
 
 void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const {
@@ -2312,11 +2312,6 @@ void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::
 void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b) const {
   if(!polarized_)
     throw std::runtime_error("Refusing to compute unrestricted XC response with restricted density.\n");
-  // The kernels contract both channels with one collocation, except at
-  // LDA level where the matrix of a channel involves only its own basis
-  if(tab_b && do_gga_)
-    throw std::runtime_error("The XC response in two bases is only available for LDA functionals.\n");
-
   std::map<std::string, arma::rowvec> ops;
   xck_ground_operands(ops);
   const xck_coll_t coll(xck_collocation("ua_o2"));
@@ -4773,9 +4768,8 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
         arma::mat & Hath(Ha);
         arma::mat & Hbth(Hb);
 #endif
-        // The kernels need both channels on the primary basis
-        if(xckernel_ && !tab_b)
-          wrk_[ith].eval_Fxc_xck(Hath,Hbth,fock_a,fock_b);
+        if(xckernel_)
+          wrk_[ith].eval_Fxc_xck(Hath,Hbth,fock_a,fock_b,tab_b);
         else
           wrk_[ith].eval_Fxc(Hath,Hbth,fock_a,fock_b,tab_b);
       }

@@ -282,7 +282,7 @@ int main_guarded(int argc, char **argv) {
   if(do_epc && (particle.q != 1.0 || particle.m != PROTON_MASS))
     throw std::runtime_error("EPCFunctional requires the quantum particle to be a proton.\n");
   ElectronicXC exc(basis, verbose);
-  exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"), do_epc);
+  exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"), epc_func);
   // The dump is a Hartree-Fock reference for post-SCF correlation, and its
   // verification rebuilds the Hartree-Fock energy
   if(settings.get_string("NEODump").size() && (exc.active() || do_epc))
