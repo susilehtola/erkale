@@ -19,6 +19,8 @@
 
 #include <armadillo>
 #include <cstddef>
+#include <map>
+#include <string>
 
 extern "C" {
 #include <xc.h>
@@ -55,6 +57,8 @@ class XCFunctional {
   bool mgga_tau_;
   /// Rung: meta-GGA using the density laplacian
   bool mgga_lapl_;
+  /// Spin-polarized (nspin=2) evaluation?
+  bool polarized_;
 
  public:
   /// Initialise functional func_id, polarized (nspin=2) or not.
@@ -82,6 +86,8 @@ class XCFunctional {
   bool is_mgga() const { return mgga_tau_ || mgga_lapl_; }
   /// Does the functional provide an energy density?
   bool has_exc() const;
+  /// Does the functional provide second derivatives?
+  bool has_fxc() const;
   /// Electron-proton correlation functional (LDA_C_EPC17/17_2/18_1/18_2)?
   bool is_epc() const;
   /// libxc functional id.
@@ -98,6 +104,15 @@ class XCFunctional {
             const double * lapl, const double * tau, bool pot,
             double * exc, double * vrho, double * vsigma,
             double * vlapl, double * vtau) const;
+  /**
+   * Evaluate the second derivatives. out receives Libxc's arrays for the
+   * functional's rung, keyed by their Libxc names (v2rho2, v2rhosigma,
+   * ...), each stored ncomp x N with the spin component fastest, i.e.
+   * Libxc's flat layout. Throws if the functional has no fxc.
+   */
+  void eval_fxc(size_t N, const double * rho, const double * sigma,
+                const double * lapl, const double * tau,
+                std::map<std::string, arma::mat> & out) const;
 };
 
 #endif

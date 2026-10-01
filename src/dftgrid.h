@@ -21,6 +21,9 @@
 #include "global.h"
 #include "basis.h"
 #include "sap.h"
+
+#include <map>
+#include <string>
 class Hirshfeld;
 
 /// Screen out points with Becke weights smaller than 1e-8 * tol
@@ -302,6 +305,25 @@ class AngularGrid {
   arma::mat vlapl_;
   /// Functional derivative of energy wrt kinetic energy density
   arma::mat vtau_;
+  /// Second functional derivatives (x+c), keyed by Libxc name, in
+  /// Libxc's ncomp x N layout; filled by compute_xc with fxc set
+  std::map<std::string, arma::mat> v2_;
+
+  /// libxckernel family of the functional evaluated on the batch
+  std::string xck_family() const;
+  /// Collocation in libxckernel's layout (grid index fastest)
+  struct xck_coll_t {
+    arma::mat chi, dchi, lapl;
+  };
+  xck_coll_t xck_collocation() const;
+  /// Ground-state operands: weights, density gradients and the first
+  /// and second functional derivatives, by libxckernel name
+  void xck_ground_operands(std::map<std::string, arma::rowvec> & ops) const;
+  /// Perturbation-density operands of the (symmetric) AO matrix Px,
+  /// spin suffix "" (restricted), "_a" or "_b"
+  void xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const;
+  /// Run kernel name on the batch and accumulate into H (full basis)
+  void xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H) const;
 
   // VV10 stuff
   /// Density threshold
@@ -437,8 +459,9 @@ class AngularGrid {
   /// Initialize XC arrays
   void init_xc();
   /// Compute XC functional from density and add to total XC
-  /// array. Pot toggles evaluation of potential
-  void compute_xc(int func_id, bool pot);
+  /// array. Pot toggles evaluation of potential, fxc that of the
+  /// second derivatives (for eval_Kxc)
+  void compute_xc(int func_id, bool pot, bool fxc=false);
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
   /// Zero out energy
@@ -499,6 +522,17 @@ class AngularGrid {
   /// Evaluate Fock matrix, unrestricted calculation. alpha and beta
   /// select the channels that are assembled.
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
+  /// Evaluate Fock matrix with the libxckernel order-1 kernels, restricted
+  void eval_Fxc_xck(arma::mat & H) const;
+  /// Evaluate Fock matrices with the libxckernel order-1 kernels, unrestricted
+  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true) const;
+  /// XC response (libxckernel order 2) to the symmetric perturbation
+  /// densities Px, accumulated into Hx; restricted. Needs compute_xc
+  /// with fxc.
+  void eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const;
+  /// XC response to the perturbation densities (Pxa[i], Pxb[i]),
+  /// accumulated into (Hxa[i], Hxb[i]); unrestricted
+  void eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
@@ -546,6 +580,8 @@ class DFTGrid {
   const BasisSet * basp_;
   /// Verbose operation?
   bool verbose_;
+  /// Assemble the XC matrices with libxckernel?
+  bool xckernel_=false;
 
   /// Prune shells with no points
   void prune_shells();
@@ -611,6 +647,20 @@ class DFTGrid {
   /// select the matrices that are built (the energy always is); a matrix
   /// that is not built is left empty.
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true);
+
+  /// Assemble the XC matrices of eval_Fxc with the libxckernel
+  /// order-1 kernels instead of the hand-written contractions
+  void set_xckernel(bool xck);
+
+  /**
+   * XC response kernel: the first-order change of the restricted XC
+   * matrix at density P for each symmetric perturbation density Px[i],
+   * i.e. the second-derivative (libxckernel order-2) contraction.
+   */
+  std::vector<arma::mat> eval_Kxc(int x_func, int c_func, const arma::mat & P, const std::vector<arma::mat> & Px);
+  /// XC response kernel, unrestricted: the change of (Ha, Hb) at (Pa, Pb)
+  /// for each perturbation (Pxa[i], Pxb[i])
+  void eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb);
 
   /**
    * Compute Fock matrix, exchange-correlation energy and integrated

@@ -23,6 +23,7 @@
 #include "dftfuncs.h"
 #include "dftgrid.h"
 #include "xcfunctional.h"
+#include "xckernel_dispatch.h"
 #include "elements.h"
 #include "hirshfeld.h"
 #include "mathf.h"
@@ -388,6 +389,7 @@ void AngularGrid::free() {
   vlapl_.clear();
   tau_.clear();
   vtau_.clear();
+  v2_.clear();
 
   // Free VV10 stuff
   VV10_arr.clear();
@@ -744,6 +746,8 @@ void AngularGrid::init_xc() {
     }
   }
 
+  v2_.clear();
+
   // Initial values
   do_gga_=false;
   do_mgga_l_=false;
@@ -818,7 +822,7 @@ void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & 
   }
 }
 
-void AngularGrid::compute_xc(int func_id, bool pot) {
+void AngularGrid::compute_xc(int func_id, bool pot, bool fxc) {
   // Compute exchange-correlation functional through a libxc wrapper.
   XCFunctional xcf(func_id, polarized_);
 
@@ -886,6 +890,22 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
     if(xcf.is_gga() || xcf.is_mgga())
       vsigma_+=vsigma_wrk;
     vxc_+=vxc_wrk;
+  }
+
+  // Second derivatives, summed over the functionals like the potential
+  if(fxc) {
+    std::map<std::string, arma::mat> v2;
+    xcf.eval_fxc(N, rho_.memptr(), sigma_.memptr(),
+                 xcf.is_mgga_lapl() ? lapl_.memptr() : NULL,
+                 xcf.is_mgga_tau()  ? tau_.memptr()  : NULL,
+                 v2);
+    for(const auto & kv : v2) {
+      auto it = v2_.find(kv.first);
+      if(it == v2_.end())
+        v2_[kv.first] = kv.second;
+      else
+        it->second += kv.second;
+    }
   }
 }
 
@@ -2084,6 +2104,150 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 	}
       }
     }
+  }
+}
+
+std::string AngularGrid::xck_family() const {
+  if(do_mgga_t_ && do_mgga_l_)
+    return "mgga";
+  if(do_mgga_t_)
+    return "mgga_tau";
+  if(do_mgga_l_)
+    return "mgga_lapl";
+  if(do_gga_)
+    return "gga";
+  return "lda";
+}
+
+AngularGrid::xck_coll_t AngularGrid::xck_collocation() const {
+  // libxckernel stores the collocation grid index fastest, i.e. the
+  // transpose of the (Nbf x Ngrid) arrays here
+  xck_coll_t coll;
+  coll.chi = bf_.t();
+  if(do_gga_)
+    coll.dchi = arma::join_rows(bf_x_.t(), bf_y_.t(), bf_z_.t());
+  if(do_mgga_l_)
+    coll.lapl = bf_lapl_.t();
+  return coll;
+}
+
+void AngularGrid::xck_ground_operands(std::map<std::string, arma::rowvec> & ops) const {
+  ops["w"] = w_;
+
+  // Libxc derivative arrays: the unpolarized ones are bare, the
+  // polarized components get the Libxc component index as suffix
+  auto deriv = [&](const std::string & name, const arma::mat & v) {
+    if(polarized_)
+      for(size_t k=0;k<v.n_rows;k++)
+        ops[name + "_" + std::to_string(k)] = v.row(k);
+    else
+      ops[name] = v.row(0);
+  };
+  deriv("vrho", vxc_);
+  if(do_gga_)
+    deriv("vsigma", vsigma_);
+  if(do_mgga_t_)
+    deriv("vtau", vtau_);
+  if(do_mgga_l_)
+    deriv("vlapl", vlapl_);
+  for(const auto & kv : v2_)
+    deriv(kv.first, kv.second);
+
+  if(do_gga_) {
+    const std::string xyz[] = {"_x", "_y", "_z"};
+    for(int ic=0;ic<3;ic++) {
+      if(polarized_) {
+        ops["grad_rho_a" + xyz[ic]] = grho_.row(ic);
+        ops["grad_rho_b" + xyz[ic]] = grho_.row(3+ic);
+      } else
+        ops["grad_rho" + xyz[ic]] = grho_.row(ic);
+    }
+  }
+}
+
+void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const {
+  // The gradient expressions below assume a symmetric matrix
+  arma::mat P(Px(bf_ind_,bf_ind_));
+  P = 0.5*(P + P.t());
+  const arma::mat Pvx(P*bf_);
+  const std::string sfx(spin + "_p1");
+
+  ops["rho" + sfx] = arma::sum(Pvx % bf_, 0);
+  if(do_gga_) {
+    ops["grad_rho" + sfx + "_x"] = 2.0 * arma::sum(Pvx % bf_x_, 0);
+    ops["grad_rho" + sfx + "_y"] = 2.0 * arma::sum(Pvx % bf_y_, 0);
+    ops["grad_rho" + sfx + "_z"] = 2.0 * arma::sum(Pvx % bf_z_, 0);
+  }
+  if(do_mgga_t_ || do_mgga_l_) {
+    const arma::rowvec grad_v(arma::sum((P*bf_x_) % bf_x_ + (P*bf_y_) % bf_y_ + (P*bf_z_) % bf_z_, 0));
+    if(do_mgga_t_)
+      ops["tau" + sfx] = 0.5 * grad_v;
+    if(do_mgga_l_)
+      ops["lapl_rho" + sfx] = 2.0 * (arma::sum(Pvx % bf_lapl_, 0) + grad_v);
+  }
+}
+
+void AngularGrid::xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H) const {
+  xckernel_dispatch::operands_t scal;
+  for(const auto & kv : ops)
+    scal[kv.first] = kv.second.memptr();
+
+  arma::mat Hw(bf_ind_.n_elem, bf_ind_.n_elem, arma::fill::zeros);
+  xckernel_dispatch::contract("xck_" + xck_family() + "_" + name, grid_.size(), bf_ind_.n_elem,
+                              coll.chi.memptr(),
+                              coll.dchi.n_elem ? coll.dchi.memptr() : nullptr,
+                              coll.lapl.n_elem ? coll.lapl.memptr() : nullptr,
+                              scal, Hw.memptr());
+  H(bf_ind_,bf_ind_) += Hw;
+}
+
+void AngularGrid::eval_Fxc_xck(arma::mat & H) const {
+  if(polarized_)
+    throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
+
+  std::map<std::string, arma::rowvec> ops;
+  xck_ground_operands(ops);
+  xck_contract("r_o1", xck_collocation(), ops, H);
+}
+
+void AngularGrid::eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha, bool beta) const {
+  if(!polarized_)
+    throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
+
+  std::map<std::string, arma::rowvec> ops;
+  xck_ground_operands(ops);
+  const xck_coll_t coll(xck_collocation());
+  if(alpha)
+    xck_contract("ua_o1", coll, ops, Ha);
+  if(beta)
+    xck_contract("ub_o1", coll, ops, Hb);
+}
+
+void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const {
+  if(polarized_)
+    throw std::runtime_error("Refusing to compute restricted XC response with unrestricted density.\n");
+
+  std::map<std::string, arma::rowvec> ops;
+  xck_ground_operands(ops);
+  const xck_coll_t coll(xck_collocation());
+  for(size_t i=0;i<Px.size();i++) {
+    xck_pert_operands(Px[i], "", ops);
+    xck_contract("r_o2", coll, ops, Hx[i]);
+  }
+}
+
+void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb) const {
+  if(!polarized_)
+    throw std::runtime_error("Refusing to compute unrestricted XC response with restricted density.\n");
+
+  std::map<std::string, arma::rowvec> ops;
+  xck_ground_operands(ops);
+  const xck_coll_t coll(xck_collocation());
+  for(size_t i=0;i<Pxa.size();i++) {
+    xck_pert_operands(Pxa[i], "_a", ops);
+    xck_pert_operands(Pxb[i], "_b", ops);
+    xck_contract("ua_o2", coll, ops, Hxa[i]);
+    xck_contract("ub_o2", coll, ops, Hxb[i]);
   }
 }
 
@@ -4405,10 +4569,14 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // and construct the Fock matrices
 
 #ifdef _OPENMP
-      wrk_[ith].eval_Fxc(Hwrk[ith]);
+      arma::mat & Hth(Hwrk[ith]);
 #else
-      wrk_[ith].eval_Fxc(H);
+      arma::mat & Hth(H);
 #endif
+      if(xckernel_)
+        wrk_[ith].eval_Fxc_xck(Hth);
+      else
+        wrk_[ith].eval_Fxc(Hth);
 
       // Free memory
       wrk_[ith].free();
@@ -4518,10 +4686,17 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       // and construct the Fock matrices
       if(fock) {
 #ifdef _OPENMP
-        wrk_[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith],fock_a,fock_b,tab_b);
+        arma::mat & Hath(Hawrk[ith]);
+        arma::mat & Hbth(Hbwrk[ith]);
 #else
-        wrk_[ith].eval_Fxc(Ha,Hb,fock_a,fock_b,tab_b);
+        arma::mat & Hath(Ha);
+        arma::mat & Hbth(Hb);
 #endif
+        // The kernels need both channels on the primary basis
+        if(xckernel_ && !tab_b)
+          wrk_[ith].eval_Fxc_xck(Hath,Hbth,fock_a,fock_b);
+        else
+          wrk_[ith].eval_Fxc(Hath,Hbth,fock_a,fock_b,tab_b);
       }
 
       // Free memory
@@ -4544,6 +4719,108 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 
   Excv=Ex+Ec;
   Nelv=Nel;
+}
+
+void DFTGrid::set_xckernel(bool xck) {
+  xckernel_=xck;
+}
+
+std::vector<arma::mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & P, const std::vector<arma::mat> & Px) {
+  const size_t Nbf(basp_->Nbf());
+  std::vector<arma::mat> Hx(Px.size(), arma::zeros<arma::mat>(Nbf,Nbf));
+
+#ifdef _OPENMP
+  const int maxt=omp_get_max_threads();
+  std::vector< std::vector<arma::mat> > Hwrk(maxt, Hx);
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    const int ith=omp_get_thread_num();
+    std::vector<arma::mat> & Hth(Hwrk[ith]);
+#else
+    const int ith=0;
+    std::vector<arma::mat> & Hth(Hx);
+#endif
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids_.size();i++) {
+      wrk_[ith].set_shell(grids_[i]);
+      wrk_[ith].form_grid();
+      wrk_[ith].update_density(P);
+
+      wrk_[ith].init_xc();
+      if(x_func>0)
+        wrk_[ith].compute_xc(x_func,true,true);
+      if(c_func>0)
+        wrk_[ith].compute_xc(c_func,true,true);
+      wrk_[ith].eval_Kxc(Px,Hth);
+
+      wrk_[ith].free();
+    }
+  }
+
+#ifdef _OPENMP
+  for(int i=0;i<maxt;i++)
+    for(size_t j=0;j<Hx.size();j++)
+      Hx[j]+=Hwrk[i][j];
+#endif
+
+  return Hx;
+}
+
+void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb) {
+  if(Pxa.size() != Pxb.size())
+    throw std::logic_error("eval_Kxc: inconsistent numbers of alpha and beta perturbations.\n");
+
+  const size_t Nbf(basp_->Nbf());
+  Hxa.assign(Pxa.size(), arma::zeros<arma::mat>(Nbf,Nbf));
+  Hxb.assign(Pxb.size(), arma::zeros<arma::mat>(Nbf,Nbf));
+
+#ifdef _OPENMP
+  const int maxt=omp_get_max_threads();
+  std::vector< std::vector<arma::mat> > Hawrk(maxt, Hxa), Hbwrk(maxt, Hxb);
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    const int ith=omp_get_thread_num();
+    std::vector<arma::mat> & Hath(Hawrk[ith]);
+    std::vector<arma::mat> & Hbth(Hbwrk[ith]);
+#else
+    const int ith=0;
+    std::vector<arma::mat> & Hath(Hxa);
+    std::vector<arma::mat> & Hbth(Hxb);
+#endif
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids_.size();i++) {
+      wrk_[ith].set_shell(grids_[i]);
+      wrk_[ith].form_grid();
+      wrk_[ith].update_density(Pa,Pb);
+
+      wrk_[ith].init_xc();
+      if(x_func>0)
+        wrk_[ith].compute_xc(x_func,true,true);
+      if(c_func>0)
+        wrk_[ith].compute_xc(c_func,true,true);
+      wrk_[ith].eval_Kxc(Pxa,Pxb,Hath,Hbth);
+
+      wrk_[ith].free();
+    }
+  }
+
+#ifdef _OPENMP
+  for(int i=0;i<maxt;i++)
+    for(size_t j=0;j<Hxa.size();j++) {
+      Hxa[j]+=Hawrk[i][j];
+      Hxb[j]+=Hbwrk[i][j];
+    }
+#endif
 }
 
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & CW, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {

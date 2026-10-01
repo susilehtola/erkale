@@ -24,6 +24,8 @@
 #include "../cintenv.h"
 #include "../eriworker.h"
 #include "../xyzutils.h"
+#include "../dftgrid.h"
+#include "../xcfunctional.h"
 #include <xckernel.h>
 
 #include <cstdio>
@@ -609,6 +611,109 @@ void check_xckernel() {
   }
 }
 
+/// Relative difference of two matrices
+static double reldiff(const arma::mat & a, const arma::mat & b) {
+  return arma::abs(a-b).max()/arma::abs(b).max();
+}
+
+void check_xckernel_dftgrid() {
+  // The libxckernel path of DFTGrid on a water-like molecule with a
+  // random density, for each functional family: the order-1 kernels must
+  // reproduce the hand-written XC matrices, and the order-2 response
+  // must equal the central finite difference of the XC matrix.
+  BasisSet basis;
+  const double r[3][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}};
+  for(size_t inuc=0;inuc<3;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+    nuc.bsse=false;
+    nuc.symbol = inuc ? "H" : "O";
+    nuc.Z = inuc ? 1 : 8;
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    const double z[3]={inuc ? 5.0 : 30.0, inuc ? 1.0 : 5.0, inuc ? 0.25 : 1.0};
+    for(int am=0;am<=(inuc ? 1 : 2);am++)
+      for(int ip=0;ip<3;ip++) {
+        std::vector<contr_t> c(1);
+        c[0].z=z[ip]*(am+1);
+        c[0].c=1.0;
+        basis.add_shell(inuc, am, true, c, false);
+      }
+  }
+  basis.finalize();
+
+  // Random occupied orbitals, orthonormal in the overlap metric, and
+  // symmetric perturbations spanned by them: these decay like the
+  // density, so that the finite difference stays in the linear regime
+  // also in the tails
+  const arma::mat S(basis.overlap());
+  arma::arma_rng::set_seed(7);
+  auto orbitals = [&](size_t nocc) {
+    arma::mat C(arma::randn<arma::mat>(S.n_rows, nocc));
+    return arma::mat(C*arma::inv(arma::chol(C.t()*S*C)));
+  };
+  auto perturbation = [&](const arma::mat & C) {
+    arma::mat M(arma::randn<arma::mat>(C.n_cols, C.n_cols));
+    return arma::mat(C*(M+M.t())*C.t());
+  };
+  const arma::mat Ca(orbitals(5)), Cb(orbitals(4));
+  const arma::mat Pa(Ca*Ca.t()), Pb(Cb*Cb.t());
+  const arma::mat P(2.0*Pa);
+  const arma::mat Xa(perturbation(Ca)), Xb(perturbation(Cb));
+
+  struct func_t { const char * name; int x, c; };
+  const func_t funcs[] = {
+    {"lda", XC_LDA_X, XC_LDA_C_PW},
+    {"gga", XC_GGA_X_PBE, XC_GGA_C_PBE},
+    {"mgga_tau", XC_MGGA_X_TPSS, XC_MGGA_C_TPSS},
+    {"mgga_lapl", XC_MGGA_XC_CC06, 0},
+    {"mgga", XC_MGGA_X_BR89_EXPLICIT, XC_MGGA_C_TPSS},
+  };
+  // A larger step crosses Libxc's sigma <= 8 rho tau clamp in the
+  // single-orbital tails, where the functional is not differentiable
+  const double h=1e-5;
+  for(const func_t & f : funcs) {
+    DFTGrid grid(&basis, false);
+    grid.construct(40, 17, f.x, f.c);
+    double Exc, Nel;
+
+    // Order 1, restricted and unrestricted
+    arma::mat H, Hx, Ha, Hb, Hxa, Hxb;
+    grid.set_xckernel(false);
+    grid.eval_Fxc(f.x, f.c, P, H, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, Pa, Pb, Ha, Hb, Exc, Nel);
+    grid.set_xckernel(true);
+    grid.eval_Fxc(f.x, f.c, P, Hx, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, Pa, Pb, Hxa, Hxb, Exc, Nel);
+    grid.set_xckernel(false);
+    const double d1 = std::max(reldiff(Hx, H), std::max(reldiff(Hxa, Ha), reldiff(Hxb, Hb)));
+
+    // Order 2, restricted: dH/dP . Xa
+    const arma::mat K(grid.eval_Kxc(f.x, f.c, P, {Xa})[0]);
+    arma::mat Hp, Hm;
+    grid.eval_Fxc(f.x, f.c, P+h*Xa, Hp, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, P-h*Xa, Hm, Exc, Nel);
+    double d2 = reldiff(K, (Hp-Hm)/(2*h));
+
+    // Order 2, unrestricted: perturb both channels at once
+    std::vector<arma::mat> Ka, Kb;
+    grid.eval_Kxc(f.x, f.c, Pa, Pb, {Xa}, {Xb}, Ka, Kb);
+    arma::mat Hap, Hbp, Ham, Hbm;
+    grid.eval_Fxc(f.x, f.c, Pa+h*Xa, Pb+h*Xb, Hap, Hbp, Exc, Nel);
+    grid.eval_Fxc(f.x, f.c, Pa-h*Xa, Pb-h*Xb, Ham, Hbm, Exc, Nel);
+    d2 = std::max(d2, std::max(reldiff(Ka[0], (Hap-Ham)/(2*h)), reldiff(Kb[0], (Hbp-Hbm)/(2*h))));
+
+    printf("libxckernel %-9s: order 1 vs hand-written %.1e, order 2 vs finite difference %.1e\n", f.name, d1, d2);
+    fflush(stdout);
+    if(d1 > 1e-10 || d2 > 1e-6) {
+      std::ostringstream oss;
+      oss << "check_xckernel_dftgrid: the " << f.name << " kernels disagree with the reference.\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -631,6 +736,8 @@ int main(void) {
   // Vendored XC kernels
   check_xckernel();
   printf("libxckernel kernels OK.\n");
+  check_xckernel_dftgrid();
+  printf("libxckernel DFTGrid path OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection
