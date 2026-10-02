@@ -317,16 +317,20 @@ int main_guarded(int argc, char **argv) {
   printf("Electronic basis contains %i functions out of which %i are linearly dependent.\n",(int) X.n_rows, (int) (X.n_rows-X.n_cols));
   printf("Protonic basis contains %i functions out of which %i are linearly dependent.\n",(int) Xp.n_rows, (int) (Xp.n_rows-Xp.n_cols));
 
-  // Set up ERI evaluator data
-  double alpha = 1.0, beta = 0.0, omega = 0.0;
+  // Range separation (omega, alpha, beta) of the interactions involving a
+  // proton: the bare Coulomb operator for point protons, and the
+  // Gaussian-screened one for finite protons. These apply to the p-p and
+  // e-p integrals only; the electronic range separation of the functional
+  // is omega_electron etc. below.
+  double alpha_proton = 1.0, beta_proton = 0.0, omega_proton = 0.0;
   if(finiteproton) {
     const double fwhm = 1.5900e-5; // 0.8414 fm = 1.5900e-5 bohr
     double sigma = fwhm/sqrt(8.0*log(2.0));
 
-    alpha = 1.0;
-    beta = -1.0;
-    omega = 1.0/(sqrt(2.0)*sigma);
-    printf("Using finite protonic model with fwhm = %e bohr => omega = %e.\n",fwhm,omega);
+    alpha_proton = 1.0;
+    beta_proton = -1.0;
+    omega_proton = 1.0/(sqrt(2.0)*sigma);
+    printf("Using finite protonic model with fwhm = %e bohr => omega = %e.\n",fwhm,omega_proton);
   }
 
   // Coulomb/exchange machinery. The merged DensityFit class drives
@@ -396,9 +400,9 @@ int main_guarded(int argc, char **argv) {
         // The finite protonic charge distribution screens the
         // interaction: the p-p terms are fitted in the metric of the
         // screened operator, and the e-p terms in the electronic one.
-        pfit.set_range_separation(omega, alpha, beta);
+        pfit.set_range_separation(omega_proton, alpha_proton, beta_proton);
         Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
-        pfit_ep.set_range_separation(omega, alpha, beta);
+        pfit_ep.set_range_separation(omega_proton, alpha_proton, beta_proton);
         pfit_ep.fill(pbasis,dfitbas,direct,intthr,dfit.metric_half_inverse());
       } else
         Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,dfit.metric_half_inverse());
@@ -422,7 +426,7 @@ int main_guarded(int argc, char **argv) {
     } else {
       Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
       if(finiteproton)
-        pfit.set_range_separation(omega, alpha, beta);
+        pfit.set_range_separation(omega_proton, alpha_proton, beta_proton);
       // The protonic factor is needed by the Fock build only when vpp is on, but
       // the dump exports it regardless -- a correlation treatment needs B_p even
       // when the reference SCF omitted the proton-proton mean field.
@@ -433,9 +437,10 @@ int main_guarded(int argc, char **argv) {
 
   // Short-range electronic exchange of a range-separated functional,
   // fitted the same way as the full-range interaction
+  const double omega_electron = exc.omega(), alpha_electron = 0.0, beta_electron = 1.0;
   DensityFit dfit_sr;
   if(exc.kshort() != 0.0) {
-    dfit_sr.set_range_separation(exc.omega(), 0.0, 1.0);
+    dfit_sr.set_range_separation(omega_electron, alpha_electron, beta_electron);
     if(density_fitting)
       dfit_sr.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
     else
@@ -552,8 +557,8 @@ int main_guarded(int argc, char **argv) {
     // Get shellpairs
     double shtol=settings.get_double("IntegralThresh");
     bool verbose=false;
-    ScreeningData s_scr = source_basis.compute_screening(shtol,omega,alpha,beta,verbose);
-    ScreeningData t_scr = target_basis.compute_screening(shtol,omega,alpha,beta,verbose);
+    ScreeningData s_scr = source_basis.compute_screening(shtol,omega_proton,alpha_proton,beta_proton,verbose);
+    ScreeningData t_scr = target_basis.compute_screening(shtol,omega_proton,alpha_proton,beta_proton,verbose);
     const arma::mat & Qs = s_scr.Q;
     const arma::mat & Qt = t_scr.Q;
     const std::vector<eripair_t> & spairs = s_scr.shpairs;
@@ -577,7 +582,7 @@ int main_guarded(int argc, char **argv) {
     {
       // ERI worker. unique_ptr so a throw inside the loop doesn't
       // leak the allocation
-      auto eri_owner = make_eri_worker(cenv, omega, alpha, beta);
+      auto eri_owner = make_eri_worker(cenv, omega_proton, alpha_proton, beta_proton);
       ERIWorker *eri = eri_owner.get();
 
 #ifndef _OPENMP
@@ -1505,10 +1510,10 @@ int main_guarded(int argc, char **argv) {
 #endif
       neo_dump(neodump, settings.get_string("NEODumpIntegrals"), settings.get_bool("NEODumpVerify"),
                basis, dfit, restricted_e, Ce, occe_v, hcore_e,
-               pbasis, pfit, Cp_ao, occp, hcore_p,
+               pbasis, pfit, pfit_cross, Cp_ao, occp, hcore_p,
                Nel, (int) proton_indices.size(), proton_mass, proton_charge,
                Escf, Ecnucr,
-               factorized_ep, omega, alpha, beta, version);
+               factorized_ep, omega_proton, alpha_proton, beta_proton, version);
     }
   }
 
