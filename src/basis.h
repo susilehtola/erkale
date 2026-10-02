@@ -295,10 +295,20 @@ public:
    * Comput. 19, 6242 (2023): on each center, shells with l above
    * aux_lmax_keep(Z, l_obs, linc) are dropped. @a linc < 0 disables pruning.
    *
-   * @param thr   Cholesky / aux-pivot threshold (typical 1e-7).
-   * @param linc  lmax-pruning increment, or < 0 to keep all shells.
+   * When @a cobasis is given, its shells on each nucleus of this basis
+   * join the orbital shells there before the decomposition, so that the
+   * auxiliary basis spans the products within either basis as well as
+   * the cross products. This fits the densities of a multicomponent
+   * calculation (e.g. the electrons and quantum protons of erkale_neo)
+   * in one auxiliary basis. Every nucleus of @a cobasis must coincide
+   * with a nucleus of this basis.
+   *
+   * @param thr     Cholesky / aux-pivot threshold (typical 1e-7).
+   * @param linc    lmax-pruning increment, or < 0 to keep all shells.
+   * @param cobasis second orbital basis on (a subset of) the same centers,
+   *                or nullptr.
    */
-  BasisSet cholesky_aux_basis(double thr, int linc=-1) const;
+  BasisSet cholesky_aux_basis(double thr, int linc=-1, const BasisSet * cobasis=nullptr) const;
 
   /// Decontract basis set, m gives mapping from old functions to new ones
   BasisSet decontract(arma::mat & m) const;
