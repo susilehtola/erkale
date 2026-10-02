@@ -88,6 +88,8 @@ if(ERKALE_LIBXC_HAS_EPC)
 endif()
 # Multicomponent DFT with a range-separated hybrid for the electrons
 run_neo(neo_wb97x "-76.36052")
+# Density fitting in the automatic electron-proton auxiliary basis
+run_neo(neo_ri "-76.01543")
 
 # Linear symmetry in the complex basis, restricted and unrestricted DFT
 add_test(build_erkale_complex_orbs "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale_complex_orbs)

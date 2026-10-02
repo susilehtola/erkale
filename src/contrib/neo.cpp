@@ -129,6 +129,12 @@ int main_guarded(int argc, char **argv) {
   settings.add_bool("TrustRegion", "Finish the coupled SCF with second-order trust-region optimization (OpenTrustRegion)?", false);
   settings.add_bool("StabilityAnalysis", "Check the stability of the coupled solution, following instabilities if TrustRegion is used?", false);
 
+  // Fit electrons and protons by default in one automatic auxiliary basis
+  // formed from the union of the electronic and protonic basis sets on each
+  // center; a standard electronic fitting basis cannot represent the
+  // compact protonic densities
+  settings.set_string("FittingBasis","Auto");
+
   // Parse settings
   settings.parse(std::string(argv[1]),true);
   settings.print();
@@ -381,14 +387,27 @@ int main_guarded(int argc, char **argv) {
   DensityFit & pfit_cross = (density_fitting && finiteproton) ? pfit_ep : pfit;
 
   if(density_fitting) {
-    fitlib.load_basis(settings.get_string("FittingBasis"));
-    {
+    const std::string fitbasname(settings.get_string("FittingBasis"));
+    if(stricmp(fitbasname,"Auto")==0) {
+      // CD-derived auxiliary basis (Lehtola JCTC 17, 6886 (2021)) from the
+      // union of the electronic and protonic basis sets on each center, so
+      // that it spans the e-e, e-p and p-p products alike. Its accuracy is
+      // limited by the electronic basis on the proton centers, which should
+      // be at least of triple-zeta quality.
+      dfitbas=basis.cholesky_aux_basis(settings.get_double("CholeskyThr"), settings.get_int("FittingLmaxInc"), &pbasis);
+      printf("Auxiliary basis formed from the union of the electronic and protonic basis sets\n"
+             "(accurate for an electronic basis of at least triple-zeta quality).\n");
+      fflush(stdout);
+    } else if(stricmp(fitbasname,"AutoABS")==0) {
+      throw std::runtime_error("FittingBasis AutoABS fits only the Coulomb interaction, but erkale_neo needs exchange; use Auto or a named fitting basis.\n");
+    } else {
+      fitlib.load_basis(fitbasname);
       // Construct fitting basis
       bool uselm=settings.get_bool("UseLM");
       settings.set_bool("UseLM",true);
       construct_basis(dfitbas,basis.nuclei(),fitlib);
       dfitbas.coulomb_normalize();
-    settings.set_bool("UseLM",uselm);
+      settings.set_bool("UseLM",uselm);
     }
 
     Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
