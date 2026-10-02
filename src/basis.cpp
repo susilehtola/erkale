@@ -3384,7 +3384,27 @@ BasisSet BasisSet::exchange_fitting() const {
   return fit;
 }
 
-BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
+BasisSet BasisSet::cholesky_aux_basis(double thr, int linc, const BasisSet * cobasis) const {
+  // Nuclei of the cobasis on each nucleus of this basis
+  std::vector<std::vector<size_t>> conuc(nuclei_.size());
+  if(cobasis) {
+    for(size_t jnuc=0; jnuc<cobasis->Nnuc(); jnuc++) {
+      const coords_t rj(cobasis->nucleus(jnuc).r);
+      bool found=false;
+      for(size_t inuc=0; inuc<nuclei_.size(); inuc++)
+        if(norm(nuclei_[inuc].r - rj) < 1e-10) {
+          conuc[inuc].push_back(jnuc);
+          found=true;
+          break;
+        }
+      if(!found) {
+        std::ostringstream oss;
+        oss << "BasisSet::cholesky_aux_basis: nucleus " << jnuc+1 << " of the second basis does not coincide with any nucleus of the orbital basis.\n";
+        throw std::runtime_error(oss.str());
+      }
+    }
+  }
+
   // Per-nucleus atomic Cholesky decomposition. A given element can
   // carry different orbital bases on different centers (mixed-basis
   // calculations), so we run cholesky_set per nucleus and tag each
@@ -3397,6 +3417,10 @@ BasisSet BasisSet::cholesky_aux_basis(double thr, int linc) const {
     // Build the orbital ElementBasisSet for this nucleus
     ElementBasisSet el(nuclei_[inuc].symbol);
     std::vector<GaussianShell> shs(funcs(inuc));
+    for(size_t jnuc : conuc[inuc]) {
+      std::vector<GaussianShell> coshs(cobasis->funcs(jnuc));
+      shs.insert(shs.end(), coshs.begin(), coshs.end());
+    }
     for(size_t ish=0; ish<shs.size(); ish++)
       el.add_function(FunctionShell(shs[ish].am(), shs[ish].contr()));
 
