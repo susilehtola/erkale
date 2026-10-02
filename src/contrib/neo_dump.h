@@ -47,12 +47,16 @@ class DensityFit;
  * \param Ce,occe         per-block electron SCF MOs and occupations
  * \param hcore_e         electron AO core Hamiltonian (spin-independent)
  * \param pbasis,pfit     proton basis and engine
+ * \param pfit_ep         proton engine of the e-p expansion: pfit itself, or,
+ *                   for finite-proton density fitting, a fit of the screened
+ *                   integrals in the electronic metric
  * \param Cp,occp,hcore_p proton SCF MOs, occupations, AO core Hamiltonian
  * \param n_electrons,n_protons,proton_mass,proton_charge  counts / particle
  * \param e_scf,e_classical  SCF total energy and classical nuclear repulsion
  * \param shared_aux      true when both species expand in one auxiliary/pivot
  *                   space, so (mu nu|a b) = B_e B_p^T; false means e-p is
- *                   recomputed exactly. omega/alpha/beta select the operator
+ *                   recomputed exactly. omega_proton/alpha_proton/beta_proton
+ *                   select the operator of the interactions with a proton
  * \param version         ERKALE version string for provenance
  */
 void neo_dump(const std::string & filename,
@@ -65,13 +69,13 @@ void neo_dump(const std::string & filename,
               const std::vector<arma::vec> & occe,
               const arma::mat & hcore_e,
               // protons
-              const BasisSet & pbasis, const DensityFit & pfit,
+              const BasisSet & pbasis, const DensityFit & pfit, const DensityFit & pfit_ep,
               const arma::mat & Cp, const arma::vec & occp,
               const arma::mat & hcore_p,
               // scalars
               int n_electrons, int n_protons, double proton_mass, double proton_charge,
               double e_scf, double e_classical,
-              bool shared_aux, double omega, double alpha, double beta,
+              bool shared_aux, double omega_proton, double alpha_proton, double beta_proton,
               const std::string & version);
 
 #endif

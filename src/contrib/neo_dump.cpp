@@ -107,12 +107,12 @@ namespace {
   }
 
   // Exact electron-proton Coulomb integrals (mu nu | a b), bare (no sign),
-  // with the engine's (omega,alpha,beta) operator so the finite-proton
+  // with the engine's (omega_proton,alpha_proton,beta_proton) operator so the finite-proton
   // (screened) model is honored. Returns G(mu*Ne+nu, a*Np+b) = (mu nu | a b).
   // Mirrors the contraction loop in neo.cpp's multicomponent_coulomb_tei, but
   // stores the full tensor instead of contracting with a density.
   arma::mat exact_ep(const BasisSet & ebasis, const BasisSet & pbasis,
-                     double omega, double alpha, double beta) {
+                     double omega_proton, double alpha_proton, double beta_proton) {
     std::vector<GaussianShell> eshells = ebasis.shells();
     std::vector<GaussianShell> pshells = pbasis.shells();
     size_t Ne = ebasis.Nbf();
@@ -124,7 +124,7 @@ namespace {
     // protonic ones
     CintEnv cenv(ebasis, pbasis);
     const size_t Nsh_e = cenv.Nsh_orb();
-    auto eri_owner = make_eri_worker(cenv, omega, alpha, beta);
+    auto eri_owner = make_eri_worker(cenv, omega_proton, alpha_proton, beta_proton);
     ERIWorker * eri = eri_owner.get();
 
     for(size_t i=0;i<eshells.size();i++) {
@@ -246,12 +246,12 @@ void neo_dump(const std::string & filename,
               const std::vector<arma::mat> & Ce,
               const std::vector<arma::vec> & occe,
               const arma::mat & hcore_e,
-              const BasisSet & pbasis, const DensityFit & pfit,
+              const BasisSet & pbasis, const DensityFit & pfit, const DensityFit & pfit_ep,
               const arma::mat & Cp, const arma::vec & occp,
               const arma::mat & hcore_p,
               int n_electrons, int n_protons, double proton_mass, double proton_charge,
               double e_scf, double e_classical,
-              bool shared_aux, double omega, double alpha, double beta,
+              bool shared_aux, double omega_proton, double alpha_proton, double beta_proton,
               const std::string & version) {
 
   if(representation != "btensor" && representation != "dense") {
@@ -271,20 +271,27 @@ void neo_dump(const std::string & filename,
   // dense representation on disk). e-e/p-p come from the SCF's own engine
   // factor. The e-p tensor matches the engine the SCF used: the shared-aux RI
   // reconstruction B_e B_p^T in density-fitting mode, or the exact engine
-  // integral (same omega,alpha,beta) in Cholesky mode -- where the SCF itself
-  // evaluates e-p exactly.
+  // integral (same omega_proton,alpha_proton,beta_proton) in Cholesky mode --
+  // where the SCF itself evaluates e-p exactly. The e-p expansion uses
+  // pfit_ep, which is pfit itself unless finite protons give the p-p fit
+  // a metric of its own; eri_ep is then not B_e B_p^T of the factors on
+  // disk, and is written out explicitly.
   arma::mat Be = B_factor(dfit);
   arma::mat Bp = B_factor(pfit);
+  const bool separate_ep = (&pfit_ep != &pfit);
   arma::mat Gee = Be * Be.t();
   arma::mat Gpp = Bp * Bp.t();
   arma::mat Gep;
   if(shared_aux) {
-    if(Be.n_cols != Bp.n_cols)
+    const arma::mat Bp_ep(separate_ep ? B_factor(pfit_ep) : Bp);
+    if(Be.n_cols != Bp_ep.n_cols)
       throw std::runtime_error("neo_dump: the electron and proton factors do not share a vector index -- cannot form the e-p expansion.\n");
-    Gep = Be * Bp.t();
+    Gep = Be * Bp_ep.t();
   } else {
-    Gep = exact_ep(ebasis, pbasis, omega, alpha, beta);
+    Gep = exact_ep(ebasis, pbasis, omega_proton, alpha_proton, beta_proton);
   }
+  // Can eri_ep be reconstructed as B_e B_p^T from the factors on disk?
+  const bool ep_from_factors = shared_aux && !separate_ep;
 
   // AO overlap is the metric each species' basis lives in (also dumped).
   arma::mat S_e = ebasis.overlap();
@@ -393,7 +400,7 @@ void neo_dump(const std::string & filename,
   }
   // With a shared auxiliary/pivot space the two B factors carry a common vector
   // index, so eri_ep is a product of tensors already on disk and is not stored.
-  write_int_attr(root, "shared_aux", shared_aux ? 1 : 0);
+  write_int_attr(root, "shared_aux", ep_from_factors ? 1 : 0);
   write_dbl_attr(root, "e_scf", e_scf);
   write_dbl_attr(root, "e_classical", e_classical);
   write_str_attr(root, "erkale_version", version);
@@ -436,7 +443,7 @@ void neo_dump(const std::string & filename,
   // factors share a vector index, since it is then exactly B_e B_p^T and storing
   // it would cost Ne^2 Np^2 for nothing. Written dense otherwise -- including in
   // "dense" representation, where no B factor is on disk to reconstruct it from.
-  if(dense || !shared_aux) {
+  if(dense || !ep_from_factors) {
     // C-order (Ne,Ne,Np,Np): row-major of Gep is the column-major buffer of Gep.t().
     arma::mat Gept = Gep.t();
     std::vector<hsize_t> dims = { (hsize_t) Ne, (hsize_t) Ne, (hsize_t) Np, (hsize_t) Np };
@@ -515,19 +522,9 @@ void neo_dump(const std::string & filename,
     fflush(stdout);
 
     if(std::abs(diff) > 1e-7) {
-      bool screened = !(omega == 0.0 && alpha == 1.0 && beta == 0.0);
-      if(shared_aux && screened)
-        // Finite-proton RI uses dfit's metric for the electron-side expansion and
-        // pfit's (screened) 3-center for the proton-side projection; that mixed
-        // metric is not exactly B_e B_p^T, so a small residual is expected here.
-        printf("  NOTE: finite-proton density-fitting run -- the e-p RI uses a mixed\n"
-               "  metric, so a small residual is expected. Use the Cholesky path for\n"
-               "  a machine-precision check.\n");
-      else {
-        std::ostringstream oss;
-        oss << "neo_dump verify: reconstructed energy differs from SCF by " << diff << " (> 1e-7)!\n";
-        throw std::runtime_error(oss.str());
-      }
+      std::ostringstream oss;
+      oss << "neo_dump verify: reconstructed energy differs from SCF by " << diff << " (> 1e-7)!\n";
+      throw std::runtime_error(oss.str());
     }
     fflush(stdout);
   }
