@@ -62,13 +62,17 @@ DirectDFBlocks::DirectDFBlocks(size_t Nbf, size_t Naux,
                                std::vector<std::pair<size_t, size_t>> sizes,
                                std::vector<GaussianShell> orb_shells,
                                std::vector<GaussianShell> aux_shells,
+                               arma::mat X,
                                const CintEnv & cenv,
                                double omega, double alpha, double beta)
     : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       aux_shells_(std::move(aux_shells)),
+      X_(std::move(X)),
       omega_(omega), alpha_(alpha), beta_(beta),
       cenv_(&cenv) {
+  if(X_.n_rows != Naux_)
+    throw std::logic_error("DirectDFBlocks: metric half-inverse does not match Naux");
   // Worst-case Nmu*Nnu across shellpairs; per-thread scratch is sized
   // to this at construction so get_block(ip) never reallocs.
   max_NmuNnu_ = 0;
@@ -385,8 +389,7 @@ arma::mat DirectDFBlocks::get_block(size_t ip) const {
   // aux shell gives Nmu * Nnu * Na entries with the auxiliary index
   // fastest, which is exactly the column-major layout of the block, so
   // they go straight into our slice. Matches the cached
-  // compute_a_munu layout so the J/K kernels see identical blocks
-  // either way.
+  // compute_a_munu layout.
   const size_t Nsh_orb = cenv_->Nsh_orb();
   double * buf_ptr = buf.memptr();
   for(size_t ia=0; ia<aux_shells_.size(); ia++) {
