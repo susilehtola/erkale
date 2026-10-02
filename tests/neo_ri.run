@@ -1,0 +1,14 @@
+# Density-fitted multicomponent SCF in the default automatic auxiliary
+# basis, formed from the union of the electronic and protonic basis sets
+# on each center. The electronic basis is triple-zeta, which the union
+# needs to be accurate: the energy agrees with Cholesky to 1e-7 Eh. The
+# dump's self-consistency check exercises the shared fitting basis.
+System H2O.xyz
+Basis cc-pVTZ
+ProtonBasis PB4-D
+QuantumProtons 2
+Method HF
+JKMethod RI
+SaveChk neo_ri.chk
+NEODump neo_ri.h5
+NEODumpVerify true
