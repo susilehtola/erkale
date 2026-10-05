@@ -9,5 +9,7 @@ ComplexBasis true
 OptLM false
 JKMethod Cholesky
 DFTGrid 75 -302
-ConvThr 1e-8
+# The meta-GGA orbital gradient has a quadrature noise floor of a few
+# 1e-8, which some runs do not get below; the energy is checked to 1e-5
+ConvThr 1e-7
 SaveChk complex_orbs_o2_tpss.chk
