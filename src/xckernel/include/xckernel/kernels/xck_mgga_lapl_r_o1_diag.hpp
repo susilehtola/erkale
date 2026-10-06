@@ -125,8 +125,9 @@ inline int64_t xck_mgga_lapl_r_o1_diag_work(int64_t npts, int64_t nbf) {
 }
 
 /* fields: the per-point tower operands (type T), in the order
- * of xck_mgga_lapl_r_o1_diag_scal_names; xc: the functional-derivative arrays
- * (type Txc; Libxc computes in double whatever T is). */
+ * of xck_mgga_lapl_r_o1_diag_field_names; xc: the functional-derivative
+ * arrays (type Txc; Libxc computes in double whatever T is),
+ * in the order of xck_mgga_lapl_r_o1_diag_xc_names (both below). */
 template <typename T, typename Txc = T>
 int xck_mgga_lapl_r_o1_diag_t(int64_t npts,
         int64_t nbf,
@@ -186,6 +187,42 @@ int xck_mgga_lapl_r_o1_diag_t(int64_t npts,
     }
     if (own) delete[] c;
     return 0;
+}
+
+
+/* Operands of xck_mgga_lapl_r_o1_diag_t: `fields` in the order of
+ * xck_mgga_lapl_r_o1_diag_field_names, `xc` in the order of xck_mgga_lapl_r_o1_diag_xc_names (the
+ * C ABI's `scal` is the two concatenated, split at n_fields). The
+ * structs name them; the overload taking them packs the arrays. */
+inline constexpr int xck_mgga_lapl_r_o1_diag_n_fields = 4;
+inline constexpr int xck_mgga_lapl_r_o1_diag_n_xc = 3;
+inline constexpr const char* xck_mgga_lapl_r_o1_diag_field_names[] = {"w", "rho_x", "rho_y", "rho_z"};
+inline constexpr const char* xck_mgga_lapl_r_o1_diag_xc_names[] = {"vlapl", "vrho", "vsigma"};
+template <typename T>
+struct xck_mgga_lapl_r_o1_diag_fields {
+    const T* w;
+    const T* rho_x;
+    const T* rho_y;
+    const T* rho_z;
+};
+template <typename Txc>
+struct xck_mgga_lapl_r_o1_diag_xc {
+    const Txc* vlapl;
+    const Txc* vrho;
+    const Txc* vsigma;
+};
+
+template <typename T, typename Txc = T>
+int xck_mgga_lapl_r_o1_diag_t(int64_t npts,
+        int64_t nbf,
+        const T* chi,
+        const xck_mgga_lapl_r_o1_diag_fields<T>& fields_,
+        const xck_mgga_lapl_r_o1_diag_xc<Txc>& xc_,
+        T* out,
+        T* work = nullptr) {
+    const T* f_[] = {fields_.w, fields_.rho_x, fields_.rho_y, fields_.rho_z};
+    const Txc* x_[] = {xc_.vlapl, xc_.vrho, xc_.vsigma};
+    return xck_mgga_lapl_r_o1_diag_t<T, Txc>(npts, nbf, chi, f_, x_, out, work);
 }
 
 } // namespace xckernel

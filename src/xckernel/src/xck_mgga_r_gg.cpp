@@ -4,37 +4,43 @@
 extern "C" {
 
 const char* xck_mgga_r_gg_scal_names[26] = {
-    "w",
-    "rho_x",
-    "rho_y",
-    "rho_z",
-    "rho_xx",
-    "rho_xy",
-    "rho_xz",
-    "rho_yy",
-    "rho_yz",
-    "rho_zz",
-    "tau_x",
-    "tau_y",
-    "tau_z",
-    "rho_xxx",
-    "rho_xyy",
-    "rho_xzz",
-    "rho_xxy",
-    "rho_yyy",
-    "rho_yzz",
-    "rho_xxz",
-    "rho_yyz",
-    "rho_zzz",
-    "vlapl",
-    "vrho",
-    "vsigma",
-    "vtau",
+    xckernel::xck_mgga_r_gg_field_names[0],
+    xckernel::xck_mgga_r_gg_field_names[1],
+    xckernel::xck_mgga_r_gg_field_names[2],
+    xckernel::xck_mgga_r_gg_field_names[3],
+    xckernel::xck_mgga_r_gg_field_names[4],
+    xckernel::xck_mgga_r_gg_field_names[5],
+    xckernel::xck_mgga_r_gg_field_names[6],
+    xckernel::xck_mgga_r_gg_field_names[7],
+    xckernel::xck_mgga_r_gg_field_names[8],
+    xckernel::xck_mgga_r_gg_field_names[9],
+    xckernel::xck_mgga_r_gg_field_names[10],
+    xckernel::xck_mgga_r_gg_field_names[11],
+    xckernel::xck_mgga_r_gg_field_names[12],
+    xckernel::xck_mgga_r_gg_field_names[13],
+    xckernel::xck_mgga_r_gg_field_names[14],
+    xckernel::xck_mgga_r_gg_field_names[15],
+    xckernel::xck_mgga_r_gg_field_names[16],
+    xckernel::xck_mgga_r_gg_field_names[17],
+    xckernel::xck_mgga_r_gg_field_names[18],
+    xckernel::xck_mgga_r_gg_field_names[19],
+    xckernel::xck_mgga_r_gg_field_names[20],
+    xckernel::xck_mgga_r_gg_field_names[21],
+    xckernel::xck_mgga_r_gg_xc_names[0],
+    xckernel::xck_mgga_r_gg_xc_names[1],
+    xckernel::xck_mgga_r_gg_xc_names[2],
+    xckernel::xck_mgga_r_gg_xc_names[3],
 };
 extern const int xck_mgga_r_gg_n_scal;
-const int xck_mgga_r_gg_n_scal = 26;
+const int xck_mgga_r_gg_n_scal = xckernel::xck_mgga_r_gg_n_fields + xckernel::xck_mgga_r_gg_n_xc;
 extern const int xck_mgga_r_gg_n_fields;
-const int xck_mgga_r_gg_n_fields = 22;
+const int xck_mgga_r_gg_n_fields = xckernel::xck_mgga_r_gg_n_fields;
+extern const char* const xck_mgga_r_gg_kind;
+const char* const xck_mgga_r_gg_kind = "gg";
+extern const int xck_mgga_r_gg_out_rank;
+const int xck_mgga_r_gg_out_rank = 2;
+extern const char* const xck_mgga_r_gg_out_shape;
+const char* const xck_mgga_r_gg_out_shape = "(3, ng)";
 
 /* One homogeneous scal list (all double): the per-point tower
  * operands first, the functional-derivative arrays from

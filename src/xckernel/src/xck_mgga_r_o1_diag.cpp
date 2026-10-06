@@ -4,19 +4,25 @@
 extern "C" {
 
 const char* xck_mgga_r_o1_diag_scal_names[8] = {
-    "w",
-    "rho_x",
-    "rho_y",
-    "rho_z",
-    "vlapl",
-    "vrho",
-    "vsigma",
-    "vtau",
+    xckernel::xck_mgga_r_o1_diag_field_names[0],
+    xckernel::xck_mgga_r_o1_diag_field_names[1],
+    xckernel::xck_mgga_r_o1_diag_field_names[2],
+    xckernel::xck_mgga_r_o1_diag_field_names[3],
+    xckernel::xck_mgga_r_o1_diag_xc_names[0],
+    xckernel::xck_mgga_r_o1_diag_xc_names[1],
+    xckernel::xck_mgga_r_o1_diag_xc_names[2],
+    xckernel::xck_mgga_r_o1_diag_xc_names[3],
 };
 extern const int xck_mgga_r_o1_diag_n_scal;
-const int xck_mgga_r_o1_diag_n_scal = 8;
+const int xck_mgga_r_o1_diag_n_scal = xckernel::xck_mgga_r_o1_diag_n_fields + xckernel::xck_mgga_r_o1_diag_n_xc;
 extern const int xck_mgga_r_o1_diag_n_fields;
-const int xck_mgga_r_o1_diag_n_fields = 4;
+const int xck_mgga_r_o1_diag_n_fields = xckernel::xck_mgga_r_o1_diag_n_fields;
+extern const char* const xck_mgga_r_o1_diag_kind;
+const char* const xck_mgga_r_o1_diag_kind = "diag";
+extern const int xck_mgga_r_o1_diag_out_rank;
+const int xck_mgga_r_o1_diag_out_rank = 1;
+extern const char* const xck_mgga_r_o1_diag_out_shape;
+const char* const xck_mgga_r_o1_diag_out_shape = "(nbf,)";
 extern const int xck_mgga_r_o1_diag_chi_order;
 const int xck_mgga_r_o1_diag_chi_order = 2;
 

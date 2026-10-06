@@ -44,8 +44,9 @@ inline int64_t xck_mgga_lapl_r_gg_work(int64_t npts, int64_t nbf) {
 }
 
 /* fields: the per-point tower operands (type T), in the order
- * of xck_mgga_lapl_r_gg_scal_names; xc: the functional-derivative arrays
- * (type Txc; Libxc computes in double whatever T is). */
+ * of xck_mgga_lapl_r_gg_field_names; xc: the functional-derivative
+ * arrays (type Txc; Libxc computes in double whatever T is),
+ * in the order of xck_mgga_lapl_r_gg_xc_names (both below). */
 template <typename T, typename Txc = T>
 int xck_mgga_lapl_r_gg_t(int64_t npts,
         const T* const* fields,
@@ -90,6 +91,55 @@ int xck_mgga_lapl_r_gg_t(int64_t npts,
     }
     if (own) delete[] c;
     return 0;
+}
+
+
+/* Operands of xck_mgga_lapl_r_gg_t: `fields` in the order of
+ * xck_mgga_lapl_r_gg_field_names, `xc` in the order of xck_mgga_lapl_r_gg_xc_names (the
+ * C ABI's `scal` is the two concatenated, split at n_fields). The
+ * structs name them; the overload taking them packs the arrays. */
+inline constexpr int xck_mgga_lapl_r_gg_n_fields = 19;
+inline constexpr int xck_mgga_lapl_r_gg_n_xc = 3;
+inline constexpr const char* xck_mgga_lapl_r_gg_field_names[] = {"w", "rho_x", "rho_y", "rho_z", "rho_xx", "rho_xy", "rho_xz", "rho_yy", "rho_yz", "rho_zz", "rho_xxx", "rho_xyy", "rho_xzz", "rho_xxy", "rho_yyy", "rho_yzz", "rho_xxz", "rho_yyz", "rho_zzz"};
+inline constexpr const char* xck_mgga_lapl_r_gg_xc_names[] = {"vlapl", "vrho", "vsigma"};
+template <typename T>
+struct xck_mgga_lapl_r_gg_fields {
+    const T* w;
+    const T* rho_x;
+    const T* rho_y;
+    const T* rho_z;
+    const T* rho_xx;
+    const T* rho_xy;
+    const T* rho_xz;
+    const T* rho_yy;
+    const T* rho_yz;
+    const T* rho_zz;
+    const T* rho_xxx;
+    const T* rho_xyy;
+    const T* rho_xzz;
+    const T* rho_xxy;
+    const T* rho_yyy;
+    const T* rho_yzz;
+    const T* rho_xxz;
+    const T* rho_yyz;
+    const T* rho_zzz;
+};
+template <typename Txc>
+struct xck_mgga_lapl_r_gg_xc {
+    const Txc* vlapl;
+    const Txc* vrho;
+    const Txc* vsigma;
+};
+
+template <typename T, typename Txc = T>
+int xck_mgga_lapl_r_gg_t(int64_t npts,
+        const xck_mgga_lapl_r_gg_fields<T>& fields_,
+        const xck_mgga_lapl_r_gg_xc<Txc>& xc_,
+        T* out,
+        T* work = nullptr) {
+    const T* f_[] = {fields_.w, fields_.rho_x, fields_.rho_y, fields_.rho_z, fields_.rho_xx, fields_.rho_xy, fields_.rho_xz, fields_.rho_yy, fields_.rho_yz, fields_.rho_zz, fields_.rho_xxx, fields_.rho_xyy, fields_.rho_xzz, fields_.rho_xxy, fields_.rho_yyy, fields_.rho_yzz, fields_.rho_xxz, fields_.rho_yyz, fields_.rho_zzz};
+    const Txc* x_[] = {xc_.vlapl, xc_.vrho, xc_.vsigma};
+    return xck_mgga_lapl_r_gg_t<T, Txc>(npts, f_, x_, out, work);
 }
 
 } // namespace xckernel

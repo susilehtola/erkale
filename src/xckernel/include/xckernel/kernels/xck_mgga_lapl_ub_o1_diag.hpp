@@ -125,8 +125,9 @@ inline int64_t xck_mgga_lapl_ub_o1_diag_work(int64_t npts, int64_t nbf) {
 }
 
 /* fields: the per-point tower operands (type T), in the order
- * of xck_mgga_lapl_ub_o1_diag_scal_names; xc: the functional-derivative arrays
- * (type Txc; Libxc computes in double whatever T is). */
+ * of xck_mgga_lapl_ub_o1_diag_field_names; xc: the functional-derivative
+ * arrays (type Txc; Libxc computes in double whatever T is),
+ * in the order of xck_mgga_lapl_ub_o1_diag_xc_names (both below). */
 template <typename T, typename Txc = T>
 int xck_mgga_lapl_ub_o1_diag_t(int64_t npts,
         int64_t nbf,
@@ -186,6 +187,46 @@ int xck_mgga_lapl_ub_o1_diag_t(int64_t npts,
     }
     if (own) delete[] c;
     return 0;
+}
+
+
+/* Operands of xck_mgga_lapl_ub_o1_diag_t: `fields` in the order of
+ * xck_mgga_lapl_ub_o1_diag_field_names, `xc` in the order of xck_mgga_lapl_ub_o1_diag_xc_names (the
+ * C ABI's `scal` is the two concatenated, split at n_fields). The
+ * structs name them; the overload taking them packs the arrays. */
+inline constexpr int xck_mgga_lapl_ub_o1_diag_n_fields = 7;
+inline constexpr int xck_mgga_lapl_ub_o1_diag_n_xc = 4;
+inline constexpr const char* xck_mgga_lapl_ub_o1_diag_field_names[] = {"w", "rho_a_x", "rho_a_y", "rho_a_z", "rho_b_x", "rho_b_y", "rho_b_z"};
+inline constexpr const char* xck_mgga_lapl_ub_o1_diag_xc_names[] = {"vlapl_1", "vrho_1", "vsigma_1", "vsigma_2"};
+template <typename T>
+struct xck_mgga_lapl_ub_o1_diag_fields {
+    const T* w;
+    const T* rho_a_x;
+    const T* rho_a_y;
+    const T* rho_a_z;
+    const T* rho_b_x;
+    const T* rho_b_y;
+    const T* rho_b_z;
+};
+template <typename Txc>
+struct xck_mgga_lapl_ub_o1_diag_xc {
+    const Txc* vlapl_1;
+    const Txc* vrho_1;
+    const Txc* vsigma_1;
+    const Txc* vsigma_2;
+};
+
+template <typename T, typename Txc = T>
+int xck_mgga_lapl_ub_o1_diag_t(int64_t npts,
+        int64_t nbf,
+        const T* chi,
+        const xck_mgga_lapl_ub_o1_diag_fields<T>& fields_,
+        const xck_mgga_lapl_ub_o1_diag_xc<Txc>& xc_,
+        T* out,
+        T* work = nullptr) {
+    const T* f_[] = {fields_.w, fields_.rho_a_x, fields_.rho_a_y, fields_.rho_a_z, fields_.rho_b_x, fields_.rho_b_y, fields_.rho_b_z};
+    const Txc* x_[] = {xc_.vlapl_1, xc_.vrho_1, xc_.vsigma_1, xc_.vsigma_2};
+    return xck_mgga_lapl_ub_o1_diag_t<T, Txc>(npts, nbf, chi, f_, x_, out, work);
 }
 
 } // namespace xckernel

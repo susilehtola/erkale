@@ -125,8 +125,9 @@ inline int64_t xck_mgga_lapl_r_o2_work(int64_t npts, int64_t nbf) {
 }
 
 /* fields: the per-point tower operands (type T), in the order
- * of xck_mgga_lapl_r_o2_scal_names; xc: the functional-derivative arrays
- * (type Txc; Libxc computes in double whatever T is). */
+ * of xck_mgga_lapl_r_o2_field_names; xc: the functional-derivative
+ * arrays (type Txc; Libxc computes in double whatever T is),
+ * in the order of xck_mgga_lapl_r_o2_xc_names (both below). */
 template <typename T, typename Txc = T>
 int xck_mgga_lapl_r_o2_t(int64_t npts,
         int64_t nbf,
@@ -192,6 +193,53 @@ int xck_mgga_lapl_r_o2_t(int64_t npts,
     }
     if (own) delete[] c;
     return 0;
+}
+
+
+/* Operands of xck_mgga_lapl_r_o2_t: `fields` in the order of
+ * xck_mgga_lapl_r_o2_field_names, `xc` in the order of xck_mgga_lapl_r_o2_xc_names (the
+ * C ABI's `scal` is the two concatenated, split at n_fields). The
+ * structs name them; the overload taking them packs the arrays. */
+inline constexpr int xck_mgga_lapl_r_o2_n_fields = 11;
+inline constexpr int xck_mgga_lapl_r_o2_n_xc = 7;
+inline constexpr const char* xck_mgga_lapl_r_o2_field_names[] = {"w", "rho_x", "rho_y", "rho_z", "rho_p1_x", "rho_p1_y", "rho_p1_z", "rho_p1_xx", "rho_p1_yy", "rho_p1_zz", "rho_p1"};
+inline constexpr const char* xck_mgga_lapl_r_o2_xc_names[] = {"v2lapl2", "v2rho2", "v2sigma2", "vsigma", "v2rholapl", "v2rhosigma", "v2sigmalapl"};
+template <typename T>
+struct xck_mgga_lapl_r_o2_fields {
+    const T* w;
+    const T* rho_x;
+    const T* rho_y;
+    const T* rho_z;
+    const T* rho_p1_x;
+    const T* rho_p1_y;
+    const T* rho_p1_z;
+    const T* rho_p1_xx;
+    const T* rho_p1_yy;
+    const T* rho_p1_zz;
+    const T* rho_p1;
+};
+template <typename Txc>
+struct xck_mgga_lapl_r_o2_xc {
+    const Txc* v2lapl2;
+    const Txc* v2rho2;
+    const Txc* v2sigma2;
+    const Txc* vsigma;
+    const Txc* v2rholapl;
+    const Txc* v2rhosigma;
+    const Txc* v2sigmalapl;
+};
+
+template <typename T, typename Txc = T>
+int xck_mgga_lapl_r_o2_t(int64_t npts,
+        int64_t nbf,
+        const T* chi,
+        const xck_mgga_lapl_r_o2_fields<T>& fields_,
+        const xck_mgga_lapl_r_o2_xc<Txc>& xc_,
+        T* out,
+        T* work = nullptr) {
+    const T* f_[] = {fields_.w, fields_.rho_x, fields_.rho_y, fields_.rho_z, fields_.rho_p1_x, fields_.rho_p1_y, fields_.rho_p1_z, fields_.rho_p1_xx, fields_.rho_p1_yy, fields_.rho_p1_zz, fields_.rho_p1};
+    const Txc* x_[] = {xc_.v2lapl2, xc_.v2rho2, xc_.v2sigma2, xc_.vsigma, xc_.v2rholapl, xc_.v2rhosigma, xc_.v2sigmalapl};
+    return xck_mgga_lapl_r_o2_t<T, Txc>(npts, nbf, chi, f_, x_, out, work);
 }
 
 } // namespace xckernel

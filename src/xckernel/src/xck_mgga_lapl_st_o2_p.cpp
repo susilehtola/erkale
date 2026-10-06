@@ -4,46 +4,52 @@
 extern "C" {
 
 const char* xck_mgga_lapl_st_o2_p_scal_names[35] = {
-    "w",
-    "rho_a_x",
-    "rho_a_y",
-    "rho_a_z",
-    "rho_a_p1_x",
-    "rho_a_p1_y",
-    "rho_a_p1_z",
-    "rho_a_p1_xx",
-    "rho_a_p1_yy",
-    "rho_a_p1_zz",
-    "rho_a_p1",
-    "vsigma_0",
-    "vsigma_1",
-    "v2lapl2_0",
-    "v2lapl2_1",
-    "v2rho2_0",
-    "v2rho2_1",
-    "v2rholapl_0",
-    "v2rholapl_1",
-    "v2rholapl_2",
-    "v2rhosigma_0",
-    "v2rhosigma_1",
-    "v2rhosigma_2",
-    "v2rhosigma_3",
-    "v2rhosigma_4",
-    "v2sigma2_0",
-    "v2sigma2_1",
-    "v2sigma2_2",
-    "v2sigma2_3",
-    "v2sigma2_4",
-    "v2sigmalapl_0",
-    "v2sigmalapl_1",
-    "v2sigmalapl_2",
-    "v2sigmalapl_3",
-    "v2sigmalapl_4",
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[0],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[1],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[2],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[3],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[4],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[5],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[6],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[7],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[8],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[9],
+    xckernel::xck_mgga_lapl_st_o2_p_field_names[10],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[0],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[1],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[2],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[3],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[4],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[5],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[6],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[7],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[8],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[9],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[10],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[11],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[12],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[13],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[14],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[15],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[16],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[17],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[18],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[19],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[20],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[21],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[22],
+    xckernel::xck_mgga_lapl_st_o2_p_xc_names[23],
 };
 extern const int xck_mgga_lapl_st_o2_p_n_scal;
-const int xck_mgga_lapl_st_o2_p_n_scal = 35;
+const int xck_mgga_lapl_st_o2_p_n_scal = xckernel::xck_mgga_lapl_st_o2_p_n_fields + xckernel::xck_mgga_lapl_st_o2_p_n_xc;
 extern const int xck_mgga_lapl_st_o2_p_n_fields;
-const int xck_mgga_lapl_st_o2_p_n_fields = 11;
+const int xck_mgga_lapl_st_o2_p_n_fields = xckernel::xck_mgga_lapl_st_o2_p_n_fields;
+extern const char* const xck_mgga_lapl_st_o2_p_kind;
+const char* const xck_mgga_lapl_st_o2_p_kind = "matrix";
+extern const int xck_mgga_lapl_st_o2_p_out_rank;
+const int xck_mgga_lapl_st_o2_p_out_rank = 2;
+extern const char* const xck_mgga_lapl_st_o2_p_out_shape;
+const char* const xck_mgga_lapl_st_o2_p_out_shape = "(nbf, nbf)";
 extern const int xck_mgga_lapl_st_o2_p_chi_order;
 const int xck_mgga_lapl_st_o2_p_chi_order = 2;
 

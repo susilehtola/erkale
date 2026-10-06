@@ -14,9 +14,13 @@
 set -e
 
 XCKERNEL_REPO=${XCKERNEL_REPO:-https://github.com/susilehtola/libxckernel.git}
-XCKERNEL_COMMIT=${XCKERNEL_COMMIT:-59f3353623a92f3a93fcbce2facfeeaa3e537002}
+XCKERNEL_COMMIT=${XCKERNEL_COMMIT:-5d84d7a801fc30addfa2df418fd3365e8840d1bb}
 FAMILIES=lda,gga,mgga_tau,mgga_lapl,mgga,cmgga_tau
 MAX_ORDER=2
+# The kernel kinds ERKALE calls: energy, Fock matrix, its diagonal,
+# batched and MO-projected response, and the nuclear gradient. Add kinds
+# (f1/fg for CPHF, h2*/e1p* for Hessians, giao) as consumers appear.
+KINDS=exc,matrix,diag,o2b,mo2,mo2u,g1,g1c,gg
 
 here=$(cd "$(dirname "$0")" && pwd)
 work=$(mktemp -d)
@@ -24,7 +28,7 @@ trap 'rm -rf "$work"' EXIT
 
 git clone --quiet "$XCKERNEL_REPO" "$work/libxckernel"
 git -C "$work/libxckernel" checkout --quiet "$XCKERNEL_COMMIT"
-(cd "$work/libxckernel" && python3 -m xckernel.catalog "$work/out" "$FAMILIES" "$MAX_ORDER" c)
+(cd "$work/libxckernel" && python3 -m xckernel.catalog "$work/out" "$FAMILIES" "$MAX_ORDER" c --kinds "$KINDS")
 cp "$work/libxckernel/LICENSE" "$work/out/LICENSE"
 
 # Replace everything generated, keeping this script and the README

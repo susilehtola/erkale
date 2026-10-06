@@ -44,8 +44,9 @@ inline int64_t xck_lda_ua_g1_work(int64_t npts, int64_t nbf) {
 }
 
 /* fields: the per-point tower operands (type T), in the order
- * of xck_lda_ua_g1_scal_names; xc: the functional-derivative arrays
- * (type Txc; Libxc computes in double whatever T is). */
+ * of xck_lda_ua_g1_field_names; xc: the functional-derivative
+ * arrays (type Txc; Libxc computes in double whatever T is),
+ * in the order of xck_lda_ua_g1_xc_names (both below). */
 template <typename T, typename Txc = T>
 int xck_lda_ua_g1_t(int64_t npts,
         int64_t nbf,
@@ -80,6 +81,38 @@ int xck_lda_ua_g1_t(int64_t npts,
     }
     if (own) delete[] c;
     return 0;
+}
+
+
+/* Operands of xck_lda_ua_g1_t: `fields` in the order of
+ * xck_lda_ua_g1_field_names, `xc` in the order of xck_lda_ua_g1_xc_names (the
+ * C ABI's `scal` is the two concatenated, split at n_fields). The
+ * structs name them; the overload taking them packs the arrays. */
+inline constexpr int xck_lda_ua_g1_n_fields = 1;
+inline constexpr int xck_lda_ua_g1_n_xc = 1;
+inline constexpr const char* xck_lda_ua_g1_field_names[] = {"w"};
+inline constexpr const char* xck_lda_ua_g1_xc_names[] = {"vrho_0"};
+template <typename T>
+struct xck_lda_ua_g1_fields {
+    const T* w;
+};
+template <typename Txc>
+struct xck_lda_ua_g1_xc {
+    const Txc* vrho_0;
+};
+
+template <typename T, typename Txc = T>
+int xck_lda_ua_g1_t(int64_t npts,
+        int64_t nbf,
+        const T* chi,
+        const T* Dchi,
+        const xck_lda_ua_g1_fields<T>& fields_,
+        const xck_lda_ua_g1_xc<Txc>& xc_,
+        T* out,
+        T* work = nullptr) {
+    const T* f_[] = {fields_.w};
+    const Txc* x_[] = {xc_.vrho_0};
+    return xck_lda_ua_g1_t<T, Txc>(npts, nbf, chi, Dchi, f_, x_, out, work);
 }
 
 } // namespace xckernel

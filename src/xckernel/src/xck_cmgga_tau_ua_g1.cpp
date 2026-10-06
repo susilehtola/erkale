@@ -4,26 +4,32 @@
 extern "C" {
 
 const char* xck_cmgga_tau_ua_g1_scal_names[15] = {
-    "w",
-    "rho_a_x",
-    "rho_a_y",
-    "rho_a_z",
-    "rho_b_x",
-    "rho_b_y",
-    "rho_b_z",
-    "jpx_a",
-    "jpy_a",
-    "jpz_a",
-    "inv_rho_a",
-    "vrho_0",
-    "vsigma_0",
-    "vsigma_1",
-    "vtau_0",
+    xckernel::xck_cmgga_tau_ua_g1_field_names[0],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[1],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[2],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[3],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[4],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[5],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[6],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[7],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[8],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[9],
+    xckernel::xck_cmgga_tau_ua_g1_field_names[10],
+    xckernel::xck_cmgga_tau_ua_g1_xc_names[0],
+    xckernel::xck_cmgga_tau_ua_g1_xc_names[1],
+    xckernel::xck_cmgga_tau_ua_g1_xc_names[2],
+    xckernel::xck_cmgga_tau_ua_g1_xc_names[3],
 };
 extern const int xck_cmgga_tau_ua_g1_n_scal;
-const int xck_cmgga_tau_ua_g1_n_scal = 15;
+const int xck_cmgga_tau_ua_g1_n_scal = xckernel::xck_cmgga_tau_ua_g1_n_fields + xckernel::xck_cmgga_tau_ua_g1_n_xc;
 extern const int xck_cmgga_tau_ua_g1_n_fields;
-const int xck_cmgga_tau_ua_g1_n_fields = 11;
+const int xck_cmgga_tau_ua_g1_n_fields = xckernel::xck_cmgga_tau_ua_g1_n_fields;
+extern const char* const xck_cmgga_tau_ua_g1_kind;
+const char* const xck_cmgga_tau_ua_g1_kind = "g1c";
+extern const int xck_cmgga_tau_ua_g1_out_rank;
+const int xck_cmgga_tau_ua_g1_out_rank = 2;
+extern const char* const xck_cmgga_tau_ua_g1_out_shape;
+const char* const xck_cmgga_tau_ua_g1_out_shape = "(3, nbf)";
 extern const int xck_cmgga_tau_ua_g1_chi_order;
 const int xck_cmgga_tau_ua_g1_chi_order = 2;
 extern const int xck_cmgga_tau_ua_g1_Dchi_order;

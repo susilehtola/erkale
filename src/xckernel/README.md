@@ -9,6 +9,11 @@ the Fock matrix (basis and grid classes) for the `lda`, `gga`, `mgga_tau`, `mgga
 The kernels contain the XC terms only; Coulomb and exact exchange stay
 in ERKALE.
 
+Only the kernel kinds ERKALE calls are generated (`KINDS` in
+`regenerate.sh`, recorded as `XCKERNEL_KINDS` in `include/xckernel.h`
+and under `kinds` in `manifest.json`); add kinds there as consumers
+appear.
+
 Everything here except `regenerate.sh` and this file is machine-generated:
 do not edit it. To update the kernels, change the libxckernel commit or
 the selection in `regenerate.sh` and run it; it needs git and Python

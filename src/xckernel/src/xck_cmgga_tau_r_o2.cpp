@@ -4,35 +4,41 @@
 extern "C" {
 
 const char* xck_cmgga_tau_r_o2_scal_names[24] = {
-    "w",
-    "rho_x",
-    "rho_y",
-    "rho_z",
-    "jpx",
-    "jpy",
-    "jpz",
-    "inv_rho",
-    "rho_p1_x",
-    "rho_p1_y",
-    "rho_p1_z",
-    "jpx_p1",
-    "jpy_p1",
-    "jpz_p1",
-    "rho_p1",
-    "tau_p1",
-    "v2rho2",
-    "v2sigma2",
-    "v2tau2",
-    "vsigma",
-    "vtau",
-    "v2rhosigma",
-    "v2rhotau",
-    "v2sigmatau",
+    xckernel::xck_cmgga_tau_r_o2_field_names[0],
+    xckernel::xck_cmgga_tau_r_o2_field_names[1],
+    xckernel::xck_cmgga_tau_r_o2_field_names[2],
+    xckernel::xck_cmgga_tau_r_o2_field_names[3],
+    xckernel::xck_cmgga_tau_r_o2_field_names[4],
+    xckernel::xck_cmgga_tau_r_o2_field_names[5],
+    xckernel::xck_cmgga_tau_r_o2_field_names[6],
+    xckernel::xck_cmgga_tau_r_o2_field_names[7],
+    xckernel::xck_cmgga_tau_r_o2_field_names[8],
+    xckernel::xck_cmgga_tau_r_o2_field_names[9],
+    xckernel::xck_cmgga_tau_r_o2_field_names[10],
+    xckernel::xck_cmgga_tau_r_o2_field_names[11],
+    xckernel::xck_cmgga_tau_r_o2_field_names[12],
+    xckernel::xck_cmgga_tau_r_o2_field_names[13],
+    xckernel::xck_cmgga_tau_r_o2_field_names[14],
+    xckernel::xck_cmgga_tau_r_o2_field_names[15],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[0],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[1],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[2],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[3],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[4],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[5],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[6],
+    xckernel::xck_cmgga_tau_r_o2_xc_names[7],
 };
 extern const int xck_cmgga_tau_r_o2_n_scal;
-const int xck_cmgga_tau_r_o2_n_scal = 24;
+const int xck_cmgga_tau_r_o2_n_scal = xckernel::xck_cmgga_tau_r_o2_n_fields + xckernel::xck_cmgga_tau_r_o2_n_xc;
 extern const int xck_cmgga_tau_r_o2_n_fields;
-const int xck_cmgga_tau_r_o2_n_fields = 16;
+const int xck_cmgga_tau_r_o2_n_fields = xckernel::xck_cmgga_tau_r_o2_n_fields;
+extern const char* const xck_cmgga_tau_r_o2_kind;
+const char* const xck_cmgga_tau_r_o2_kind = "matrix";
+extern const int xck_cmgga_tau_r_o2_out_rank;
+const int xck_cmgga_tau_r_o2_out_rank = 2;
+extern const char* const xck_cmgga_tau_r_o2_out_shape;
+const char* const xck_cmgga_tau_r_o2_out_shape = "(nbf, nbf)";
 extern const int xck_cmgga_tau_r_o2_chi_order;
 const int xck_cmgga_tau_r_o2_chi_order = 1;
 

@@ -132,31 +132,66 @@ XCK_HD inline void combine(int64_t bk, int64_t n, int nt, const T* const* src,
     }
 }
 
-/* Zero the rows of functions off the atom: X(i,g) = 0 where !mask[i]. */
+/* A batched coefficient: c(g) = sum_t A[t](g) P[t](g) -- the response
+ * coefficient of one perturbation from the ground-state tables A[t] and
+ * that perturbation's field components P[t]. */
 template <typename T>
-XCK_HD inline void mask_rows(int64_t bk, int64_t n, const int8_t* mask,
-                             T* X) {
-    for (int64_t i = 0; i < n; ++i)
-        if (!mask[i])
-            for (int64_t g = 0; g < bk; ++g) X[i * bk + g] = T(0);
+XCK_HD inline void lincomb(int64_t bk, int nt, const T* const* A,
+                           const T* const* P, T* c) {
+    for (int64_t g = 0; g < bk; ++g) c[g] = T(0);
+    for (int t = 0; t < nt; ++t) {
+        const T* a = A[t];
+        const T* p = P[t];
+        for (int64_t g = 0; g < bk; ++g) c[g] += a[g] * p[g];
+    }
 }
 
-/* A per-point reduction over the functions on an atom:
- * out(g) = sum_{i: mask[i]} sum_t c[t] A[t](i,g) B[t](i,g), rows of
- * stride npts -- the perturbed fields of a nuclear displacement. */
+/* Rectangular C(i,j) += sum_g A(i,g) B(j,g), i < m, j < n; row-major with
+ * row strides lda, ldb, ldc. The stacked GEMM of the batched kernels. */
 template <typename T>
-XCK_HD inline void masked_colsum(int64_t npts, int64_t n, const int8_t* mask,
-                                 int nt, const T* const* A,
-                                 const T* const* B, const double* c, T* out) {
-    for (int64_t g = 0; g < npts; ++g) out[g] = T(0);
-    for (int64_t i = 0; i < n; ++i) {
-        if (!mask[i]) continue;
-        for (int t = 0; t < nt; ++t) {
-            const T* a = A[t] + i * npts;
-            const T* b = B[t] + i * npts;
-            const T ct = T(c[t]);
-            for (int64_t g = 0; g < npts; ++g) out[g] += ct * a[g] * b[g];
+XCK_HD inline void gemm_rect(int64_t m, int64_t n, int64_t k, const T* A,
+                             int64_t lda, const T* B, int64_t ldb, T* C,
+                             int64_t ldc) {
+    for (int64_t i = 0; i < m; ++i) {
+        const T* Ai = A + i * lda;
+        for (int64_t j = 0; j < n; ++j) {
+            const T* Bj = B + j * ldb;
+            T s = T(0);
+            for (int64_t g = 0; g < k; ++g) s += Ai[g] * Bj[g];
+            C[i * ldc + j] += s;
         }
+    }
+}
+
+/* C(i,g) = sum_a A(i,a) B(a,g), A (m x n) row stride lda, B (n x k) row
+ * stride ldb, C (m x k) row stride ldc, overwritten: the trial vector
+ * applied to the virtual collocation, Z = X phi_v. */
+template <typename T>
+XCK_HD inline void gemm_nn(int64_t m, int64_t n, int64_t k, const double* A,
+                           int64_t lda, const T* B, int64_t ldb, T* C,
+                           int64_t ldc) {
+    for (int64_t i = 0; i < m; ++i) {
+        T* Ci = C + i * ldc;
+        for (int64_t g = 0; g < k; ++g) Ci[g] = T(0);
+        for (int64_t a = 0; a < n; ++a) {
+            const T x = T(A[i * lda + a]);
+            if (x == T(0)) continue;
+            const T* Ba = B + a * ldb;
+            for (int64_t g = 0; g < k; ++g) Ci[g] += x * Ba[g];
+        }
+    }
+}
+
+/* out(g) += c * sum_i A(i,g) B(i,g): a per-point sum over occupied
+ * orbitals (the perturbed fields of a trial vector). */
+template <typename T>
+XCK_HD inline void colsum_prod(int64_t n, int64_t k, double c, const T* A,
+                               int64_t lda, const T* B, int64_t ldb, T* out) {
+    const T cc = T(c);
+    for (int64_t i = 0; i < n; ++i) {
+        const T* Ai = A + i * lda;
+        const T* Bi = B + i * ldb;
+        for (int64_t g = 0; g < k; ++g) out[g] += cc * Ai[g] * Bi[g];
     }
 }
 
@@ -192,6 +227,33 @@ inline void gemm_nt(int64_t n, int64_t k, const double* A, int64_t lda,
     const XCKERNEL_BLAS_INT bn = n, bk = k, ba = lda, bb = ldb;
     const double one = 1.0;
     dgemm_("T", "N", &bn, &bn, &bk, &one, B, &bb, A, &ba, &one, out, &bn);
+}
+
+/* Row-major C = A B^T (m x n) is column-major C^T = B^T A. */
+inline void gemm_rect(int64_t m, int64_t n, int64_t k, const double* A,
+                      int64_t lda, const double* B, int64_t ldb, double* C,
+                      int64_t ldc) {
+    if (m == 0 || n == 0 || k == 0) return;
+    if (!detail::blas_fits(m, k, lda, ldb) || !detail::blas_fits(n, k, ldc, 1))
+        return gemm_rect<double>(m, n, k, A, lda, B, ldb, C, ldc);
+    const XCKERNEL_BLAS_INT bm = m, bn = n, bk = k, ba = lda, bb = ldb,
+        bc = ldc;
+    const double one = 1.0;
+    dgemm_("T", "N", &bn, &bm, &bk, &one, B, &bb, A, &ba, &one, C, &bc);
+}
+
+/* Row-major C = A B is column-major C^T = B^T A^T. */
+inline void gemm_nn(int64_t m, int64_t n, int64_t k, const double* A,
+                    int64_t lda, const double* B, int64_t ldb, double* C,
+                    int64_t ldc) {
+    if (m == 0 || k == 0) return;
+    if (n == 0 || !detail::blas_fits(m, n, lda, ldb)
+        || !detail::blas_fits(k, n, ldc, 1))
+        return gemm_nn<double>(m, n, k, A, lda, B, ldb, C, ldc);
+    const XCKERNEL_BLAS_INT bm = m, bn = n, bk = k, ba = lda, bb = ldb,
+        bc = ldc;
+    const double one = 1.0, zero = 0.0;
+    dgemm_("N", "N", &bk, &bm, &bn, &one, B, &bb, A, &ba, &zero, C, &bc);
 }
 
 inline void gemm_nt(int64_t n, int64_t k, const float* A, int64_t lda,

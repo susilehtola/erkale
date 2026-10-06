@@ -4,40 +4,46 @@
 extern "C" {
 
 const char* xck_gga_ua_o2_scal_names[29] = {
-    "w",
-    "rho_a_x",
-    "rho_a_y",
-    "rho_a_z",
-    "rho_b_x",
-    "rho_b_y",
-    "rho_b_z",
-    "rho_a_p1_x",
-    "rho_a_p1_y",
-    "rho_a_p1_z",
-    "rho_b_p1_x",
-    "rho_b_p1_y",
-    "rho_b_p1_z",
-    "rho_a_p1",
-    "rho_b_p1",
-    "vsigma_0",
-    "vsigma_1",
-    "v2rho2_0",
-    "v2rho2_1",
-    "v2rhosigma_0",
-    "v2rhosigma_1",
-    "v2rhosigma_2",
-    "v2rhosigma_3",
-    "v2rhosigma_4",
-    "v2sigma2_0",
-    "v2sigma2_1",
-    "v2sigma2_2",
-    "v2sigma2_3",
-    "v2sigma2_4",
+    xckernel::xck_gga_ua_o2_field_names[0],
+    xckernel::xck_gga_ua_o2_field_names[1],
+    xckernel::xck_gga_ua_o2_field_names[2],
+    xckernel::xck_gga_ua_o2_field_names[3],
+    xckernel::xck_gga_ua_o2_field_names[4],
+    xckernel::xck_gga_ua_o2_field_names[5],
+    xckernel::xck_gga_ua_o2_field_names[6],
+    xckernel::xck_gga_ua_o2_field_names[7],
+    xckernel::xck_gga_ua_o2_field_names[8],
+    xckernel::xck_gga_ua_o2_field_names[9],
+    xckernel::xck_gga_ua_o2_field_names[10],
+    xckernel::xck_gga_ua_o2_field_names[11],
+    xckernel::xck_gga_ua_o2_field_names[12],
+    xckernel::xck_gga_ua_o2_field_names[13],
+    xckernel::xck_gga_ua_o2_field_names[14],
+    xckernel::xck_gga_ua_o2_xc_names[0],
+    xckernel::xck_gga_ua_o2_xc_names[1],
+    xckernel::xck_gga_ua_o2_xc_names[2],
+    xckernel::xck_gga_ua_o2_xc_names[3],
+    xckernel::xck_gga_ua_o2_xc_names[4],
+    xckernel::xck_gga_ua_o2_xc_names[5],
+    xckernel::xck_gga_ua_o2_xc_names[6],
+    xckernel::xck_gga_ua_o2_xc_names[7],
+    xckernel::xck_gga_ua_o2_xc_names[8],
+    xckernel::xck_gga_ua_o2_xc_names[9],
+    xckernel::xck_gga_ua_o2_xc_names[10],
+    xckernel::xck_gga_ua_o2_xc_names[11],
+    xckernel::xck_gga_ua_o2_xc_names[12],
+    xckernel::xck_gga_ua_o2_xc_names[13],
 };
 extern const int xck_gga_ua_o2_n_scal;
-const int xck_gga_ua_o2_n_scal = 29;
+const int xck_gga_ua_o2_n_scal = xckernel::xck_gga_ua_o2_n_fields + xckernel::xck_gga_ua_o2_n_xc;
 extern const int xck_gga_ua_o2_n_fields;
-const int xck_gga_ua_o2_n_fields = 15;
+const int xck_gga_ua_o2_n_fields = xckernel::xck_gga_ua_o2_n_fields;
+extern const char* const xck_gga_ua_o2_kind;
+const char* const xck_gga_ua_o2_kind = "matrix";
+extern const int xck_gga_ua_o2_out_rank;
+const int xck_gga_ua_o2_out_rank = 2;
+extern const char* const xck_gga_ua_o2_out_shape;
+const char* const xck_gga_ua_o2_out_shape = "(nbf, nbf)";
 extern const int xck_gga_ua_o2_chi_order;
 const int xck_gga_ua_o2_chi_order = 1;
 

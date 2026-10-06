@@ -4,35 +4,41 @@
 extern "C" {
 
 const char* xck_gga_u_gg_scal_names[24] = {
-    "w",
-    "rho_a_x",
-    "rho_a_y",
-    "rho_a_z",
-    "rho_b_x",
-    "rho_b_y",
-    "rho_b_z",
-    "rho_a_xx",
-    "rho_a_xy",
-    "rho_a_xz",
-    "rho_a_yy",
-    "rho_a_yz",
-    "rho_a_zz",
-    "rho_b_xx",
-    "rho_b_xy",
-    "rho_b_xz",
-    "rho_b_yy",
-    "rho_b_yz",
-    "rho_b_zz",
-    "vrho_0",
-    "vrho_1",
-    "vsigma_0",
-    "vsigma_1",
-    "vsigma_2",
+    xckernel::xck_gga_u_gg_field_names[0],
+    xckernel::xck_gga_u_gg_field_names[1],
+    xckernel::xck_gga_u_gg_field_names[2],
+    xckernel::xck_gga_u_gg_field_names[3],
+    xckernel::xck_gga_u_gg_field_names[4],
+    xckernel::xck_gga_u_gg_field_names[5],
+    xckernel::xck_gga_u_gg_field_names[6],
+    xckernel::xck_gga_u_gg_field_names[7],
+    xckernel::xck_gga_u_gg_field_names[8],
+    xckernel::xck_gga_u_gg_field_names[9],
+    xckernel::xck_gga_u_gg_field_names[10],
+    xckernel::xck_gga_u_gg_field_names[11],
+    xckernel::xck_gga_u_gg_field_names[12],
+    xckernel::xck_gga_u_gg_field_names[13],
+    xckernel::xck_gga_u_gg_field_names[14],
+    xckernel::xck_gga_u_gg_field_names[15],
+    xckernel::xck_gga_u_gg_field_names[16],
+    xckernel::xck_gga_u_gg_field_names[17],
+    xckernel::xck_gga_u_gg_field_names[18],
+    xckernel::xck_gga_u_gg_xc_names[0],
+    xckernel::xck_gga_u_gg_xc_names[1],
+    xckernel::xck_gga_u_gg_xc_names[2],
+    xckernel::xck_gga_u_gg_xc_names[3],
+    xckernel::xck_gga_u_gg_xc_names[4],
 };
 extern const int xck_gga_u_gg_n_scal;
-const int xck_gga_u_gg_n_scal = 24;
+const int xck_gga_u_gg_n_scal = xckernel::xck_gga_u_gg_n_fields + xckernel::xck_gga_u_gg_n_xc;
 extern const int xck_gga_u_gg_n_fields;
-const int xck_gga_u_gg_n_fields = 19;
+const int xck_gga_u_gg_n_fields = xckernel::xck_gga_u_gg_n_fields;
+extern const char* const xck_gga_u_gg_kind;
+const char* const xck_gga_u_gg_kind = "gg";
+extern const int xck_gga_u_gg_out_rank;
+const int xck_gga_u_gg_out_rank = 2;
+extern const char* const xck_gga_u_gg_out_shape;
+const char* const xck_gga_u_gg_out_shape = "(3, ng)";
 
 /* One homogeneous scal list (all double): the per-point tower
  * operands first, the functional-derivative arrays from

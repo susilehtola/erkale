@@ -4,29 +4,35 @@
 extern "C" {
 
 const char* xck_mgga_lapl_r_o2_scal_names[18] = {
-    "w",
-    "rho_x",
-    "rho_y",
-    "rho_z",
-    "rho_p1_x",
-    "rho_p1_y",
-    "rho_p1_z",
-    "rho_p1_xx",
-    "rho_p1_yy",
-    "rho_p1_zz",
-    "rho_p1",
-    "v2lapl2",
-    "v2rho2",
-    "v2sigma2",
-    "vsigma",
-    "v2rholapl",
-    "v2rhosigma",
-    "v2sigmalapl",
+    xckernel::xck_mgga_lapl_r_o2_field_names[0],
+    xckernel::xck_mgga_lapl_r_o2_field_names[1],
+    xckernel::xck_mgga_lapl_r_o2_field_names[2],
+    xckernel::xck_mgga_lapl_r_o2_field_names[3],
+    xckernel::xck_mgga_lapl_r_o2_field_names[4],
+    xckernel::xck_mgga_lapl_r_o2_field_names[5],
+    xckernel::xck_mgga_lapl_r_o2_field_names[6],
+    xckernel::xck_mgga_lapl_r_o2_field_names[7],
+    xckernel::xck_mgga_lapl_r_o2_field_names[8],
+    xckernel::xck_mgga_lapl_r_o2_field_names[9],
+    xckernel::xck_mgga_lapl_r_o2_field_names[10],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[0],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[1],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[2],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[3],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[4],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[5],
+    xckernel::xck_mgga_lapl_r_o2_xc_names[6],
 };
 extern const int xck_mgga_lapl_r_o2_n_scal;
-const int xck_mgga_lapl_r_o2_n_scal = 18;
+const int xck_mgga_lapl_r_o2_n_scal = xckernel::xck_mgga_lapl_r_o2_n_fields + xckernel::xck_mgga_lapl_r_o2_n_xc;
 extern const int xck_mgga_lapl_r_o2_n_fields;
-const int xck_mgga_lapl_r_o2_n_fields = 11;
+const int xck_mgga_lapl_r_o2_n_fields = xckernel::xck_mgga_lapl_r_o2_n_fields;
+extern const char* const xck_mgga_lapl_r_o2_kind;
+const char* const xck_mgga_lapl_r_o2_kind = "matrix";
+extern const int xck_mgga_lapl_r_o2_out_rank;
+const int xck_mgga_lapl_r_o2_out_rank = 2;
+extern const char* const xck_mgga_lapl_r_o2_out_shape;
+const char* const xck_mgga_lapl_r_o2_out_shape = "(nbf, nbf)";
 extern const int xck_mgga_lapl_r_o2_chi_order;
 const int xck_mgga_lapl_r_o2_chi_order = 2;
 

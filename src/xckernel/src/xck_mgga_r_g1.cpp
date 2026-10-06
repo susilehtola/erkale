@@ -4,19 +4,25 @@
 extern "C" {
 
 const char* xck_mgga_r_g1_scal_names[8] = {
-    "w",
-    "rho_x",
-    "rho_y",
-    "rho_z",
-    "vlapl",
-    "vrho",
-    "vsigma",
-    "vtau",
+    xckernel::xck_mgga_r_g1_field_names[0],
+    xckernel::xck_mgga_r_g1_field_names[1],
+    xckernel::xck_mgga_r_g1_field_names[2],
+    xckernel::xck_mgga_r_g1_field_names[3],
+    xckernel::xck_mgga_r_g1_xc_names[0],
+    xckernel::xck_mgga_r_g1_xc_names[1],
+    xckernel::xck_mgga_r_g1_xc_names[2],
+    xckernel::xck_mgga_r_g1_xc_names[3],
 };
 extern const int xck_mgga_r_g1_n_scal;
-const int xck_mgga_r_g1_n_scal = 8;
+const int xck_mgga_r_g1_n_scal = xckernel::xck_mgga_r_g1_n_fields + xckernel::xck_mgga_r_g1_n_xc;
 extern const int xck_mgga_r_g1_n_fields;
-const int xck_mgga_r_g1_n_fields = 4;
+const int xck_mgga_r_g1_n_fields = xckernel::xck_mgga_r_g1_n_fields;
+extern const char* const xck_mgga_r_g1_kind;
+const char* const xck_mgga_r_g1_kind = "g1";
+extern const int xck_mgga_r_g1_out_rank;
+const int xck_mgga_r_g1_out_rank = 2;
+extern const char* const xck_mgga_r_g1_out_shape;
+const char* const xck_mgga_r_g1_out_shape = "(3, nbf)";
 extern const int xck_mgga_r_g1_chi_order;
 const int xck_mgga_r_g1_chi_order = 3;
 extern const int xck_mgga_r_g1_Dchi_order;

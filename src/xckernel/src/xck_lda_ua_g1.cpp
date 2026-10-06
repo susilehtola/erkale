@@ -4,13 +4,19 @@
 extern "C" {
 
 const char* xck_lda_ua_g1_scal_names[2] = {
-    "w",
-    "vrho_0",
+    xckernel::xck_lda_ua_g1_field_names[0],
+    xckernel::xck_lda_ua_g1_xc_names[0],
 };
 extern const int xck_lda_ua_g1_n_scal;
-const int xck_lda_ua_g1_n_scal = 2;
+const int xck_lda_ua_g1_n_scal = xckernel::xck_lda_ua_g1_n_fields + xckernel::xck_lda_ua_g1_n_xc;
 extern const int xck_lda_ua_g1_n_fields;
-const int xck_lda_ua_g1_n_fields = 1;
+const int xck_lda_ua_g1_n_fields = xckernel::xck_lda_ua_g1_n_fields;
+extern const char* const xck_lda_ua_g1_kind;
+const char* const xck_lda_ua_g1_kind = "g1";
+extern const int xck_lda_ua_g1_out_rank;
+const int xck_lda_ua_g1_out_rank = 2;
+extern const char* const xck_lda_ua_g1_out_shape;
+const char* const xck_lda_ua_g1_out_shape = "(3, nbf)";
 extern const int xck_lda_ua_g1_chi_order;
 const int xck_lda_ua_g1_chi_order = 1;
 extern const int xck_lda_ua_g1_Dchi_order;

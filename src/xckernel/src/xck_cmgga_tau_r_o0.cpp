@@ -2,6 +2,12 @@
 #include "xckernel/kernels/xck_cmgga_tau_r_o0.hpp"
 
 extern "C" {
+extern const char* const xck_cmgga_tau_r_o0_kind;
+const char* const xck_cmgga_tau_r_o0_kind = "exc";
+extern const int xck_cmgga_tau_r_o0_out_rank;
+const int xck_cmgga_tau_r_o0_out_rank = 0;
+extern const char* const xck_cmgga_tau_r_o0_out_shape;
+const char* const xck_cmgga_tau_r_o0_out_shape = "()";
 double xck_cmgga_tau_r_o0(int64_t npts, const double* w, const double* rho,
               const double* zk) {
     return xckernel::xck_cmgga_tau_r_o0_t<double, double>(npts, w, rho, zk);

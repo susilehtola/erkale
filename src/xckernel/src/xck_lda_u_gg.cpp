@@ -4,20 +4,26 @@
 extern "C" {
 
 const char* xck_lda_u_gg_scal_names[9] = {
-    "w",
-    "rho_a_x",
-    "rho_a_y",
-    "rho_a_z",
-    "rho_b_x",
-    "rho_b_y",
-    "rho_b_z",
-    "vrho_0",
-    "vrho_1",
+    xckernel::xck_lda_u_gg_field_names[0],
+    xckernel::xck_lda_u_gg_field_names[1],
+    xckernel::xck_lda_u_gg_field_names[2],
+    xckernel::xck_lda_u_gg_field_names[3],
+    xckernel::xck_lda_u_gg_field_names[4],
+    xckernel::xck_lda_u_gg_field_names[5],
+    xckernel::xck_lda_u_gg_field_names[6],
+    xckernel::xck_lda_u_gg_xc_names[0],
+    xckernel::xck_lda_u_gg_xc_names[1],
 };
 extern const int xck_lda_u_gg_n_scal;
-const int xck_lda_u_gg_n_scal = 9;
+const int xck_lda_u_gg_n_scal = xckernel::xck_lda_u_gg_n_fields + xckernel::xck_lda_u_gg_n_xc;
 extern const int xck_lda_u_gg_n_fields;
-const int xck_lda_u_gg_n_fields = 7;
+const int xck_lda_u_gg_n_fields = xckernel::xck_lda_u_gg_n_fields;
+extern const char* const xck_lda_u_gg_kind;
+const char* const xck_lda_u_gg_kind = "gg";
+extern const int xck_lda_u_gg_out_rank;
+const int xck_lda_u_gg_out_rank = 2;
+extern const char* const xck_lda_u_gg_out_shape;
+const char* const xck_lda_u_gg_out_shape = "(3, ng)";
 
 /* One homogeneous scal list (all double): the per-point tower
  * operands first, the functional-derivative arrays from
