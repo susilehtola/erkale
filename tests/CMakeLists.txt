@@ -32,6 +32,13 @@ function(run_xrs target dep)
   set_property(TEST ${target} APPEND PROPERTY DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.chk)
 endfunction()
 
+# A calculation that starts from the checkpoint of another test (the
+# projection-free guess on a change of basis)
+function(run_projfree target dep)
+  run_test(${target})
+  set_property(TEST ${target}_chk APPEND PROPERTY DEPENDS ${dep}_chk)
+endfunction()
+
 # Multicomponent (NEO) tests. The dump's self-consistency check reconstructs
 # the SCF energy from the exported tensors and throws if they disagree, so the
 # run validates the charge and the mass factors by itself; the expected energy
@@ -115,6 +122,11 @@ if(ERKALE_TRUST_REGION)
     run_neo(neo_dft_epc_tr "-75.84436")
   endif()
 endif()
+
+# Projection-free guess on a change of basis, restricted DFT and
+# unrestricted Hartree-Fock
+run_projfree(H2O_projfree_pbe H2O_tz_pbe)
+run_projfree(H2O+_projfree_hf H2O+_tz_hf)
 
 # Generate list with genlist.sh
 include(TestList.txt)

@@ -545,24 +545,7 @@ class JKBackend {
             parse_xc_func(xfunc,cfunc,settings.get_string("Method"));
             if(exact_exchange(xfunc)!=0.0) rik=true;
           }
-          if(stricmp(cfg.fittingbasis.c_str(),"Auto")==0) {
-            // CD-derived auto-aux (Lehtola 2021/2023): spans the orbital
-            // products, so valid for exact exchange too.
-            dfitbas=basis.cholesky_aux_basis(cfg.cholthr, cfg.fitlmaxinc);
-          } else if(stricmp(cfg.fittingbasis.c_str(),"AutoABS")==0) {
-            // Eichkorn-style automatic aux. J-only.
-            if(rik)
-              throw std::runtime_error("FittingBasis AutoABS is not implemented for exact exchange.\nUse Auto (CD-derived) or set an explicit FittingBasis.\n");
-            dfitbas=basis.density_fitting();
-          } else {
-            BasisSetLibrary fitlib;
-            fitlib.load_basis(cfg.fittingbasis);
-            bool uselm=settings.get_bool("UseLM");
-            settings.set_bool("UseLM",true);
-            construct_basis(dfitbas,basis.nuclei(),fitlib);
-            dfitbas.coulomb_normalize();
-            settings.set_bool("UseLM",uselm);
-          }
+          dfitbas=JKBuilder::fitting_basis(basis, cfg.fittingbasis, cfg.cholthr, cfg.fitlmaxinc, rik);
         }
       }
 
@@ -755,6 +738,29 @@ void JKBuilder::configure(const Settings & set) {
     impl.reset(new DensityFitJK(cfg, method));
     break;
   }
+}
+
+BasisSet JKBuilder::fitting_basis(const BasisSet & basis, const std::string & fittingbasis, double cholthr, int fitlmaxinc, bool exact_exchange) {
+  BasisSet fitbas;
+  if(stricmp(fittingbasis,"Auto")==0) {
+    // CD-derived auto-aux (Lehtola 2021/2023): spans the orbital
+    // products, so valid for exact exchange too.
+    fitbas=basis.cholesky_aux_basis(cholthr, fitlmaxinc);
+  } else if(stricmp(fittingbasis,"AutoABS")==0) {
+    // Eichkorn-style automatic aux. J-only.
+    if(exact_exchange)
+      throw std::runtime_error("FittingBasis AutoABS is not implemented for exact exchange.\nUse Auto (CD-derived) or set an explicit FittingBasis.\n");
+    fitbas=basis.density_fitting();
+  } else {
+    BasisSetLibrary fitlib;
+    fitlib.load_basis(fittingbasis);
+    bool uselm=settings.get_bool("UseLM");
+    settings.set_bool("UseLM",true);
+    construct_basis(fitbas,basis.nuclei(),fitlib);
+    fitbas.coulomb_normalize();
+    settings.set_bool("UseLM",uselm);
+  }
+  return fitbas;
 }
 
 void JKBuilder::set_fitting(const BasisSet & fitbas) { impl->set_fitting(fitbas); }

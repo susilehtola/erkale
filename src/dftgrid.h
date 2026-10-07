@@ -413,9 +413,9 @@ class AngularGrid {
   /// Construct a fixed size grid
   angshell_t construct();
   /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
-  angshell_t construct(const arma::mat & P, double ftol, int x_func, int c_func);
+  angshell_t construct(const arma::mat & P, double ftol, int x_func, int c_func, const BasisSet * dens_basis=nullptr);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
-  angshell_t construct(const arma::mat & Pa, const arma::mat & Pb, double ftol, int x_func, int c_func);
+  angshell_t construct(const arma::mat & Pa, const arma::mat & Pb, double ftol, int x_func, int c_func, const BasisSet * dens_basis=nullptr);
   /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
   angshell_t construct(const arma::cx_vec & C, double ftol, int x_func, int c_func);
 
@@ -468,8 +468,16 @@ class AngularGrid {
 
   /// Update values of density, restricted calculation
   void update_density(const arma::mat & P, const BFTable * tab=nullptr);
-  /// Update values of density, unrestricted calculation
-  void update_density(const arma::mat & Pa, const arma::mat & Pb, const BFTable * tab_b=nullptr);
+  /// Update values of density, unrestricted calculation. tab_b / tab_a
+  /// evaluate the beta / alpha density in a second basis (tab_b alone:
+  /// the NEO proton channel; both: the projection-free guess).
+  void update_density(const arma::mat & Pa, const arma::mat & Pb, const BFTable * tab_b=nullptr, const BFTable * tab_a=nullptr);
+  /// Update values of density, restricted, with the density in
+  /// dens_basis (the primary basis if null)
+  void update_density_from(const arma::mat & P, const BasisSet * dens_basis);
+  /// Update values of density, unrestricted, with both spin densities
+  /// in dens_basis (the primary basis if null)
+  void update_density_from(const arma::mat & Pa, const arma::mat & Pb, const BasisSet * dens_basis);
   /// Update values of density, self-interaction correction
   void update_density(const arma::cx_vec & C);
 
@@ -640,9 +648,9 @@ class DFTGrid {
   /// Create fixed size grid
   void construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool nl);
   /// Create grid for restricted calculation
-  void construct(const arma::mat & P, double ftol, int x_func, int c_func);
+  void construct(const arma::mat & P, double ftol, int x_func, int c_func, const BasisSet * dens_basis=nullptr);
   /// Create grid for unrestricted calculation
-  void construct(const arma::mat & Pa, const arma::mat & Pb, double ftol, int x_func, int c_func);
+  void construct(const arma::mat & Pa, const arma::mat & Pb, double ftol, int x_func, int c_func, const BasisSet * dens_basis=nullptr);
   /// Create grid for SIC calculation
   void construct(const arma::cx_mat & C, double ftol, int x_func, int c_func);
 
@@ -684,7 +692,11 @@ class DFTGrid {
   /// basis_b = nullptr is ordinary unrestricted DFT. fock_a and fock_b
   /// select the matrices that are built (the energy always is); a matrix
   /// that is not built is left empty.
-  void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true);
+  /// With dens_basis instead (exclusive with basis_b), both spin
+  /// densities are in that basis and both matrices are assembled in the
+  /// grid's primary basis: the projection-free guess, whose loaded
+  /// density is in the old basis.
+  void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true, const BasisSet * dens_basis=nullptr);
 
   /**
    * XC response kernel: the first-order change of the restricted XC

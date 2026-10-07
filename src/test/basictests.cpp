@@ -29,6 +29,9 @@
 #include "../xcfunctional.h"
 #include "../xckernel_dispatch.h"
 #include <xckernel.h>
+#include "../eritable.h"
+#include "../density_fitting.h"
+#include "../crossbasis.h"
 
 #include <array>
 #include <cstdio>
@@ -1137,6 +1140,90 @@ void check_xc_force() {
     }
 }
 
+void check_cross_basis() {
+  // Two-electron matrices in one basis of a density in another
+  // (crossbasis.h). In a single basis they must reproduce the ordinary
+  // four-index and density-fitted builds; between two different bases,
+  // the interaction of the two densities must not depend on which one is
+  // the source.
+  const double r[3][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}};
+  auto make_basis = [&](const std::vector<double> & zO, const std::vector<double> & zH, int lO, int lH, bool coulomb) {
+    BasisSet bas;
+    for(size_t inuc=0;inuc<3;inuc++) {
+      nucleus_t nuc;
+      nuc.ind=inuc;
+      nuc.r.x=r[inuc][0]; nuc.r.y=r[inuc][1]; nuc.r.z=r[inuc][2];
+      nuc.bsse=false;
+      nuc.symbol = inuc ? "H" : "O";
+      nuc.Z = inuc ? 1 : 8;
+      nuc.Q=0;
+      bas.add_nucleus(nuc);
+      for(int am=0;am<=(inuc ? lH : lO);am++)
+        for(double z : (inuc ? zH : zO)) {
+          std::vector<contr_t> c(1);
+          c[0].z=z;
+          c[0].c=1.0;
+          bas.add_shell(inuc, am, true, c, false);
+        }
+    }
+    bas.finalize();
+    if(coulomb)
+      bas.coulomb_normalize();
+    return bas;
+  };
+  const BasisSet bA(make_basis({20.0, 4.0, 0.8, 0.2}, {3.0, 0.5}, 2, 1, false));
+  const BasisSet bB(make_basis({15.0, 2.5, 0.6}, {4.0, 0.7, 0.15}, 1, 1, false));
+  const BasisSet aux(make_basis({60.0, 20.0, 6.0, 2.0, 0.6, 0.2}, {12.0, 3.0, 0.8, 0.2}, 3, 2, true));
+
+  // Random densities from orthonormal orbitals, with occupations
+  arma::arma_rng::set_seed(11);
+  auto orbitals = [](const BasisSet & bas, size_t nocc) {
+    const arma::mat S(bas.overlap());
+    arma::mat C(arma::randn<arma::mat>(S.n_rows, nocc));
+    return arma::mat(C*arma::inv(arma::chol(C.t()*S*C)));
+  };
+  const arma::vec occ({2.0, 1.6, 1.0, 0.4});
+  const arma::mat CA(orbitals(bA, occ.n_elem)), CB(orbitals(bB, occ.n_elem));
+  const arma::mat PA(CA*arma::diagmat(occ)*CA.t()), PB(CB*arma::diagmat(occ)*CB.t());
+  const arma::mat CAs(CA*arma::diagmat(arma::sqrt(occ))), CBs(CB*arma::diagmat(arma::sqrt(occ)));
+  const std::vector<double> occs(arma::conv_to<std::vector<double>>::from(occ));
+
+  const double thr=1e-14, fitthr=1e-10, omega=0.4;
+  double dexact=0.0, ddf=0.0;
+  // A single basis: four-index
+  {
+    ERItable tab;
+    tab.fill(&bA, thr);
+    dexact=std::max(dexact, reldiff(cross_basis_J(bA, bA, PA, thr), tab.calcJ(PA)));
+    dexact=std::max(dexact, reldiff(cross_basis_K(bA, bA, PA, thr), tab.calcK(PA)));
+  }
+  // A single basis: density fitting, plain and short-range. The two fits
+  // invert the metric differently, which leaves differences of the order
+  // of 1e-10 depending on the linear algebra libraries
+  {
+    DensityFit dfit;
+    dfit.fill(bA, aux, false, thr, fitthr, 1e-12);
+    ddf=std::max(ddf, reldiff(cross_basis_J_df(bA, bA, aux, PA, fitthr), dfit.calcJ(PA)));
+    ddf=std::max(ddf, reldiff(cross_basis_K_df(bA, bA, aux, {CAs}, fitthr)[0], dfit.calcK(CA, occs)));
+    DensityFit dfit_rs;
+    dfit_rs.set_range_separation(omega, 0.0, 1.0);
+    dfit_rs.fill(bA, aux, false, thr, fitthr, 1e-12);
+    ddf=std::max(ddf, reldiff(cross_basis_K_df(bA, bA, aux, {CAs}, fitthr, omega, 0.0, 1.0)[0], dfit_rs.calcK(CA, occs)));
+  }
+  // Two bases: the interaction energies tr(X[P_B] P_A) = tr(X[P_A] P_B)
+  auto sym = [](double a, double b) { return std::abs(a-b)/std::abs(a); };
+  double ds=0.0;
+  ds=std::max(ds, sym(arma::accu(cross_basis_J(bA, bB, PB, thr)%PA), arma::accu(cross_basis_J(bB, bA, PA, thr)%PB)));
+  ds=std::max(ds, sym(arma::accu(cross_basis_K(bA, bB, PB, thr)%PA), arma::accu(cross_basis_K(bB, bA, PA, thr)%PB)));
+  ds=std::max(ds, sym(arma::accu(cross_basis_J_df(bA, bB, aux, PB, fitthr)%PA), arma::accu(cross_basis_J_df(bB, bA, aux, PA, fitthr)%PB)));
+  ds=std::max(ds, sym(arma::accu(cross_basis_K_df(bA, bB, aux, {CBs}, fitthr)[0]%PA), arma::accu(cross_basis_K_df(bB, bA, aux, {CAs}, fitthr)[0]%PB)));
+  ds=std::max(ds, sym(arma::accu(cross_basis_K(bA, bB, PB, thr, omega, 0.0, 1.0)%PA), arma::accu(cross_basis_K(bB, bA, PA, thr, omega, 0.0, 1.0)%PB)));
+  printf("Cross-basis J/K: single basis vs four-index %.1e, vs density fitting %.1e, two-basis symmetry %.1e\n", dexact, ddf, ds);
+  fflush(stdout);
+  if(dexact > 1e-10 || ddf > 1e-8 || ds > 1e-10)
+    throw std::runtime_error("check_cross_basis: the cross-basis matrices are inconsistent.\n");
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -1173,6 +1260,9 @@ int main(void) {
   // XC forces with grid response
   check_xc_force();
   printf("XC forces OK.\n");
+  // Two-electron matrices across basis sets
+  check_cross_basis();
+  printf("Cross-basis J/K OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection

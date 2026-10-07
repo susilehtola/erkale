@@ -80,6 +80,10 @@ class JKBuilder {
   static std::string method_name(Method m);
   /// Human-readable name of the resolved method.
   std::string name() const;
+  /// The auxiliary basis that the FittingBasis keyword gives for the
+  /// orbital basis in RI: a basis-set name, Auto (CD-derived) or AutoABS
+  /// (J-only; refused when exact exchange is needed).
+  static BasisSet fitting_basis(const BasisSet & basis, const std::string & fittingbasis, double cholthr, int fitlmaxinc, bool exact_exchange);
   /// Override the density-fitting auxiliary basis (before init).
   void set_fitting(const BasisSet & fitbas);
   /// Build the integral engine(s) for the chosen method.
