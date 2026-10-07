@@ -45,6 +45,7 @@
 #include "neo_particle.h"
 
 #include "eriworker.h"
+#include "crossbasis.h"
 
 #include "openorbitaloptimizer/scfsolver.hpp"
 // The Armadillo compatibility shim (OpenOrbitalOptimizer::Armadillo::) is a
@@ -569,135 +570,9 @@ int main_guarded(int argc, char **argv) {
   };
 
   std::function<arma::mat(const BasisSet &, const arma::mat &, const BasisSet &)> multicomponent_coulomb_tei = [&](const BasisSet & source_basis, const arma::mat & source_density, const BasisSet & target_basis) {
-    // Shells in the two basis sets
-    std::vector<GaussianShell> sshells=source_basis.shells();
-    std::vector<GaussianShell> tshells=target_basis.shells();
-
-    // Get shellpairs
-    double shtol=settings.get_double("IntegralThresh");
-    bool verbose=false;
-    ScreeningData s_scr = source_basis.compute_screening(shtol,omega_proton,alpha_proton,beta_proton,verbose);
-    ScreeningData t_scr = target_basis.compute_screening(shtol,omega_proton,alpha_proton,beta_proton,verbose);
-    const arma::mat & Qs = s_scr.Q;
-    const arma::mat & Qt = t_scr.Q;
-    const std::vector<eripair_t> & spairs = s_scr.shpairs;
-    const std::vector<eripair_t> & tpairs = t_scr.shpairs;
-
-    // Sanity check
-    if(source_density.n_rows != source_basis.Nbf() or source_density.n_cols != source_basis.Nbf())
-      throw std::logic_error("Density matrix does not correspond to basis set!\n");
-    // Target matrix
-    arma::mat Jt(target_basis.Nbf(), target_basis.Nbf(), arma::fill::zeros);
-
-    // libcint environment: the target shells, followed by the source
-    // shells of the other species
-    CintEnv cenv(target_basis, source_basis);
-    const size_t Nsh_tgt = cenv.Nsh_orb();
-
-    // Compute integrals
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      // ERI worker. unique_ptr so a throw inside the loop doesn't
-      // leak the allocation
-      auto eri_owner = make_eri_worker(cenv, omega_proton, alpha_proton, beta_proton);
-      ERIWorker *eri = eri_owner.get();
-
-#ifndef _OPENMP
-      int ith=0;
-#else
-      int ith(omp_get_thread_num());
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t tp=0;tp<tpairs.size();tp++) {
-        // Shells on first pair
-        size_t it=tpairs[tp].is;
-        size_t jt=tpairs[tp].js;
-        // First functions on the first pair is
-        size_t it0=tpairs[tp].i0;
-        size_t jt0=tpairs[tp].j0;
-        // Number of functions
-        size_t Nti=tpairs[tp].Ni;
-        size_t Ntj=tpairs[tp].Nj;
-
-        // Target integral shell
-        arma::mat Jtij(Nti,Ntj,arma::fill::zeros);
-
-        for(size_t sp=0;sp<spairs.size();sp++) {
-          // and those on the second pair are analogously
-          size_t ks=spairs[sp].is;
-          size_t ls=spairs[sp].js;
-          size_t ks0=spairs[sp].i0;
-          size_t ls0=spairs[sp].j0;
-          size_t Nsk=spairs[sp].Ni;
-          size_t Nsl=spairs[sp].Nj;
-
-          // Schwarz screening estimate
-          double QQ=Qt(it,jt)*Qs(ks,ls);
-          if(QQ<shtol) {
-            // Skip due to small value of integral. Because the
-            // integrals have been ordered wrt Q, all the next ones
-            // will be small as well!
-            break;
-          }
-
-          // Compute integrals
-          eri->compute(it,jt,Nsh_tgt+ks,Nsh_tgt+ls);
-
-          // Extract density
-          arma::mat Pskl = source_density.submat(ks0,ls0,ks0+Nsk-1,ls0+Nsl-1);
-
-          // Degeneracy factor
-          double fac=1.0;
-          if(ks!=ls)
-            fac=2.0;
-
-          // J_ij = (ij|kl) P_kl using matmul
-          arma::mat tei((double *)(eri->getp()->data()),Nsk*Nsl,Nti*Ntj,false,true);
-          arma::mat incr = fac*arma::vectorise(Pskl.t()).t()*tei;
-          incr.reshape(Ntj,Nti);
-          incr = incr.t();
-
-          /*
-          arma::mat Jtest(Nti,Ntj,arma::fill::zeros);
-          const std::vector<double> & ints(*eri->getp());
-          // Increment matrix
-          for(size_t ii=0;ii<Nti;ii++)
-            for(size_t jj=0;jj<Ntj;jj++) {
-
-              // Matrix element
-              double el=0.0;
-              for(size_t kk=0;kk<Nsk;kk++)
-                for(size_t ll=0;ll<Nsl;ll++)
-                  el+=Pskl(kk,ll)*ints[((ii*Ntj+jj)*Nsk+kk)*Nsl+ll];
-
-              // Set the element
-              Jtest(ii,jj)+=fac*el;
-            }
-
-          // Check correctness
-          double dint = arma::max(arma::max(arma::abs(Jtest-incr)));
-          if(dint > 1e-6) {
-            printf("Error %e\n",dint);
-            incr.print("Jt");
-            Jtest.print("Jtest");
-          }
-          */
-
-          Jtij += incr;
-        }
-
-        // Now that we've computed the block, store it in the full matrix
-        Jt.submat(it0,jt0,it0+Nti-1,jt0+Ntj-1) = Jtij;
-        if(it!=jt)
-          Jt.submat(jt0,it0,jt0+Ntj-1,it0+Nti-1) = arma::trans(Jtij);
-      }
-
-      // eri_owner releases automatically.
-    }
-
-    return Jt;
+    // Exact Coulomb interaction of the source density in the target basis,
+    // with the engine's (omega, alpha, beta) operator
+    return cross_basis_J(target_basis, source_basis, source_density, settings.get_double("IntegralThresh"), omega_proton, alpha_proton, beta_proton);
   };
 
   // c = B_e^T P_e in the shared auxiliary/pivot space, then J = -B_p c: the

@@ -174,7 +174,10 @@ enum guess_t {
   /// Minimal basis SAP
   MINSAP_GUESS,
   /// Gaussian-basis fit SAP
-  SAPFIT_GUESS
+  SAPFIT_GUESS,
+  /// Projection-free guess: the Fock matrix in the new basis of the
+  /// density loaded with LoadChk in the old basis
+  PROJFREE_GUESS
 };
 
 /// Perdew-Zunger SIC mode
