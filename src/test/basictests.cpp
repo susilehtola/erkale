@@ -32,6 +32,7 @@
 #include <array>
 #include <cstdio>
 #include <fstream>
+#include <functional>
 #include <sstream>
 
 /// Check orthogonality of spherical harmonics up to
@@ -653,8 +654,10 @@ void check_xckernel_dftgrid() {
   // The libxckernel path of DFTGrid on a water-like molecule with a
   // random density, for each functional family: the order-1 kernels must
   // reproduce the hand-written XC matrices, and the order-2 response
-  // must equal the central finite difference of the XC matrix.
-  BasisSet basis;
+  // must equal the central finite difference of the XC matrix. Channel
+  // b is also put on a second, compact basis on the hydrogens, as the
+  // protons are in multicomponent (NEO) calculations.
+  BasisSet basis, pbasis;
   const double r[3][3]={{0.0, 0.0, 0.0}, {1.43, 1.10, 0.10}, {-1.40, 1.02, -0.20}};
   for(size_t inuc=0;inuc<3;inuc++) {
     nucleus_t nuc;
@@ -665,6 +668,15 @@ void check_xckernel_dftgrid() {
     nuc.Z = inuc ? 1 : 8;
     nuc.Q=0;
     basis.add_nucleus(nuc);
+    pbasis.add_nucleus(nuc);
+    if(inuc)
+      for(int am=0;am<=2;am++)
+        for(double zp : {32.0, 8.0}) {
+          std::vector<contr_t> c(1);
+          c[0].z=zp;
+          c[0].c=1.0;
+          pbasis.add_shell(inuc, am, true, c, false);
+        }
     const double z[3]={inuc ? 5.0 : 30.0, inuc ? 1.0 : 5.0, inuc ? 0.25 : 1.0};
     for(int am=0;am<=(inuc ? 1 : 2);am++)
       for(int ip=0;ip<3;ip++) {
@@ -675,14 +687,15 @@ void check_xckernel_dftgrid() {
       }
   }
   basis.finalize();
+  pbasis.finalize();
 
   // Random occupied orbitals, orthonormal in the overlap metric, and
   // symmetric perturbations spanned by them: these decay like the
   // density, so that the finite difference stays in the linear regime
   // also in the tails
-  const arma::mat S(basis.overlap());
+  const arma::mat S(basis.overlap()), Sp(pbasis.overlap());
   arma::arma_rng::set_seed(7);
-  auto orbitals = [&](size_t nocc) {
+  auto orbitals = [&](size_t nocc, const arma::mat & S) {
     arma::mat C(arma::randn<arma::mat>(S.n_rows, nocc));
     return arma::mat(C*arma::inv(arma::chol(C.t()*S*C)));
   };
@@ -690,10 +703,11 @@ void check_xckernel_dftgrid() {
     arma::mat M(arma::randn<arma::mat>(C.n_cols, C.n_cols));
     return arma::mat(C*(M+M.t())*C.t());
   };
-  const arma::mat Ca(orbitals(5)), Cb(orbitals(4));
+  const arma::mat Ca(orbitals(5, S)), Cb(orbitals(4, S)), Cp(orbitals(2, Sp));
   const arma::mat Pa(Ca*Ca.t()), Pb(Cb*Cb.t());
   const arma::mat P(2.0*Pa);
-  const arma::mat Xa(perturbation(Ca)), Xb(perturbation(Cb));
+  const arma::mat Pp(Cp*Cp.t());
+  const arma::mat Xa(perturbation(Ca)), Xb(perturbation(Cb)), Xp(perturbation(Cp));
 
   struct func_t { const char * name; int x, c; };
   const func_t funcs[] = {
@@ -705,41 +719,79 @@ void check_xckernel_dftgrid() {
   };
   // A larger step crosses Libxc's sigma <= 8 rho tau clamp in the
   // single-orbital tails, where the functional is not differentiable
+  // Central differences, Richardson-extrapolated to remove the h^2
+  // error. A larger step would cross Libxc's sigma <= 8 rho tau clamp in
+  // the single-orbital tails, where the functional is not differentiable.
+  typedef std::vector<arma::mat> mats_t;
   const double h=1e-5;
+  auto derivative = [&](const std::function<mats_t(double)> & xc) {
+    auto central = [&](double s) {
+      mats_t p(xc(s)), m(xc(-s));
+      for(size_t i=0;i<p.size();i++)
+        p[i]=(p[i]-m[i])/(2.0*s);
+      return p;
+    };
+    const mats_t dh(central(h));
+    mats_t d(central(0.5*h));
+    for(size_t i=0;i<d.size();i++)
+      d[i]=(4.0*d[i]-dh[i])/3.0;
+    return d;
+  };
+  auto maxdiff = [](const mats_t & a, const mats_t & b) {
+    double d=0.0;
+    for(size_t i=0;i<a.size();i++)
+      d=std::max(d, reldiff(a[i], b[i]));
+    return d;
+  };
+
   for(const func_t & f : funcs) {
     DFTGrid grid(&basis, false);
     grid.construct(40, 17, f.x, f.c);
     double Exc, Nel;
+    // XC matrices: restricted at P, unrestricted at (Pa, Pb), and with
+    // channel b in the second basis at (Pa, Pp)
+    auto fock_r = [&](const arma::mat & D) {
+      arma::mat H;
+      grid.eval_Fxc(f.x, f.c, D, H, Exc, Nel);
+      return mats_t({H});
+    };
+    auto fock_u = [&](const arma::mat & Da, const arma::mat & Db, const BasisSet * bb) {
+      arma::mat Ha, Hb;
+      grid.eval_Fxc(f.x, f.c, Da, Db, Ha, Hb, Exc, Nel, bb);
+      return mats_t({Ha, Hb});
+    };
+    auto all_fock = [&]() {
+      mats_t H(fock_r(P)), Hu(fock_u(Pa, Pb, nullptr)), Hp(fock_u(Pa, Pp, &pbasis));
+      H.insert(H.end(), Hu.begin(), Hu.end());
+      H.insert(H.end(), Hp.begin(), Hp.end());
+      return H;
+    };
 
-    // Order 1, restricted and unrestricted
-    arma::mat H, Hx, Ha, Hb, Hxa, Hxb;
+    // Order 1 against the hand-written matrices
     grid.set_xckernel(false);
-    grid.eval_Fxc(f.x, f.c, P, H, Exc, Nel);
-    grid.eval_Fxc(f.x, f.c, Pa, Pb, Ha, Hb, Exc, Nel);
+    const mats_t Hhand(all_fock());
     grid.set_xckernel(true);
-    grid.eval_Fxc(f.x, f.c, P, Hx, Exc, Nel);
-    grid.eval_Fxc(f.x, f.c, Pa, Pb, Hxa, Hxb, Exc, Nel);
+    const mats_t Hxck(all_fock());
     grid.set_xckernel(false);
-    const double d1 = std::max(reldiff(Hx, H), std::max(reldiff(Hxa, Ha), reldiff(Hxb, Hb)));
+    const double d1 = maxdiff(Hxck, Hhand);
 
-    // Order 2, restricted: dH/dP . Xa
-    const arma::mat K(grid.eval_Kxc(f.x, f.c, P, {Xa})[0]);
-    arma::mat Hp, Hm;
-    grid.eval_Fxc(f.x, f.c, P+h*Xa, Hp, Exc, Nel);
-    grid.eval_Fxc(f.x, f.c, P-h*Xa, Hm, Exc, Nel);
-    double d2 = reldiff(K, (Hp-Hm)/(2*h));
-
-    // Order 2, unrestricted: perturb both channels at once
-    std::vector<arma::mat> Ka, Kb;
+    // Order 2 against the derivative of the XC matrices
+    mats_t K(grid.eval_Kxc(f.x, f.c, P, {Xa}));
+    mats_t Ka, Kb, Kpa, Kpb;
     grid.eval_Kxc(f.x, f.c, Pa, Pb, {Xa}, {Xb}, Ka, Kb);
-    arma::mat Hap, Hbp, Ham, Hbm;
-    grid.eval_Fxc(f.x, f.c, Pa+h*Xa, Pb+h*Xb, Hap, Hbp, Exc, Nel);
-    grid.eval_Fxc(f.x, f.c, Pa-h*Xa, Pb-h*Xb, Ham, Hbm, Exc, Nel);
-    d2 = std::max(d2, std::max(reldiff(Ka[0], (Hap-Ham)/(2*h)), reldiff(Kb[0], (Hbp-Hbm)/(2*h))));
+    grid.eval_Kxc(f.x, f.c, Pa, Pp, {Xa}, {Xp}, Kpa, Kpb, &pbasis);
+    K.insert(K.end(), {Ka[0], Kb[0], Kpa[0], Kpb[0]});
+    const mats_t dH(derivative([&](double t) {
+      mats_t H(fock_r(P+t*Xa)), Hu(fock_u(Pa+t*Xa, Pb+t*Xb, nullptr)), Hp(fock_u(Pa+t*Xa, Pp+t*Xp, &pbasis));
+      H.insert(H.end(), Hu.begin(), Hu.end());
+      H.insert(H.end(), Hp.begin(), Hp.end());
+      return H;
+    }));
+    const double d2 = maxdiff(K, dH);
 
     printf("libxckernel %-9s: order 1 vs hand-written %.1e, order 2 vs finite difference %.1e\n", f.name, d1, d2);
     fflush(stdout);
-    if(d1 > 1e-10 || d2 > 1e-6) {
+    if(d1 > 1e-10 || d2 > 1e-7) {
       std::ostringstream oss;
       oss << "check_xckernel_dftgrid: the " << f.name << " kernels disagree with the reference.\n";
       throw std::runtime_error(oss.str());

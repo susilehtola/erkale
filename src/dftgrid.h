@@ -318,16 +318,19 @@ class AngularGrid {
     int order;
   };
   /// Collocation tower through the order the kernels of variant
-  /// (r_o1, ua_o2, ...) of the batch's family read
-  xck_coll_t xck_collocation(const std::string & variant) const;
+  /// (r_o1, ua_o2, ...) of the batch's family read, in the basis of tab
+  /// if given
+  xck_coll_t xck_collocation(const std::string & variant, const BFTable * tab=nullptr) const;
   /// Ground-state operands: weights, density gradients and the first
   /// and second functional derivatives, by libxckernel name
   void xck_ground_operands(std::map<std::string, arma::rowvec> & ops) const;
   /// Perturbation-density operands of the (symmetric) AO matrix Px,
-  /// spin suffix "" (restricted), "_a" or "_b"
-  void xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const;
-  /// Run kernel name on the batch and accumulate into H (full basis)
-  void xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H) const;
+  /// spin suffix "" (restricted), "_a" or "_b"; in the basis of tab if
+  /// given
+  void xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops, const BFTable * tab=nullptr) const;
+  /// Run kernel name on the batch and accumulate into H (full basis,
+  /// that of tab if given)
+  void xck_contract(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, arma::mat & H, const BFTable * tab=nullptr) const;
 
   // VV10 stuff
   /// Density threshold
@@ -529,14 +532,15 @@ class AngularGrid {
   /// Evaluate Fock matrix with the libxckernel order-1 kernels, restricted
   void eval_Fxc_xck(arma::mat & H) const;
   /// Evaluate Fock matrices with the libxckernel order-1 kernels, unrestricted
-  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true) const;
+  void eval_Fxc_xck(arma::mat & Ha, arma::mat & Hb, bool alpha=true, bool beta=true, const BFTable * tab_b=nullptr) const;
   /// XC response (libxckernel order 2) to the symmetric perturbation
   /// densities Px, accumulated into Hx; restricted. Needs compute_xc
   /// with fxc.
   void eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const;
   /// XC response to the perturbation densities (Pxa[i], Pxb[i]),
-  /// accumulated into (Hxa[i], Hxb[i]); unrestricted
-  void eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb) const;
+  /// accumulated into (Hxa[i], Hxb[i]); unrestricted. With tab_b,
+  /// channel b is in that second basis.
+  void eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b=nullptr) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
@@ -663,8 +667,11 @@ class DFTGrid {
    */
   std::vector<arma::mat> eval_Kxc(int x_func, int c_func, const arma::mat & P, const std::vector<arma::mat> & Px);
   /// XC response kernel, unrestricted: the change of (Ha, Hb) at (Pa, Pb)
-  /// for each perturbation (Pxa[i], Pxb[i])
-  void eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb);
+  /// for each perturbation (Pxa[i], Pxb[i]). With basis_b, channel b is
+  /// in that basis as in eval_Fxc (multicomponent EPC). The matrix of a
+  /// channel involves only that channel's basis functions; the other
+  /// channel enters through its density and derivatives on the grid.
+  void eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b=nullptr);
 
   /**
    * Compute Fock matrix, exchange-correlation energy and integrated
