@@ -19,6 +19,8 @@
 
 #include <armadillo>
 #include <cstddef>
+#include <map>
+#include <string>
 
 extern "C" {
 #include <xc.h>
@@ -82,6 +84,14 @@ class XCFunctional {
   bool is_mgga() const { return mgga_tau_ || mgga_lapl_; }
   /// Does the functional provide an energy density?
   bool has_exc() const;
+  /// Does the functional provide second derivatives?
+  bool has_fxc() const;
+  /// Libxc's array dimensions (components per point) of this functional,
+  /// for its family and spin treatment
+  const xc_dimensions & dims() const { return func.dim; }
+  /// Libxc's array dimensions for the spin treatment, of a meta-GGA,
+  /// whose arrays cover every variable
+  static const xc_dimensions & dimensions(bool polarized);
   /// Electron-proton correlation functional (LDA_C_EPC17/17_2/18_1/18_2)?
   bool is_epc() const;
   /// libxc functional id.
@@ -98,6 +108,17 @@ class XCFunctional {
             const double * lapl, const double * tau, bool pot,
             double * exc, double * vrho, double * vsigma,
             double * vlapl, double * vtau) const;
+  /**
+   * Evaluate the second derivatives. out receives Libxc's arrays of the
+   * functional's family (all ten for a meta-GGA, zero in a variable the
+   * functional does not depend on), keyed by their Libxc names (v2rho2,
+   * v2rhosigma, ...), each stored ncomp x N with the spin component
+   * fastest and ncomp as Libxc's dimensions give it: Libxc's flat
+   * layout. Throws if the functional has no fxc.
+   */
+  void eval_fxc(size_t N, const double * rho, const double * sigma,
+                const double * lapl, const double * tau,
+                std::map<std::string, arma::mat> & out) const;
 };
 
 #endif
