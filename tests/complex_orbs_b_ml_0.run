@@ -12,5 +12,7 @@ LinearOccupationFile complex_orbs_b_ml.linocc
 LinearB 0.0
 JKMethod Cholesky
 DFTGrid 75 -302
-ConvThr 1e-9
+# The orbital gradient has a noise floor of a few 1e-9, which some runs
+# do not get below; the energy is checked to 1e-7
+ConvThr 1e-8
 SaveChk complex_orbs_b_ml_0.chk
