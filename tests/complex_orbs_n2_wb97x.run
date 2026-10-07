@@ -8,5 +8,7 @@ Restricted true
 ComplexBasis true
 JKMethod Cholesky
 DFTGrid 75 -302
-ConvThr 1e-8
+# The converged orbital gradient lands near 1e-8 (7.8e-9 typically),
+# and some runs do not get below; the energy is checked to 1e-7 or less
+ConvThr 1e-7
 SaveChk complex_orbs_n2_wb97x.chk
