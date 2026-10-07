@@ -288,7 +288,7 @@ int main_guarded(int argc, char **argv) {
   if(do_epc && (particle.q != 1.0 || particle.m != PROTON_MASS))
     throw std::runtime_error("EPCFunctional requires the quantum particle to be a proton.\n");
   ElectronicXC exc(basis, verbose);
-  exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"), do_epc);
+  exc.setup(settings.get_string("Method"), settings.get_string("DFTGrid"), epc_func);
   // The dump is a Hartree-Fock reference for post-SCF correlation, and its
   // verification rebuilds the Hartree-Fock energy
   if(settings.get_string("NEODump").size() && (exc.active() || do_epc))
@@ -1381,10 +1381,9 @@ int main_guarded(int argc, char **argv) {
       // Fock response to the transition densities D_b = L_b R_b^T + R_b L_b^T,
       // for analytic Hessian-vector products. The Coulomb and exact-exchange
       // terms are linear in the densities, and the exchange of D follows from
-      // that of L+R and L-R. The XC and EPC parts are central differences of
-      // their potentials alone, with the electronic and protonic densities
-      // displaced together so that the electron-proton coupling is included.
-      const double xc_step = 1e-4;
+      // that of L+R and L-R. The XC and EPC parts are the libxckernel
+      // second-derivative contractions; the EPC response couples the
+      // electronic and protonic transition densities.
       // Transition density in the AO basis, with its exchange
       std::function<void(const arma::mat &, const arma::mat &, const arma::mat &, const std::function<arma::mat(const arma::mat &, const std::vector<double> &)> &, arma::mat &, arma::mat &)> transition = [&](const arma::mat & Xb, const arma::mat & L, const arma::mat & R, const std::function<arma::mat(const arma::mat &, const std::vector<double> &)> & exchange, arma::mat & D, arma::mat & K) {
         const arma::mat La(Xb*L), Ra(Xb*R);
@@ -1403,13 +1402,12 @@ int main_guarded(int argc, char **argv) {
           return arma::mat(Dp.n_rows, Dp.n_cols, arma::fill::zeros);
         return arma::mat(proton_charge*proton_charge*pfit.calcJ(Dp) + Kp);
       };
-      // Central differences of the EPC potentials
+      // Response of the EPC potentials
       std::function<void(const arma::mat &, const arma::mat &, const arma::mat &, const arma::mat &, arma::mat &, arma::mat &)> epc_response = [&](const arma::mat & Pe, const arma::mat & Pp, const arma::mat & De, const arma::mat & Dp, arma::mat & dVe, arma::mat & dVp) {
-        arma::mat Vep, Vpp, Vem, Vpm;
-        ep_correlation(Pe + xc_step*De, Pp + xc_step*Dp, Vep, Vpp, true, true);
-        ep_correlation(Pe - xc_step*De, Pp - xc_step*Dp, Vem, Vpm, true, true);
-        dVe = (Vep - Vem)/(2.0*xc_step);
-        dVp = (Vpp - Vpm)/(2.0*xc_step);
+        std::vector<arma::mat> Ke, Kp;
+        exc.grid().eval_Kxc(epc_func, 0, Pe, Pp, {De}, {Dp}, Ke, Kp, &pbasis);
+        dVe = Ke[0];
+        dVp = Kp[0];
       };
       TrustRegionSCF::ResponseBuilder response;
       if(M==1)
@@ -1420,12 +1418,8 @@ int main_guarded(int argc, char **argv) {
           arma::mat dFe = dfit.calcJ(De) + 0.5*Ke + proton_electron_coulomb(Dp);
           arma::mat dFp = proton_pp(Dp, Kp) + electron_proton_coulomb(De);
           const arma::mat Pe(density(rdm, 0, X)), Pp(density(rdm, 1, Xp));
-          if(exc.active()) {
-            arma::mat Vp, Vm;
-            exc.eval(Pe + xc_step*De, Vp);
-            exc.eval(Pe - xc_step*De, Vm);
-            dFe += (Vp - Vm)/(2.0*xc_step);
-          }
+          if(exc.active())
+            dFe += exc.response(Pe, De);
           if(do_epc) {
             arma::mat dVe, dVp;
             epc_response(Pe, Pp, De, Dp, dVe, dVp);
@@ -1445,11 +1439,10 @@ int main_guarded(int argc, char **argv) {
           arma::mat dFp = proton_pp(Dp, Kp) + electron_proton_coulomb(Da + Db);
           const arma::mat Pa(density(rdm, 0, X)), Pb(density(rdm, 1, X)), Pp(density(rdm, 2, Xp));
           if(exc.active()) {
-            arma::mat Vpa, Vpb, Vma, Vmb;
-            exc.eval(Pa + xc_step*Da, Pb + xc_step*Db, Vpa, Vpb);
-            exc.eval(Pa - xc_step*Da, Pb - xc_step*Db, Vma, Vmb);
-            dFa += (Vpa - Vma)/(2.0*xc_step);
-            dFb += (Vpb - Vmb)/(2.0*xc_step);
+            arma::mat dVa, dVb;
+            exc.response(Pa, Pb, Da, Db, dVa, dVb);
+            dFa += dVa;
+            dFb += dVb;
           }
           if(do_epc) {
             arma::mat dVe, dVp;

@@ -24,6 +24,7 @@
 #include <armadillo>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 /**
  * Electronic exchange-correlation for the stand-alone SCF programs
@@ -55,10 +56,11 @@ class ElectronicXC {
   /**
    * Parse the functional and construct the grid (gridstr is nrad lmax or
    * a named grid). The grid is built when the functional needs it, or
-   * when need_grid is set for other terms evaluated on it (e.g. the
-   * electron-proton correlation in erkale_neo).
+   * when another functional is evaluated on it (extra_func > 0, e.g. the
+   * electron-proton correlation in erkale_neo); it then carries the
+   * density derivatives that either one needs.
    */
-  void setup(const std::string & method, const std::string & gridstr, bool need_grid=false) {
+  void setup(const std::string & method, const std::string & gridstr, int extra_func=0) {
     x_func_=c_func_=0;
     if(stricmp(method,"HF")!=0)
       parse_xc_func(x_func_, c_func_, method);
@@ -76,12 +78,19 @@ class ElectronicXC {
     if((x_func_>0 && needs_VV10(x_func_, b, C)) || (c_func_>0 && needs_VV10(c_func_, b, C)))
       throw std::runtime_error("VV10 functionals are not supported in this program.\n");
 
-    if(active() || need_grid) {
+    if(active() || extra_func>0) {
       if(stricmp(gridstr,"Auto")==0)
         throw std::runtime_error("Adaptive DFT grids are not supported in this program; give DFTGrid as nrad lmax.\n");
       dft_t griddft;
       parse_grid(griddft, gridstr, "DFT");
-      grid_.construct(griddft.nrad, griddft.lmax, x_func_, c_func_);
+      bool grad=false, tau=false, lapl=false;
+      for(int f : {x_func_, c_func_, extra_func})
+        if(f>0) {
+          grad = grad || gradient_needed(f);
+          tau = tau || tau_needed(f);
+          lapl = lapl || laplacian_needed(f);
+        }
+      grid_.construct(griddft.nrad, griddft.lmax, grad, tau, lapl, false);
       have_grid_=true;
     }
   }
@@ -132,6 +141,27 @@ class ElectronicXC {
       Vxcb.zeros(Pb.n_rows, Pb.n_cols);
     }
     return Exc;
+  }
+
+  /// Restricted: first-order change of the XC matrix at the density P
+  /// for the symmetric perturbation D
+  arma::mat response(const arma::mat & P, const arma::mat & D) {
+    if(!active())
+      return arma::zeros<arma::mat>(P.n_rows, P.n_cols);
+    return grid_.eval_Kxc(x_func_, c_func_, P, {D})[0];
+  }
+  /// Unrestricted: first-order change of the XC matrices at (Pa, Pb)
+  /// for the perturbation (Da, Db)
+  void response(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Da, const arma::mat & Db, arma::mat & dVa, arma::mat & dVb) {
+    if(!active()) {
+      dVa.zeros(Pa.n_rows, Pa.n_cols);
+      dVb.zeros(Pb.n_rows, Pb.n_cols);
+      return;
+    }
+    std::vector<arma::mat> Ka, Kb;
+    grid_.eval_Kxc(x_func_, c_func_, Pa, Pb, {Da}, {Db}, Ka, Kb);
+    dVa = Ka[0];
+    dVb = Kb[0];
   }
 };
 
