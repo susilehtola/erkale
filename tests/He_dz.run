@@ -5,6 +5,10 @@ Basis cc-pVDZ
 Direct false
 IntegralThresh 1e-14
 Guess Core
+# Converge well below the density comparison tolerance of chkcompare
+# (1e-6): at the default threshold, the run-to-run density noise has a
+# tail that occasionally crosses it
+ConvThr 1e-9
 
 
 Logfile He_dz.log
