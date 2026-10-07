@@ -34,6 +34,16 @@ target_link_libraries(liberkale PUBLIC
   erkale_arma GSL::gsl Libxc::xc cint erkale_hdf5
   wignernj::wignernj nlohmann_json::nlohmann_json)
 
+# Generated exchange-correlation kernels (libxckernel), vendored in
+# xckernel/ with the script that regenerates them. Orders 0-2 (energy,
+# Fock matrix, response); the BLAS integers follow ERKALE's.
+set(XCKERNEL_FORTRAN OFF CACHE BOOL "" FORCE)
+set(XCKERNEL_MAX_ORDER 2 CACHE STRING "" FORCE)
+set(XCKERNEL_BLAS ON CACHE BOOL "" FORCE)
+set(XCKERNEL_BLAS_ILP64 ${ERKALE_USE_ILP64} CACHE BOOL "" FORCE)
+add_subdirectory(xckernel)
+target_link_libraries(liberkale PUBLIC xckernel)
+
 # OpenMP: PUBLIC so the -fopenmp compile/link flags reach every consumer
 # (and _OPENMP is defined consistently with the scf-*.cpp.in code generator,
 # which is invoked with the same OpenMP flags).

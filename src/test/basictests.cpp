@@ -24,6 +24,7 @@
 #include "../cintenv.h"
 #include "../eriworker.h"
 #include "../xyzutils.h"
+#include <xckernel.h>
 
 #include <cstdio>
 #include <fstream>
@@ -552,6 +553,62 @@ void check_m_values() {
       }
 }
 
+void check_xckernel() {
+  // The vendored libxckernel kernels, against the XC Fock matrix written
+  // out by hand, on random data. This fixes the array conventions: the
+  // collocation is a Cartesian derivative tower chi[k][u][g] with the
+  // components 1, x, y, z, ... and the grid points fastest (i.e. the
+  // transposes of ERKALE's basis-function tables), and the output is
+  // accumulated.
+  const int64_t nbf=5, ng=37;
+  arma::arma_rng::set_seed(1);
+  // Column-major (ng, nbf) blocks = row-major (nbf, ng) components
+  arma::mat chi(arma::randn<arma::mat>(ng, 4*nbf));
+  const arma::mat chi0(chi.cols(0, nbf-1));
+  std::vector<arma::mat> dchi(3);
+  for(int x=0;x<3;x++)
+    dchi[x]=chi.cols((x+1)*nbf, (x+2)*nbf-1);
+  const arma::vec w(arma::randu<arma::vec>(ng)), vrho(arma::randn<arma::vec>(ng)), vsigma(arma::randn<arma::vec>(ng));
+  arma::mat grho(arma::randn<arma::mat>(ng, 3));
+
+  auto check = [](const arma::mat & out, const arma::mat & ref, const char * what) {
+    if(arma::abs(out-ref).max() > 1e-12*arma::abs(ref).max())
+      throw std::runtime_error(std::string("check_xckernel: ") + what + " differs.\n");
+  };
+
+  // LDA: sum_g w vrho chi_u chi_v
+  {
+    if(xck_lda_r_o1_chi_order != 0)
+      throw std::runtime_error("check_xckernel: unexpected LDA collocation order.\n");
+    const arma::mat ref(chi0.t()*arma::diagmat(w%vrho)*chi0);
+    arma::mat out(nbf, nbf, arma::fill::zeros);
+    const double * scal[2]={w.memptr(), vrho.memptr()};
+    if(xck_lda_r_o1(ng, nbf, chi.memptr(), scal, out.memptr()))
+      throw std::runtime_error("check_xckernel: LDA kernel failed.\n");
+    check(out, ref, "LDA Fock matrix");
+  }
+  // GGA: + sum_g w 2 vsigma grad(rho).(grad(chi_u) chi_v + chi_u grad(chi_v))
+  {
+    if(xck_gga_r_o1_chi_order != 1)
+      throw std::runtime_error("check_xckernel: unexpected GGA collocation order.\n");
+    arma::mat ref(chi0.t()*arma::diagmat(w%vrho)*chi0);
+    for(int x=0;x<3;x++) {
+      const arma::mat A(dchi[x].t()*arma::diagmat(2.0*w%vsigma%grho.col(x))*chi0);
+      ref+=A+A.t();
+    }
+    arma::mat out(nbf, nbf, arma::fill::zeros);
+    const double * scal[6]={w.memptr(), grho.colptr(0), grho.colptr(1), grho.colptr(2), vrho.memptr(), vsigma.memptr()};
+    if(xck_gga_r_o1(ng, nbf, chi.memptr(), scal, out.memptr()))
+      throw std::runtime_error("check_xckernel: GGA kernel failed.\n");
+    check(out, ref, "GGA Fock matrix");
+    // and its diagonal alone
+    arma::vec diag(nbf, arma::fill::zeros);
+    if(xck_gga_r_o1_diag(ng, nbf, chi.memptr(), scal, diag.memptr()))
+      throw std::runtime_error("check_xckernel: GGA diagonal kernel failed.\n");
+    check(diag, arma::diagvec(ref), "GGA Fock diagonal");
+  }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -571,6 +628,9 @@ int main(void) {
   // m labels of the functions for linear symmetry
   check_m_values();
   printf("Linear-symmetry m values OK.\n");
+  // Vendored XC kernels
+  check_xckernel();
+  printf("libxckernel kernels OK.\n");
   // BSE JSON basis-set reader / writer
   test_bse_json();
   // BSE JSON effective-core-potential rejection
