@@ -18,6 +18,8 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
+#include <iostream>
+#include <stdexcept>
 #include <vector>
 #include <algorithm>
 
@@ -618,7 +620,7 @@ void fractional_occupations(const std::vector<int> & Zs, bool largeactive, int Q
 
 Settings settings;
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Linear symmetries from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -688,4 +690,17 @@ int main(int argc, char **argv) {
     integer_occupations(Zs,largeactive,Q,saveconf);
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+#ifdef CATCH_EXCEPTIONS
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
+#else
+  return main_guarded(argc, argv);
+#endif
 }

@@ -28,8 +28,14 @@ include(CheckCXXCompilerFlag)
 set(ERKALE_SYSTEM_LIBRARY "" CACHE STRING
     "System-wide default basis-set repository (need not exist)")
 
-# Catch C++ exceptions in the executables' main()?
-option(CATCH_EXCEPTIONS "Catch C++ exceptions?" OFF)
+# Catch C++ exceptions in the executables' main(), so that an error (e.g.
+# an unrecognized input keyword) ends with its message and exit status 1
+# instead of std::terminate and a core dump. Switch it off to get a core
+# dump at the throw for debugging.
+option(CATCH_EXCEPTIONS "Catch C++ exceptions in the executables' main()?" ON)
+if(CATCH_EXCEPTIONS)
+  add_compile_definitions(CATCH_EXCEPTIONS)
+endif()
 
 # Build the OpenMP-parallel version (executables get an _omp suffix)?
 option(USE_OPENMP "Compile the OpenMP-parallel version?" ON)
