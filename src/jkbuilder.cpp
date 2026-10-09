@@ -721,6 +721,10 @@ std::string JKBuilder::method_name(Method m) {
   return "unknown";
 }
 
+std::string JKBuilder::name() const {
+  return method_name(method);
+}
+
 void JKBuilder::configure(const Settings & set) {
   method = resolve_method(set);
 
