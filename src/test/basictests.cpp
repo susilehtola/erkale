@@ -506,6 +506,96 @@ void check_spherical_order() {
   }
 }
 
+/// All the electron repulsion integrals of a basis, (ij|kl) as G(ij, kl)
+static arma::mat eri_tensor(const BasisSet & basis) {
+  const size_t N=basis.Nbf();
+  arma::mat G(N*N, N*N);
+  CintEnv cenv(basis);
+  ERIWorker eri(cenv);
+  for(size_t is=0;is<basis.Nshells();is++)
+    for(size_t js=0;js<basis.Nshells();js++)
+      for(size_t ks=0;ks<basis.Nshells();ks++)
+        for(size_t ls=0;ls<basis.Nshells();ls++) {
+          eri.compute(is,js,ks,ls);
+          const std::vector<double> & v=*eri.getp();
+          const size_t Ni=basis.Nbf(is), Nj=basis.Nbf(js), Nk=basis.Nbf(ks), Nl=basis.Nbf(ls);
+          for(size_t i=0;i<Ni;i++)
+            for(size_t j=0;j<Nj;j++)
+              for(size_t k=0;k<Nk;k++)
+                for(size_t l=0;l<Nl;l++)
+                  G((basis.first_ind(is)+i)*N+basis.first_ind(js)+j, (basis.first_ind(ks)+k)*N+basis.first_ind(ls)+l)=v[((i*Nj+j)*Nk+k)*Nl+l];
+        }
+  return G;
+}
+
+void check_mixed_basis() {
+  // A basis that mixes spherical and cartesian shells of l >= 2 is
+  // evaluated with libcint's cartesian kernels, and its spherical shells
+  // are transformed afterwards. Its integrals must equal those of the
+  // all-cartesian basis transformed with transmat into the mixed basis.
+  // The shells alternate between spherical and cartesian by angular
+  // momentum and by center, so the spherical-cartesian pairs of the
+  // same and of different l all appear.
+  std::vector<contr_t> c(3);
+  const double z[3]={3.0, 0.9, 0.25};
+  const double a[3]={0.30, 0.50, 0.40};
+  for(int i=0;i<3;i++) {
+    c[i].z=z[i];
+    c[i].c=a[i];
+  }
+
+  BasisSet bmix, bcart;
+  for(size_t inuc=0;inuc<2;inuc++) {
+    nucleus_t nuc;
+    nuc.ind=inuc;
+    nuc.r.x=0.3*inuc; nuc.r.y=-0.7*inuc; nuc.r.z=1.1*inuc;
+    nuc.bsse=false;
+    nuc.symbol="C";
+    nuc.Z=6;
+    nuc.Q=0;
+    bmix.add_nucleus(nuc);
+    bcart.add_nucleus(nuc);
+    for(int am=0;am<=3;am++) {
+      bmix.add_shell(inuc, am, (am+inuc)%2==0, c, false);
+      bcart.add_shell(inuc, am, false, c, false);
+    }
+  }
+  bmix.finalize();
+  bcart.finalize();
+
+  // Transformation from the cartesian to the mixed basis, normalized as
+  // in check_spherical_order
+  arma::mat T(bmix.Nbf(), bcart.Nbf(), arma::fill::zeros);
+  for(size_t is=0;is<bmix.Nshells();is++) {
+    const std::vector<shellf_t> cart(bcart.shells()[is].cart());
+    arma::vec rn(cart.size());
+    for(size_t ic=0;ic<cart.size();ic++)
+      rn(ic)=cart[ic].relnorm;
+    const GaussianShell & sh=bmix.shells_ref()[is];
+    T.submat(bmix.first_ind(is), bcart.first_ind(is), bmix.first_ind(is)+bmix.Nbf(is)-1, bcart.first_ind(is)+bcart.Nbf(is)-1) =
+      sh.lm_in_use() ? arma::mat(sh.transmat()*arma::diagmat(1.0/rn)) : arma::mat(arma::eye(rn.n_elem,rn.n_elem));
+  }
+  T=arma::diagmat(1.0/arma::sqrt(arma::diagvec(T*bcart.overlap()*T.t())))*T;
+
+  auto compare=[](const std::string & what, const arma::mat & mix, const arma::mat & tra) {
+    const double d=arma::abs(mix-tra).max();
+    if(d>1e-10) {
+      std::ostringstream oss;
+      oss << "check_mixed_basis: the " << what << " of the mixed basis and of the transformed cartesian basis differ by " << d << ".\n";
+      throw std::runtime_error(oss.str());
+    }
+  };
+  compare("overlap", bmix.overlap(), T*bcart.overlap()*T.t());
+  compare("kinetic energy", bmix.kinetic(), T*bcart.kinetic()*T.t());
+  compare("nuclear attraction", bmix.nuclear(), T*bcart.nuclear()*T.t());
+  // A multi-component operator
+  const std::vector<arma::mat> rmix(bmix.moment(1)), rcart(bcart.moment(1));
+  for(int ic=0;ic<3;ic++)
+    compare("dipole", rmix[ic], T*rcart[ic]*T.t());
+  const arma::mat TT(arma::kron(T,T));
+  compare("electron repulsion integrals", eri_tensor(bmix), TT*eri_tensor(bcart)*TT.t());
+}
+
 void check_m_values() {
   // m labels for linear symmetry. Two nuclei on the z axis carry
   // generally contracted s, p and d shells, with cartesian s and p
@@ -1063,6 +1153,9 @@ int main(void) {
   // Spherical functions: transmat against libcint
   check_spherical_order();
   printf("Spherical harmonic order OK.\n");
+  // A basis mixing spherical and cartesian shells
+  check_mixed_basis();
+  printf("Mixed spherical and cartesian basis OK.\n");
   // m labels of the functions for linear symmetry
   check_m_values();
   printf("Linear-symmetry m values OK.\n");
