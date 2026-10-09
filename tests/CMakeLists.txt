@@ -120,36 +120,50 @@ endif()
 include(TestList.txt)
 
 # TREXIO export: write TREXIO files from the checkpoints of a few of the
-# tests above (restricted, unrestricted and ROHF; up to g functions) and
+# tests above (restricted, unrestricted and ROHF; spherical and cartesian;
+# up to g functions) and
 # validate them with trexio-validate. Each file is also imported back and
 # re-exported, and the result validated, which exercises the import. The
 # one-electron integrals are always exported and checked; with the ERI
 # option, the AO electron repulsion integrals are too (trexio-validate
 # checks them for at most 64 AOs).
+#
+# With FROM, the TREXIO file is given instead of exported from a
+# checkpoint, and the round trip starts with its import.
 function(run_trexio target)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "ERI" "" "")
+  cmake_parse_arguments(PARSE_ARGV 1 arg "ERI" "FROM" "")
   set(trexio_env "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
   set(export export)
   set(required basis nucleus_repulsion electron_count mo_orthonormality)
   foreach(op overlap kinetic potential_n_e core_hamiltonian dipole_x dipole_y dipole_z)
     list(APPEND required ao_1e_int_${op} mo_1e_int_${op})
+    list(APPEND required_mo mo_1e_int_${op})
   endforeach()
   if(arg_ERI)
     list(APPEND export --eri)
     list(APPEND required ao_2e_int_eri)
   endif()
 
-  add_test(NAME ${target}_trexio_export COMMAND erkale_trexio ${export} ${target}.chk ${target}.h5)
-  add_test(NAME ${target}_trexio_import COMMAND erkale_trexio import ${target}.h5 ${target}_trexio.chk)
+  if(arg_FROM)
+    set(src ${arg_FROM})
+    # A given file need not carry the AO integrals
+    set(required_src basis nucleus_repulsion electron_count mo_orthonormality ${required_mo})
+  else()
+    set(required_src ${required})
+    set(src ${CMAKE_CURRENT_BINARY_DIR}/${target}.h5)
+    add_test(NAME ${target}_trexio_export COMMAND erkale_trexio ${export} ${target}.chk ${src})
+    set_tests_properties(${target}_trexio_export PROPERTIES ENVIRONMENT "${trexio_env}"
+      DEPENDS ${target}_chk FIXTURES_SETUP ${target}_trexio)
+  endif()
+  add_test(NAME ${target}_trexio_import COMMAND erkale_trexio import ${src} ${target}_trexio.chk)
   add_test(NAME ${target}_trexio_reexport COMMAND erkale_trexio ${export} ${target}_trexio.chk ${target}_trexio.h5)
-  set_tests_properties(${target}_trexio_export ${target}_trexio_import ${target}_trexio_reexport
+  set_tests_properties(${target}_trexio_import ${target}_trexio_reexport
     PROPERTIES ENVIRONMENT "${trexio_env}")
-  set_tests_properties(${target}_trexio_export PROPERTIES DEPENDS ${target}_chk FIXTURES_SETUP ${target}_trexio)
   set_tests_properties(${target}_trexio_import PROPERTIES FIXTURES_REQUIRED ${target}_trexio FIXTURES_SETUP ${target}_trexio_rt)
   set_tests_properties(${target}_trexio_reexport PROPERTIES FIXTURES_REQUIRED ${target}_trexio_rt FIXTURES_SETUP ${target}_trexio_rt2)
   trexio_validate_add_test(${target}_trexio_validate
-    FILE ${CMAKE_CURRENT_BINARY_DIR}/${target}.h5
-    FIXTURES_REQUIRED ${target}_trexio REQUIRE ${required})
+    FILE ${src}
+    FIXTURES_REQUIRED ${target}_trexio REQUIRE ${required_src})
   trexio_validate_add_test(${target}_trexio_revalidate
     FILE ${CMAKE_CURRENT_BINARY_DIR}/${target}_trexio.h5
     FIXTURES_REQUIRED ${target}_trexio_rt2 REQUIRE ${required})
@@ -163,4 +177,15 @@ if(TARGET erkale_trexio AND COMMAND trexio_validate_add_test)
   run_trexio(H2O_qz)
   # Spherical p functions (OptLM false): libcint's (x, y, z) order
   run_trexio(H2O_tz_pbe_sphp ERI)
+  # Cartesian d and higher functions (UseLM false); trexio-validate
+  # checks the ERIs only of the smaller Ne
+  run_trexio(H2O_tz_pbe_cart)
+  run_trexio(Ne_tz_cart ERI)
+  # A basis mixing spherical and cartesian shells, flagged per shell with
+  # ao.cartesian_shell: the H2O_tz_pbe wavefunction with the oxygen f
+  # shell rewritten as cartesian, in another normalization convention.
+  # The file carries only the MO-basis integrals.
+  if(ERKALE_TREXIO_HAS_CARTESIAN_SHELL)
+    run_trexio(H2O_tz_pbe_mixed ERI FROM ${CMAKE_CURRENT_SOURCE_DIR}/H2O_tz_pbe_mixed.h5)
+  endif()
 endif()
