@@ -37,6 +37,13 @@ extern "C" {
 #include <trexio.h>
 }
 
+// libtrexio after 2.6.1 can flag each shell as cartesian or spherical
+// (ao.cartesian_shell); its TREXIO_AMBIGUOUS_CARTESIAN error code comes
+// with it.
+#ifdef TREXIO_AMBIGUOUS_CARTESIAN
+#define ERKALE_TREXIO_CARTESIAN_SHELL
+#endif
+
 namespace {
   // Abort with a descriptive message if a TREXIO call failed.
   void check(trexio_exit_code rc, const char * what) {
@@ -48,16 +55,13 @@ namespace {
   }
 #define TX(call) check((call), #call)
 
-  // ERKALE local index of the function with signed m in a shell of
-  // angular momentum l. Spherical d and higher shells store
+  // ERKALE local index of the function with signed m in a spherical
+  // shell of angular momentum l. Spherical d and higher shells store
   // m = -l..+l. s and p functions are the same whether cartesian (the
   // OptLM default) or spherical, and follow libcint's order:
   //   l=0: [s]              (m=0 -> 0)
   //   l=1: [x, y, z]        (m=+1 -> 0, m=-1 -> 1, m=0 -> 2)
-  // Cartesian d and higher are genuinely different (6d != 5d) and not
-  // supported for a spherical TREXIO export.
-  size_t erkale_local_index(const GaussianShell & sh, int m) {
-    const int l = sh.am();
+  size_t erkale_local_index(int l, int m) {
     if(l == 0)
       return 0;
     if(l == 1) {
@@ -65,9 +69,12 @@ namespace {
       if(m == -1) return 1;   // y
       return 2;               // z (m == 0)
     }
-    if(sh.lm_in_use())
-      return (size_t)(m + l);
-    throw std::runtime_error("TREXIO spherical export needs spherical d and higher shells (run with UseLM true; cartesian d+ unsupported).");
+    return (size_t)(m + l);
+  }
+
+  /// Number of functions of a TREXIO shell of angular momentum l
+  size_t trexio_nfunc(int l, bool cart) {
+    return cart ? (l+1)*(l+2)/2 : 2*l+1;
   }
 
   // Signed m of the j-th spherical function in TREXIO storage order
@@ -83,7 +90,8 @@ namespace {
   // contractions, so a generally contracted shell is written as one
   // TREXIO shell per contraction. ERKALE orders the functions of a
   // generally contracted shell contraction-slowest, so contraction ic
-  // occupies [first, first+2l+1) and the segments keep ERKALE's order.
+  // occupies its own span from first and the segments keep ERKALE's
+  // order.
   struct segment_t {
     /// The ERKALE shell
     const GaussianShell * sh;
@@ -102,18 +110,39 @@ namespace {
     return seg;
   }
 
-  // Per-segment permutation to TREXIO's storage order (m = 0,+1,-1,...).
-  // perm[trexio_ao] = erkale_ao, so a quantity in ERKALE AO order is
-  // read as q_erkale[perm[a]] at TREXIO position a. Segment order is
-  // shared, and every segment has 2l+1 functions, so the global offset
-  // is the same on both sides.
-  std::vector<size_t> erkale_to_trexio_perm(const BasisSet & basis) {
+  // Cartesian flags of the TREXIO shells on export. ERKALE's own flag
+  // decides for d and higher shells. s and p functions are the same
+  // either way: they follow the d+ shells when those agree, so that the
+  // file needs only the global ao.cartesian, and are spherical otherwise.
+  std::vector<int32_t> cartesian_flags(const std::vector<segment_t> & seg) {
+    // Flag shared by the d+ shells: -1 none seen yet, 2 mixed
+    int dcart=-1;
+    for(const segment_t & sg : seg)
+      if(sg.sh->am() >= 2) {
+        const int c = !sg.sh->lm_in_use();
+        dcart = (dcart == -1 || dcart == c) ? c : 2;
+      }
+    std::vector<int32_t> cart(seg.size());
+    for(size_t k=0; k<seg.size(); k++)
+      cart[k] = (seg[k].sh->am() >= 2) ? !seg[k].sh->lm_in_use() : (dcart == 1);
+    return cart;
+  }
+
+  // Per-segment permutation to TREXIO's storage order: m = 0,+1,-1,...
+  // in a spherical shell, and the alphabetical order of the cartesian
+  // functions -- which is ERKALE's -- in a cartesian one. cart holds
+  // the TREXIO flag of each segment. perm[trexio_ao] = erkale_ao, so a
+  // quantity in ERKALE AO order is read as q_erkale[perm[a]] at TREXIO
+  // position a. Segment order is shared, and a segment has as many
+  // functions on both sides, so the global offset is the same too.
+  std::vector<size_t> erkale_to_trexio_perm(const BasisSet & basis, const std::vector<int32_t> & cart) {
     const std::vector<GaussianShell> shells = basis.shells();
+    const std::vector<segment_t> seg = segments(shells);
     std::vector<size_t> perm(basis.Nbf());
-    for(const segment_t & sg : segments(shells)) {
-      const int l = sg.sh->am();
-      for(int j=0; j<2*l+1; j++)
-        perm[sg.first + j] = sg.first + erkale_local_index(*sg.sh, trexio_signed_m(j));
+    for(size_t k=0; k<seg.size(); k++) {
+      const int l = seg[k].sh->am();
+      for(size_t j=0; j<trexio_nfunc(l, cart[k]); j++)
+        perm[seg[k].first + j] = seg[k].first + (cart[k] ? j : erkale_local_index(l, trexio_signed_m(j)));
     }
     return perm;
   }
@@ -223,6 +252,14 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
   const std::vector<segment_t> seg = segments(shells);
   const size_t Nsh = seg.size();
   const size_t Nnuc = nuclei.size();
+  // Cartesian flags of the TREXIO shells; one for all of them if they
+  // agree, or one per shell (ao.cartesian_shell)
+  const std::vector<int32_t> cart = cartesian_flags(seg);
+  const bool cart_uniform = std::all_of(cart.begin(), cart.end(), [&](int32_t c) { return c == cart[0]; });
+#ifndef ERKALE_TREXIO_CARTESIAN_SHELL
+  if(!cart_uniform)
+    throw std::runtime_error("The basis mixes cartesian and spherical shells, which needs a libtrexio with ao.cartesian_shell (newer than 2.6.1).");
+#endif
 
   // Spin handling: "C" present -> restricted, else "Ca"/"Cb".
   const bool restr = chk.exist("C");
@@ -312,7 +349,8 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
       // contr_normalized() returns the coefficients for *normalized*
       // primitives (the basis-file contraction coefficients); TREXIO
       // overlaps bare primitives scaled by prim_factor, so prim_factor
-      // is the spherical-Gaussian primitive normalization
+      // is the normalization of the x^l (or, the same, the spherical)
+      // Gaussian primitive
       //   N(z,l) = (2/pi)^{3/4} 2^l z^{(2l+3)/4} / sqrt((2l-1)!!)
       // (ERKALE's own convention), and the contracted AO comes out
       // unit-normalized with shell_factor = 1.
@@ -335,19 +373,33 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     TX(trexio_write_basis_coefficient(tf, coefficient.data()));
     TX(trexio_write_basis_prim_factor(tf, prim_factor.data()));
 
-    // --- ao (spherical) ---
-    TX(trexio_write_ao_cartesian(tf, 0));
+    // --- ao ---
+    if(cart_uniform)
+      TX(trexio_write_ao_cartesian(tf, cart[0]));
+#ifdef ERKALE_TREXIO_CARTESIAN_SHELL
+    else
+      TX(trexio_write_ao_cartesian_shell(tf, cart.data()));
+#endif
     TX(trexio_write_ao_num(tf, (int32_t) Nbf));
     std::vector<int32_t> ao_shell(Nbf);
     for(size_t ish=0; ish<Nsh; ish++)
-      for(int k=0; k<2*seg[ish].sh->am()+1; k++)
+      for(size_t k=0; k<trexio_nfunc(seg[ish].sh->am(), cart[ish]); k++)
         ao_shell[seg[ish].first+k] = (int32_t) ish;   // segment order is shared, so first is the TREXIO offset too
     TX(trexio_write_ao_shell(tf, ao_shell.data()));
+    // ERKALE normalizes each cartesian function (the GAMESS convention),
+    // so the functions of a cartesian shell carry their norm relative to
+    // x^l, which prim_factor normalizes
     std::vector<double> ao_norm(Nbf, 1.0);
+    for(size_t ish=0; ish<Nsh; ish++)
+      if(!seg[ish].sh->lm_in_use()) {
+        const std::vector<shellf_t> & cf = seg[ish].sh->cart_ref();
+        for(size_t k=0; k<cf.size(); k++)
+          ao_norm[seg[ish].first+k] = cf[k].relnorm;
+      }
     TX(trexio_write_ao_normalization(tf, ao_norm.data()));
 
     // --- mo ---
-    const std::vector<size_t> perm = erkale_to_trexio_perm(basis);
+    const std::vector<size_t> perm = erkale_to_trexio_perm(basis, cart);
     const size_t nmo_a = Ca.n_cols;
     const size_t nmo_b = restr ? 0 : Cb.n_cols;
     const size_t Nmo = nmo_a + nmo_b;
@@ -427,7 +479,7 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
   // still works and the round-trip test validates correctness.
 #ifdef ERKALE_TREXIO_OVERLAP_HELPERS
   {
-    const std::vector<size_t> perm = erkale_to_trexio_perm(basis);
+    const std::vector<size_t> perm = erkale_to_trexio_perm(basis, cart);
     trexio_exit_code orc;
     trexio_t * rf = trexio_open(trexiofile.c_str(), 'r', TREXIO_HDF5, &orc);
     if(rf != NULL) {
@@ -489,7 +541,7 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
 
   BasisSet basis;
   size_t Nbf=0, Nmo=0, Nsh=0;
-  int32_t cart=0, up=0, dn=0;
+  int32_t up=0, dn=0;
   arma::mat Cfull;
   std::vector<double> occ, energy;
   std::vector<int32_t> spin;
@@ -504,10 +556,22 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
     TX(trexio_read_mo_num(tf, &nmo));
     TX(trexio_read_electron_up_num(tf, &up));
     TX(trexio_read_electron_dn_num(tf, &dn));
-    TX(trexio_read_ao_cartesian(tf, &cart));
-    if(cart)
-      throw std::runtime_error("TREXIO import currently supports spherical AOs only (ao_cartesian = 0).");
     Nsh=nsh; Nbf=nao; Nmo=nmo;
+
+    // Cartesian flags of the shells: one for all of them (ao.cartesian)
+    // or one per shell (ao.cartesian_shell). A file has one or the other.
+    std::vector<int32_t> cart(nsh);
+    if(trexio_has_ao_cartesian(tf)==TREXIO_SUCCESS) {
+      int32_t c;
+      TX(trexio_read_ao_cartesian(tf, &c));
+      cart.assign(nsh, c);
+    }
+#ifdef ERKALE_TREXIO_CARTESIAN_SHELL
+    else if(trexio_has_ao_cartesian_shell(tf)==TREXIO_SUCCESS)
+      TX(trexio_read_ao_cartesian_shell(tf, cart.data()));
+#endif
+    else
+      throw std::runtime_error("The TREXIO file has no ao.cartesian. If it has ao.cartesian_shell instead, ERKALE needs to be built with a libtrexio newer than 2.6.1.");
 
     // nuclei
     std::vector<double> charge(nnuc), coord(3*nnuc);
@@ -527,32 +591,61 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
     // basis -> shells
     std::vector<int32_t> nuc_index(nsh), shell_am(nsh), shell_index(nprim);
     std::vector<double>  exponent(nprim), coefficient(nprim), prim_factor(nprim);
+    std::vector<double>  shell_factor(nsh, 1.0), ao_norm(nao, 1.0);
     TX(trexio_read_basis_nucleus_index(tf, nuc_index.data()));
     TX(trexio_read_basis_shell_ang_mom(tf, shell_am.data()));
     TX(trexio_read_basis_shell_index(tf, shell_index.data()));
     TX(trexio_read_basis_exponent(tf, exponent.data()));
     TX(trexio_read_basis_coefficient(tf, coefficient.data()));
     TX(trexio_read_basis_prim_factor(tf, prim_factor.data()));
+    if(trexio_has_basis_shell_factor(tf)==TREXIO_SUCCESS)
+      TX(trexio_read_basis_shell_factor(tf, shell_factor.data()));
+    if(trexio_has_ao_normalization(tf)==TREXIO_SUCCESS)
+      TX(trexio_read_ao_normalization(tf, ao_norm.data()));
+    // Norm of the x^l (or, the same, the spherical) function of each
+    // shell, which ERKALE's functions have normalized
+    std::vector<double> shell_norm(nsh);
     for(int32_t ish=0; ish<nsh; ish++) {
       // TREXIO scales the bare primitive exp(-z r^2) by prim_factor, so
       // coefficient*prim_factor is the coefficient of the bare primitive,
       // which is what ERKALE stores; finalize then normalizes the
-      // contraction (the overall shell scale does not matter).
+      // contraction.
       std::vector<contr_t> c;
       for(int32_t p=0; p<nprim; p++)
         if(shell_index[p]==ish) {
           contr_t t; t.z=exponent[p]; t.c=coefficient[p]*prim_factor[p]; c.push_back(t);
         }
-      // ERKALE's OptLM default: s and p cartesian, d and higher
-      // spherical, so the AO order matches a native ERKALE run.
-      basis.add_shell(nuc_index[ish], shell_am[ish], shell_am[ish]>=2, c, false);
+      const int l = shell_am[ish];
+      double S=0.0;
+      for(const contr_t & p : c)
+        for(const contr_t & q : c)
+          S += p.c*q.c/pow(p.z+q.z, l+1.5);
+      shell_norm[ish] = shell_factor[ish]*std::sqrt(pow(M_PI,1.5)*doublefact(2*l-1)/pow(2.0,l)*S);
+      // Spherical d and higher shells as such; s and p are cartesian as
+      // in ERKALE's OptLM default, and the same functions either way.
+      basis.add_shell(nuc_index[ish], l, l>=2 && !cart[ish], c, false);
     }
     // Contraction-slowest segments on the same center with the same
     // exponents are regrouped into generally contracted shells here.
     basis.finalize();
 
     // MOs: undo the AO permutation (TREXIO order -> ERKALE order).
-    const std::vector<size_t> perm = erkale_to_trexio_perm(basis);
+    const std::vector<size_t> perm = erkale_to_trexio_perm(basis, cart);
+    // TREXIO AO a is ao_scale[a] times ERKALE's normalized function
+    // perm[a]: its ao.normalization times its shell's norm, over the
+    // norm of a cartesian function relative to x^l
+    std::vector<double> ao_scale(Nbf);
+    {
+      const std::vector<GaussianShell> shells = basis.shells();
+      const std::vector<segment_t> seg = segments(shells);
+      for(size_t k=0; k<seg.size(); k++)
+        for(size_t j=0; j<trexio_nfunc(seg[k].sh->am(), cart[k]); j++) {
+          const size_t a = seg[k].first + j;
+          ao_scale[a] = ao_norm[a]*shell_norm[k];
+          if(cart[k])
+            ao_scale[a] /= seg[k].sh->cart_ref()[j].relnorm;
+        }
+    }
     std::vector<double> moc(Nmo*Nbf);
     TX(trexio_read_mo_coefficient(tf, moc.data()));
     occ.resize(Nmo); energy.resize(Nmo); spin.assign(Nmo,0);
@@ -563,7 +656,7 @@ void trexio_to_chk(const std::string & trexiofile, const std::string & chkfile, 
     Cfull.set_size(Nbf, Nmo);
     for(size_t imo=0; imo<Nmo; imo++)
       for(size_t a=0; a<Nbf; a++)
-        Cfull(perm[a], imo) = moc[imo*Nbf + a];   // ERKALE row perm[a] <- TREXIO pos a
+        Cfull(perm[a], imo) = ao_scale[a]*moc[imo*Nbf + a];   // ERKALE row perm[a] <- TREXIO pos a
   } catch(...) {
     trexio_close(tf);
     throw;

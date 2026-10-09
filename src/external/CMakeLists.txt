@@ -36,6 +36,13 @@ if(TREXIO_INCLUDE_DIR AND TREXIO_LIBRARY)
   if(ERKALE_TREXIO_LIB_HAS_HELPERS)
     set(TREXIO_HAS_HELPERS ON)
   endif()
+  # Per-shell cartesian flags (ao.cartesian_shell, TREXIO after 2.6.1),
+  # which come with the TREXIO_AMBIGUOUS_CARTESIAN error code. The test
+  # suite round-trips a mixed file when the library has them.
+  include(CheckSymbolExists)
+  set(CMAKE_REQUIRED_INCLUDES ${TREXIO_INCLUDE_DIR})
+  check_symbol_exists(TREXIO_AMBIGUOUS_CARTESIAN "trexio.h" ERKALE_TREXIO_HAS_CARTESIAN_SHELL)
+  unset(CMAKE_REQUIRED_INCLUDES)
 elseif(ERKALE_FETCH_TREXIO)
   message(STATUS "TREXIO not found; fetching v2.6.1 from trexio-release (set ERKALE_FETCH_TREXIO=OFF to disable).")
   # Build only the C library: no TREXIO tests in the subbuild.
@@ -93,7 +100,7 @@ if(ERKALE_BUILD_TREXIO)
     endif()
     FetchContent_Declare(TrexioValidate
       GIT_REPOSITORY https://github.com/TREX-CoE/trexio-validate.git
-      GIT_TAG        b9882bcd431928467814460a166e50d6951b5f3c)
+      GIT_TAG        49bf5954debf76fd79c3d73c3634f742ac94bcf0)
     FetchContent_MakeAvailable(TrexioValidate)
   endif()
 endif()
