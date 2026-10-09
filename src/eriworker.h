@@ -38,7 +38,9 @@
  * reversed shell tuple -- which by the permutational symmetry of the
  * integrals is the same integral -- to get ERKALE's last-index-fastest
  * ordering, and they call the spherical kernels when the basis is
- * spherical, so no transformation step is needed.
+ * spherical, so no transformation step is needed. Only a basis that
+ * mixes spherical and cartesian d+ shells is evaluated with the
+ * cartesian kernels and transformed shell by shell.
  */
 class IntegralWorker {
  protected:
@@ -54,6 +56,9 @@ class IntegralWorker {
   std::vector<double> srbuf;
   /// Buffer for the raw libcint output, before the layout remap
   std::vector<double> tmp;
+  /// Buffers for the cartesian libcint output of a mixed basis, and for
+  /// its transformation
+  std::vector<double> cartbuf, transbuf;
 
   /// Integrals in ERKALE order
   std::vector<double> ints;
@@ -75,10 +80,15 @@ class IntegralWorker {
 
   /// Evaluate a kernel over the given shells, combining the range
   /// separation components. nsh is the number of shells the kernel takes
-  /// (2, 3 or 4), ncomp the number of operator components and N the
-  /// number of integrals per component; the results are left in out.
-  void evaluate(cint_kernel_t kernel, int nsh, const int * shls, int ncomp, size_t N,
+  /// (2, 3 or 4) and ncomp the number of operator components; the
+  /// results are left in out, in libcint's layout.
+  void evaluate(cint_kernel_t kernel, int nsh, const int * shls, int ncomp,
                 std::vector<double> & out);
+
+  /// Transform the spherical shells of a mixed basis from the cartesian
+  /// functions libcint evaluated, in libcint's layout, to ERKALE's
+  /// functions. in is used as scratch.
+  void transform_mixed(int nsh, const int * shls, int ncomp, std::vector<double> & in, std::vector<double> & out);
 
   /// Scale the integrals to ERKALE's normalization of the basis
   /// functions (a no-op when the environment has unit factors). The

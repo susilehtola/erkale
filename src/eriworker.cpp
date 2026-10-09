@@ -160,7 +160,7 @@ void * IntegralWorker::get_opt(cint_kernel_t kernel, double omega) {
   return sr_opts[kernel];
 }
 
-void IntegralWorker::evaluate(cint_kernel_t kernel, int nsh, const int * shls_in, int ncomp, size_t N,
+void IntegralWorker::evaluate(cint_kernel_t kernel, int nsh, const int * shls_in, int ncomp,
                               std::vector<double> & out) {
   CINTIntegralFunction * intor=kernel_function(kernel, envp->lm_in_use());
 
@@ -168,8 +168,14 @@ void IntegralWorker::evaluate(cint_kernel_t kernel, int nsh, const int * shls_in
   for(int i=0;i<nsh;i++)
     shls[i]=shls_in[i];
 
-  const size_t Ntot=ncomp*N;
-  out.resize(Ntot);
+  // In a mixed basis libcint evaluates the spherical shells as
+  // cartesian ones, which are transformed at the end
+  const bool mixed=envp->is_mixed();
+  size_t Ntot=ncomp;
+  for(int i=0;i<nsh;i++)
+    Ntot*=envp->Ncint(shls[i]);
+  std::vector<double> & res = mixed ? cartbuf : out;
+  res.resize(Ntot);
 
   // Evaluate the kernel with the given range separation constant. The
   // constant must be in place already for the scratch size query, since
@@ -186,9 +192,9 @@ void IntegralWorker::evaluate(cint_kernel_t kernel, int nsh, const int * shls_in
 
   // Full-range Coulomb component
   if(rs_alpha!=0.0)
-    evaluate_omega(0.0,out);
+    evaluate_omega(0.0,res);
   else
-    std::fill(out.begin(),out.end(),0.0);
+    std::fill(res.begin(),res.end(),0.0);
 
   // Short-range erfc(omega r12)/r12 component: a negative omega selects
   // the complementary error function attenuation in libcint
@@ -196,10 +202,54 @@ void IntegralWorker::evaluate(cint_kernel_t kernel, int nsh, const int * shls_in
     srbuf.resize(Ntot);
     evaluate_omega(-rs_omega,srbuf);
     for(size_t i=0;i<Ntot;i++)
-      out[i]=rs_alpha*out[i]+rs_beta*srbuf[i];
+      res[i]=rs_alpha*res[i]+rs_beta*srbuf[i];
   } else if(rs_alpha!=1.0)
     for(size_t i=0;i<Ntot;i++)
-      out[i]*=rs_alpha;
+      res[i]*=rs_alpha;
+
+  if(mixed)
+    transform_mixed(nsh,shls,ncomp,cartbuf,out);
+}
+
+void IntegralWorker::transform_mixed(int nsh, const int * shls, int ncomp, std::vector<double> & in, std::vector<double> & out) {
+  // Number of functions on each shell, as transformed so far
+  size_t dim[4];
+  for(int i=0;i<nsh;i++)
+    dim[i]=envp->Ncint(shls[i]);
+
+  // Transform one shell index at a time. In libcint's layout the first
+  // shell runs fastest and the operator component slowest; the
+  // functions of a shell run fastest within each contraction.
+  std::vector<double> * src=&in;
+  for(int q=0;q<nsh;q++) {
+    const arma::mat & T=envp->trans(shls[q]);
+    if(T.is_empty())
+      continue;
+    const size_t Nlm=T.n_rows, Ncart=T.n_cols, nctr=dim[q]/Ncart;
+    size_t inner=1, outer=ncomp;
+    for(int r=0;r<q;r++)
+      inner*=dim[r];
+    for(int r=q+1;r<nsh;r++)
+      outer*=dim[r];
+
+    std::vector<double> & dst = (src==&in) ? transbuf : in;
+    dst.assign(inner*nctr*Nlm*outer,0.0);
+    for(size_t b=0;b<outer*nctr;b++)
+      for(size_t m=0;m<Nlm;m++) {
+        double * d=dst.data()+inner*(b*Nlm+m);
+        for(size_t c=0;c<Ncart;c++) {
+          const double t=T(m,c);
+          if(t==0.0)
+            continue;
+          const double * s=src->data()+inner*(b*Ncart+c);
+          for(size_t a=0;a<inner;a++)
+            d[a]+=t*s[a];
+        }
+      }
+    dim[q]=nctr*Nlm;
+    src=&dst;
+  }
+  out.swap(*src);
 }
 
 void IntegralWorker::normalize(const size_t * shls, int nsh, int ncomp, std::vector<double> & out) const {
@@ -254,9 +304,8 @@ void ERIWorker::compute(size_t is, size_t js, size_t ks, size_t ls) {
   // (lk|ji), which by the permutational symmetry of the integrals is the
   // same integral, gives the result directly in ERKALE's layout.
   const int shls[4]={(int) ls, (int) ks, (int) js, (int) is};
-  const size_t N=envp->Nbf(is)*envp->Nbf(js)*envp->Nbf(ks)*envp->Nbf(ls);
 
-  evaluate(CINT_ERI,4,shls,1,N,ints);
+  evaluate(CINT_ERI,4,shls,1,ints);
 
   const size_t erk[4]={is, js, ks, ls};
   normalize(erk,4,1,ints);
@@ -266,7 +315,7 @@ void ERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
   const int shls[3]={(int) is, (int) js, (int) ks};
   const size_t Ni=envp->Nbf(is), Nj=envp->Nbf(js), Nk=envp->Nbf(ks);
 
-  evaluate(CINT_3C2E,3,shls,1,Ni*Nj*Nk,tmp);
+  evaluate(CINT_3C2E,3,shls,1,tmp);
   remap_3c(tmp,1,Ni,Nj,Nk,ints);
 
   const size_t erk[3]={is, js, ks};
@@ -275,9 +324,8 @@ void ERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
 
 void ERIWorker::compute_2c(size_t is, size_t js) {
   const int shls[2]={(int) js, (int) is};
-  const size_t N=envp->Nbf(is)*envp->Nbf(js);
 
-  evaluate(CINT_2C2E,2,shls,1,N,ints);
+  evaluate(CINT_2C2E,2,shls,1,ints);
 
   const size_t erk[2]={is, js};
   normalize(erk,2,1,ints);
@@ -343,13 +391,11 @@ void ERIWorker::compute_debug(size_t is, size_t js, size_t ks, size_t ls) {
                     ci[ic].relnorm*cj[jc].relnorm*ck[kc].relnorm*cl[lc].relnorm*el;
                 }
 
-          // Transform the indices into the basis the environment
-          // evaluates in, one index at a time. A cartesian shell, and any
-          // shell in a cartesian basis, transforms with the identity.
+          // Transform the indices of the spherical shells, one index at
+          // a time. A cartesian shell transforms with the identity.
           std::vector<double> in(cart), out;
           for(int q=0;q<4;q++) {
-            const bool trans=envp->lm_in_use() && shs[q]->lm_in_use();
-            if(!trans)
+            if(!shs[q]->lm_in_use())
               continue;
             const arma::mat T(shs[q]->transmat());
 
@@ -427,15 +473,15 @@ void dERIWorker::compute(size_t is, size_t js, size_t ks, size_t ls) {
   const int rev[4]={(int) ls, (int) ks, (int) js, (int) is};
   const int kfirst[4]={(int) ks, (int) ls, (int) js, (int) is};
 
-  evaluate(CINT_ERI_IP1,4,rev,3,N,tmp);
+  evaluate(CINT_ERI_IP1,4,rev,3,tmp);
   for(size_t i=0;i<3*N;i++)
     dR[9*N+i]=-tmp[i];
 
-  evaluate(CINT_ERI_IP2,4,rev,3,N,tmp);
+  evaluate(CINT_ERI_IP2,4,rev,3,tmp);
   for(size_t i=0;i<3*N;i++)
     dR[3*N+i]=-tmp[i];
 
-  evaluate(CINT_ERI_IP1,4,kfirst,3,N,tmp);
+  evaluate(CINT_ERI_IP1,4,kfirst,3,tmp);
   for(int ic=0;ic<3;ic++) {
     const double * ip=tmp.data()+ic*N;
     double * op=dR.data()+(6+ic)*N;
@@ -463,12 +509,12 @@ void dERIWorker::compute_3c(size_t is, size_t js, size_t ks) {
   // second shell follows from translational invariance
   const int shls[3]={(int) is, (int) js, (int) ks};
 
-  evaluate(CINT_3C2E_IP1,3,shls,3,N,tmp);
+  evaluate(CINT_3C2E_IP1,3,shls,3,tmp);
   remap_3c(tmp,3,Ni,Nj,Nk,scr);
   for(size_t i=0;i<3*N;i++)
     dR[i]=-scr[i];
 
-  evaluate(CINT_3C2E_IP2,3,shls,3,N,tmp);
+  evaluate(CINT_3C2E_IP2,3,shls,3,tmp);
   remap_3c(tmp,3,Ni,Nj,Nk,scr);
   for(size_t i=0;i<3*N;i++)
     dR[6*N+i]=-scr[i];
@@ -491,7 +537,7 @@ void dERIWorker::compute_2c(size_t is, size_t js) {
   // invariance
   const int rev[2]={(int) js, (int) is};
 
-  evaluate(CINT_2C2E_IP1,2,rev,3,N,tmp);
+  evaluate(CINT_2C2E_IP1,2,rev,3,tmp);
   for(size_t i=0;i<3*N;i++) {
     dR[3*N+i]=-tmp[i];
     dR[i]=tmp[i];
@@ -552,14 +598,19 @@ void Int1eWorker::compute(cint_1e_kernel_t kernel, size_t is, size_t js,
   const size_t N=Ni*Nj;
 
   // The one-electron integrals are cheap, so they are evaluated without
-  // an optimizer
+  // an optimizer. In a mixed basis the spherical shells come out
+  // cartesian and are transformed.
   int shls[2]={(int) is, (int) js};
-  tmp.resize(ncomp*N);
+  const bool mixed=envp->is_mixed();
+  std::vector<double> & res = mixed ? cartbuf : tmp;
+  res.resize(ncomp*envp->Ncint(is)*envp->Ncint(js));
   const size_t csize=intor(NULL,NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),NULL,NULL);
   if(csize>cache.size())
     cache.resize(csize);
-  if(!intor(tmp.data(),NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),NULL,cache.data()))
-    std::fill(tmp.begin(),tmp.end(),0.0);
+  if(!intor(res.data(),NULL,shls,envp->atm(),envp->natm(),envp->bas(),envp->nbas(),env.data(),NULL,cache.data()))
+    std::fill(res.begin(),res.end(),0.0);
+  if(mixed)
+    transform_mixed(2,shls,ncomp,cartbuf,tmp);
 
   // libcint runs the first shell fastest; ERKALE runs the last index
   // fastest

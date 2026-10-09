@@ -88,7 +88,10 @@ int cint_1e_ncomp(cint_1e_kernel_t kernel);
  * (normalized primitives), so the integrals come out over normalized
  * basis functions: in spherical mode they are ERKALE's basis functions
  * as-is, and in cartesian mode they need the per-function scaling given
- * by get_cartnorm().
+ * by fnorm(). A basis that mixes spherical and cartesian shells of
+ * l >= 2 is evaluated with the cartesian kernels, and the spherical
+ * shells are transformed afterwards with trans(), which is what
+ * libcint's spherical kernels do internally.
  *
  * The environment data array is copied by each integral worker, which
  * needs to write the range separation constant into it; the shell tables
@@ -117,6 +120,12 @@ class CintEnv {
   size_t Nsh_orb_;
   /// Number of functions in each shell
   std::vector<size_t> shell_Nbf_;
+  /// Number of functions libcint evaluates in each shell; more than
+  /// shell_Nbf_ for the spherical shells of a mixed basis
+  std::vector<size_t> shell_Ncint_;
+  /// Cartesian-to-spherical transform of each spherical d+ shell of a
+  /// mixed basis, per contraction; empty for the other shells
+  std::vector<arma::mat> trans_;
   /// Index of the first function of each shell
   std::vector<size_t> shell_first_;
   /// Maximum number of functions in a shell
@@ -125,8 +134,10 @@ class CintEnv {
   /// The shells themselves
   std::vector<GaussianShell> shells_;
 
-  /// Are the integrals evaluated in the spherical harmonics basis?
+  /// Are the integrals evaluated with libcint's spherical kernels?
   bool lm_;
+  /// Does the basis mix spherical and cartesian shells of l >= 2?
+  bool mixed_;
   /// Normalization of each function of each shell, relative to
   /// libcint's convention: ERKALE scales its basis functions with the
   /// per-function relnorm factors, which the Coulomb normalization used
@@ -170,8 +181,16 @@ class CintEnv {
   size_t first_ind(size_t ish) const;
   /// Maximum number of functions in a shell
   size_t max_Nbf() const;
-  /// Are the integrals in the spherical harmonics basis?
+  /// Are the integrals evaluated with libcint's spherical kernels?
   bool lm_in_use() const;
+  /// Does the basis mix spherical and cartesian shells of l >= 2?
+  bool is_mixed() const;
+  /// Number of functions libcint evaluates in shell ish
+  size_t Ncint(size_t ish) const;
+  /// Transform from libcint's cartesian functions to the spherical
+  /// functions of shell ish in a mixed basis, per contraction (empty
+  /// when the shell needs none)
+  const arma::mat & trans(size_t ish) const;
 
   /// Normalization factors of the functions of shell ish, relative to
   /// libcint's convention

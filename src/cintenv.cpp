@@ -65,7 +65,7 @@ int cint_1e_ncomp(cint_1e_kernel_t kernel) {
   }
 }
 
-CintEnv::CintEnv() : Nsh_orb_(0), max_Nbf_(0), lm_(true) {
+CintEnv::CintEnv() : Nsh_orb_(0), max_Nbf_(0), lm_(true), mixed_(false) {
 }
 
 CintEnv::CintEnv(const BasisSet & basis, bool build_opts) {
@@ -108,8 +108,7 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   // ERKALE's optlm keeps the s and p shells cartesian even when the rest
   // of the basis is spherical; since libcint's spherical s and p shells
   // coincide with the cartesian ones, such a basis is evaluated with the
-  // spherical kernels. Only shells with l >= 2 decide the mode, and they
-  // all have to agree.
+  // spherical kernels. Only shells with l >= 2 decide the mode.
   bool have_lm=false, have_cart=false;
   for(size_t is=0;is<shells_.size();is++) {
     if(shells_[is].am()<2)
@@ -119,11 +118,13 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     else
       have_cart=true;
   }
-  if(have_lm && have_cart)
-    throw std::runtime_error("CintEnv: the basis mixes spherical and cartesian shells of l >= 2, which libcint cannot evaluate in a single call.\n");
   // A basis of only s and p shells is the same either way; use the
   // spherical kernels, as they are what the rest of ERKALE defaults to.
+  // A basis that mixes spherical and cartesian d+ shells is evaluated
+  // with the cartesian kernels, and its spherical shells are transformed
+  // afterwards.
   lm_=!have_cart;
+  mixed_=have_lm && have_cart;
 
   // Collect the distinct centers
   std::vector<coords_t> centers;
@@ -154,6 +155,8 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   }
 
   shell_Nbf_.resize(shells_.size());
+  shell_Ncint_.resize(shells_.size());
+  trans_.assign(shells_.size(), arma::mat());
   shell_first_.resize(shells_.size());
   fnorm_.resize(shells_.size());
   max_Nbf_=0;
@@ -190,8 +193,12 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
 
     // Number of functions: nctr angular blocks. Spherical mode
     // evaluates every shell in the spherical basis (s and p coincide
-    // with the cartesian ones).
-    shell_Nbf_[is]= nctr * (lm_ ? (size_t) (2*l+1) : (size_t) ((l+1)*(l+2)/2));
+    // with the cartesian ones); in a mixed basis, the spherical d+
+    // shells come out cartesian and are transformed.
+    shell_Ncint_[is]= nctr * (lm_ ? (size_t) (2*l+1) : (size_t) ((l+1)*(l+2)/2));
+    if(mixed_ && l>=2 && sh.lm_in_use())
+      trans_[is]=sh.transmat();
+    shell_Nbf_[is]= trans_[is].is_empty() ? shell_Ncint_[is] : nctr*trans_[is].n_rows;
     shell_first_[is]=ibf;
     ibf+=shell_Nbf_[is];
     max_Nbf_=std::max(max_Nbf_,shell_Nbf_[is]);
@@ -209,12 +216,19 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
   std::vector<double> buf;
   for(size_t is=0;is<shells_.size();is++) {
     const size_t Nbf=shell_Nbf_[is];
+    const size_t Ncint=shell_Ncint_[is];
     fnorm_[is].assign(Nbf,1.0);
 
     int shls[2]={(int) is, (int) is};
-    buf.resize(Nbf*Nbf);
+    buf.resize(Ncint*Ncint);
     if(!ovlp(buf.data(),NULL,shls,cint_atm_.data(),(int) centers.size(),cint_bas_.data(),(int) shells_.size(),cint_env_.data(),NULL,NULL))
       throw std::runtime_error("CintEnv: failed to evaluate the self-overlap of a shell.\n");
+    if(!trans_[is].is_empty()) {
+      // The self-overlap of the transformed functions
+      const arma::mat T(arma::kron(arma::eye(Ncint/trans_[is].n_cols, Ncint/trans_[is].n_cols), trans_[is]));
+      const arma::mat S(T*arma::mat(buf.data(), Ncint, Ncint, false, true)*T.t());
+      buf.assign(S.begin(), S.end());
+    }
 
     const arma::vec Serk=shells_[is].function_norms();
     if(Serk.n_elem != Nbf)
@@ -284,6 +298,18 @@ size_t CintEnv::max_Nbf() const {
 
 bool CintEnv::lm_in_use() const {
   return lm_;
+}
+
+bool CintEnv::is_mixed() const {
+  return mixed_;
+}
+
+size_t CintEnv::Ncint(size_t ish) const {
+  return shell_Ncint_[ish];
+}
+
+const arma::mat & CintEnv::trans(size_t ish) const {
+  return trans_[ish];
 }
 
 const std::vector<double> & CintEnv::fnorm(size_t ish) const {
