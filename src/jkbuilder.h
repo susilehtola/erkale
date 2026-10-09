@@ -78,6 +78,8 @@ class JKBuilder {
   static Method resolve_method(const Settings & set);
   /// Human-readable method name.
   static std::string method_name(Method m);
+  /// Human-readable name of the resolved method.
+  std::string name() const;
   /// Override the density-fitting auxiliary basis (before init).
   void set_fitting(const BasisSet & fitbas);
   /// Build the integral engine(s) for the chosen method.
