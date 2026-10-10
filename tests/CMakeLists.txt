@@ -112,6 +112,8 @@ configure_file(complex_orbs_b_ml.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs
 run_complex_orbs(complex_orbs_b_ml_0 "-24.3478542")
 run_complex_orbs(complex_orbs_b_ml_p "-24.3943705")
 run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
+# Cylindrical symmetry: m and -m share their orbitals and occupations
+run_complex_orbs(complex_orbs_o2_b3lyp_cyl "-150.23617")
 
 # Second-order trust-region SCF and stability analysis (OpenTrustRegion)
 if(ERKALE_TRUST_REGION)
