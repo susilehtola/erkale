@@ -93,6 +93,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("ComplexBasis", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
+  settings.add_bool("CylindricalSymmetry", "Give the m and -m orbitals the same radial-axial part and equal occupations, so that the density is cylindrically symmetric?", false);
   settings.add_string("SCFMethods", "SCF convergence methods to use", "DIIS + LBFGS");
   settings.add_bool("TrustRegion", "Finish the SCF with second-order trust-region optimization (OpenTrustRegion)?", false);
   settings.add_bool("StabilityAnalysis", "Check the stability of the solution within its symmetry, following instabilities if TrustRegion is used?", false);
@@ -121,6 +122,7 @@ int main_guarded(int argc, char **argv) {
   double linE = settings.get_double("LinearE");
   double confinement = settings.get_double("HarmonicConfinement");
   bool unrestricted = !(settings.get_bool("Restricted"));
+  bool cylindrical = settings.get_bool("CylindricalSymmetry");
   std::string guess = settings.get_string("Guess");
   std::string scfmethods = settings.get_string("SCFMethods");
   bool trustregion = settings.get_bool("TrustRegion");
@@ -128,6 +130,9 @@ int main_guarded(int argc, char **argv) {
   double handover = settings.get_double("TrustRegionHandover");
   double trcheck = settings.get_double("TrustRegionCheck");
   bool trexact = settings.get_bool("TrustRegionExactPrecond");
+  // The orbital Zeeman term splits m from -m
+  if(cylindrical && linB != 0.0)
+    throw std::runtime_error("CylindricalSymmetry is incompatible with a magnetic field (LinearB).\n");
 #ifndef ERKALE_TRUST_REGION
   if(trustregion || stability)
     throw std::runtime_error("TrustRegion and StabilityAnalysis need ERKALE built with OpenTrustRegion.\n");
@@ -240,7 +245,38 @@ int main_guarded(int argc, char **argv) {
     X[m] = BasOrth(Smat(m_indices[m], m_indices[m]));
     Nmo += X[m].n_cols;
   }
-  
+
+  // Symmetry blocks seen by the SCF solver. By default, these are the m
+  // blocks. With CylindricalSymmetry, m and -m share one |m| block, whose
+  // orbitals are used for both, half of each orbital's occupation going to
+  // each, and whose Fock matrix is the average of theirs, which gives the
+  // energy derivatives with respect to the shared orbitals and occupations
+  // (the derivative with respect to an occupation is half the sum). The
+  // functions of m and -m correspond shell by shell, so the -m block
+  // reuses the orthonormal basis of m, which would otherwise differ by the
+  // signs of its vectors. The blocks of m and -m agree even for a bent
+  // molecule in the complex basis, so check the geometry itself.
+  std::vector<size_t> symblock(X.size()), symmult;
+  for (int m = -maxam; m <= maxam; m++)
+    symblock[m+maxam] = cylindrical ? std::abs(m) : m+maxam;
+  symmult.assign(symblock.back()+1, 0);
+  for (size_t m=0; m<X.size(); m++)
+    symmult[symblock[m]]++;
+  if (cylindrical) {
+    for (size_t i = 0; i < atoms.size(); i++)
+      if (std::abs(atoms[i].x) > 1e-8 || std::abs(atoms[i].y) > 1e-8)
+        throw std::runtime_error("CylindricalSymmetry needs a linear molecule along the z axis.\n");
+    const arma::mat & Smat = complexbas ? S_c : S;
+    for (int m = 1; m <= maxam; m++) {
+      const arma::uvec & ip = m_indices[maxam+m];
+      const arma::uvec & im = m_indices[maxam-m];
+      if (arma::abs(Smat(ip, ip) - Smat(im, im)).max() > 1e-10)
+        throw std::logic_error("The functions of m=" + std::to_string(m) + " and m=" + std::to_string(-m) + " do not correspond.\n");
+      X[maxam-m] = X[maxam+m];
+    }
+  }
+  const size_t nsym = symmult.size();
+
   int Nel = basis.Ztot() - Q;
   int Nela;
   int Nelb;
@@ -552,8 +588,55 @@ int main_guarded(int argc, char **argv) {
   }// if(loadchk != "")
     
 
+  // The solver's density matrix for the m blocks, and the solver's Fock
+  // matrices from those of the m blocks and back. A particle type has
+  // X.size() m blocks and nsym solver blocks.
+  const size_t nparticle = unrestricted ? 2 : 1;
+  std::function<OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double>(const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> &)> unfold_density = [&](const auto & dm) {
+    OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> full;
+    for (size_t p=0; p<nparticle; p++)
+      for (size_t m=0; m<X.size(); m++) {
+        const size_t b = p*nsym + symblock[m];
+        full.first.push_back(dm.first[b]);
+        full.second.push_back(dm.second[b] / symmult[symblock[m]]);
+      }
+    return full;
+  };
+  std::function<std::vector<arma::mat>(const std::vector<arma::mat> &)> fold_fock = [&](const auto & full) {
+    std::vector<arma::mat> folded(nparticle*nsym);
+    for (size_t p=0; p<nparticle; p++)
+      for (size_t m=0; m<X.size(); m++) {
+        arma::mat & F = folded[p*nsym + symblock[m]];
+        if (F.is_empty())
+          F = full[p*X.size() + m];
+        else
+          F += full[p*X.size() + m];
+      }
+    for (size_t b=0; b<folded.size(); b++)
+      folded[b] /= symmult[b % nsym];
+    return folded;
+  };
+  std::function<std::vector<arma::mat>(const std::vector<arma::mat> &)> unfold_blocks = [&](const auto & folded) {
+    std::vector<arma::mat> full;
+    for (size_t p=0; p<nparticle; p++)
+      for (size_t m=0; m<X.size(); m++)
+        full.push_back(folded[p*nsym + symblock[m]]);
+    return full;
+  };
+  // Occupation numbers of the m blocks for the solver blocks; m and -m
+  // must carry the same
+  std::function<arma::vec(const arma::vec &)> fold_occupations = [&](const arma::vec & occ) {
+    arma::vec folded(nsym, arma::fill::zeros);
+    for (size_t m=0; m<X.size(); m++) {
+      if (occ(m) != occ(X.size()-1-m))
+        throw std::logic_error("CylindricalSymmetry needs equal occupations for m and -m in LinearOccupationFile.\n");
+      folded(symblock[m]) += occ(m);
+    }
+    return folded;
+  };
+
   // Data for SCF solver
-  int nblocks = Fguess.size();
+  int nblocks = nparticle*nsym;
   arma::uvec number_of_blocks_per_particle_type;
   arma::vec maximum_occupation;
   arma::vec number_of_particles;
@@ -564,29 +647,38 @@ int main_guarded(int argc, char **argv) {
   // Run SCF
   if (!unrestricted) {
     number_of_blocks_per_particle_type = {(arma::uword) nblocks};
-    maximum_occupation.set_size(nblocks).fill(2.0);
+    maximum_occupation = 2.0*arma::conv_to<arma::vec>::from(symmult);
     number_of_particles = {(double) (Nel)};
     if (readlinocc < 0)
-      number_of_particles_per_block = occnuma + occnumb;
+      number_of_particles_per_block = cylindrical ? fold_occupations(occnuma + occnumb) : arma::vec(occnuma + occnumb);
     for (int k=0; k<nblocks; k++) {
-      std::string str = "m=" + std::to_string(k - maxam);
+      std::string str = cylindrical ? "|m|=" + std::to_string(k) : "m=" + std::to_string(k - maxam);
       block_descriptions.push_back(str);
     }
     fock_builder = restricted_fock_builder;
   } else {
     number_of_blocks_per_particle_type = {(arma::uword) nblocks / 2, (arma::uword) nblocks / 2};
-    maximum_occupation.set_size(nblocks).fill(1.0);
+    maximum_occupation = arma::join_cols(arma::conv_to<arma::vec>::from(symmult), arma::conv_to<arma::vec>::from(symmult));
     number_of_particles = {(double) (Nela), (double) (Nelb)};
     if (readlinocc < 0)
-      number_of_particles_per_block = arma::join_cols(occnuma, occnumb);
+      number_of_particles_per_block = cylindrical ? arma::join_cols(fold_occupations(occnuma), fold_occupations(occnumb)) : arma::join_cols(occnuma, occnumb);
     for (int s=0; s<2; s++) {
       std::string spin = s ? "beta" : "alpha";
       for (int k=0; k<nblocks / 2; k++) {
-	std::string str = spin + " m=" + std::to_string(k - maxam);
+	std::string str = spin + (cylindrical ? " |m|=" + std::to_string(k) : " m=" + std::to_string(k - maxam));
 	block_descriptions.push_back(str);
       }
     }
     fock_builder = unrestricted_fock_builder;
+  }
+  if (cylindrical) {
+    const auto full_builder = fock_builder;
+    fock_builder = [&, full_builder](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
+      auto ret = full_builder(unfold_density(dm));
+      ret.second = fold_fock(ret.second);
+      return ret;
+    };
+    Fguess = fold_fock(Fguess);
   }
 
   printf("\n\n\nSolving SCF\n");
@@ -691,6 +783,17 @@ int main_guarded(int argc, char **argv) {
     // L+R and L-R are not: use finite differences then
     if(jk.is_occ_rik())
       response = TrustRegionSCF::ResponseBuilder();
+    // A transition density of an |m| block goes half to m and half to -m,
+    // like its occupations
+    else if(cylindrical) {
+      const auto full_response = response;
+      response = [&, full_response](const TrustRegionSCF::DensityMatrix & dm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
+        std::vector<arma::mat> Rhalf(R);
+        for (size_t b=0; b<Rhalf.size(); b++)
+          Rhalf[b] /= symmult[b % nsym];
+        return fold_fock(full_response(unfold_density(dm), unfold_blocks(L), unfold_blocks(Rhalf)));
+      };
+    }
 
     printf("\nFirst-order SCF energy % .10f\n", E);
     fflush(stdout);
@@ -726,7 +829,8 @@ int main_guarded(int argc, char **argv) {
     fock = ret.second;
   }
 #endif
-  save_matrices(fock);
+  // The checkpoint holds the Fock matrices of the m blocks
+  save_matrices(cylindrical ? unfold_blocks(fock) : fock);
 
   printf("SCF converged. Total energy is % .10f\n", E);
   fflush(stdout);
