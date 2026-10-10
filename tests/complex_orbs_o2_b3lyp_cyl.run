@@ -1,0 +1,16 @@
+# Restricted singlet O2 with cylindrical symmetry: the two pi* electrons
+# are spread over m=+1 and m=-1, half an electron in each spin orbital,
+# instead of pairing in one complex orbital (-150.29075). The fractional
+# occupations raise the energy by 55 mEh through the exact exchange; a
+# pure functional gives both the same energy.
+System O2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_b3lyp
+Multiplicity 1
+Restricted true
+ComplexBasis true
+CylindricalSymmetry true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-7
+SaveChk complex_orbs_o2_b3lyp_cyl.chk
