@@ -1,0 +1,17 @@
+# Restricted C atom: the aufbau over the m blocks puts both 2p
+# electrons in m=-1, with the empty 2p0 below them in energy. The
+# trust-region solver releases charge into m=0 and optimizes the
+# occupations with the orbitals, reaching the fractional ensemble
+# (4/3 and 2/3, at a common Fermi level) 4.4 mEh below.
+System C.xyz
+Basis cc-pVDZ
+Method gga_x_pbe-gga_c_pbe
+DFTGrid 75 -302
+Multiplicity 1
+Restricted true
+ComplexBasis true
+JKMethod Cholesky
+ConvThr 1e-7
+MaxIter 60
+TrustRegion true
+SaveChk complex_orbs_c_pbe_tr.chk
