@@ -87,6 +87,9 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   settings.add_scf_settings();
+  // The orbitals are blocked by m, which is exact only for a linear
+  // molecule along the z axis
+  settings.set_bool("LinearSymmetry", true);
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
@@ -123,6 +126,8 @@ int main_guarded(int argc, char **argv) {
   double confinement = settings.get_double("HarmonicConfinement");
   bool unrestricted = !(settings.get_bool("Restricted"));
   bool cylindrical = settings.get_bool("CylindricalSymmetry");
+  if(!settings.get_bool("LinearSymmetry"))
+    throw std::runtime_error("erkale_complex_orbs blocks the orbitals by m, so it only runs with LinearSymmetry.\n");
   std::string guess = settings.get_string("Guess");
   std::string scfmethods = settings.get_string("SCFMethods");
   bool trustregion = settings.get_bool("TrustRegion");
@@ -149,6 +154,9 @@ int main_guarded(int argc, char **argv) {
   potlib.load_basis(settings.get_string("SAPBasis"));
 
   auto atoms=load_system(settings.get_string("System"),!settings.get_bool("InputBohr"));
+  for (size_t i = 0; i < atoms.size(); i++)
+    if (std::abs(atoms[i].x) > 1e-8 || std::abs(atoms[i].y) > 1e-8)
+      throw std::runtime_error("LinearSymmetry needs a linear molecule along the z axis.\n");
 
   // Nucleus repulsion energy
   double Enucr = 0.0;
@@ -254,8 +262,7 @@ int main_guarded(int argc, char **argv) {
   // (the derivative with respect to an occupation is half the sum). The
   // functions of m and -m correspond shell by shell, so the -m block
   // reuses the orthonormal basis of m, which would otherwise differ by the
-  // signs of its vectors. The blocks of m and -m agree even for a bent
-  // molecule in the complex basis, so check the geometry itself.
+  // signs of its vectors.
   std::vector<size_t> symblock(X.size()), symmult;
   for (int m = -maxam; m <= maxam; m++)
     symblock[m+maxam] = cylindrical ? std::abs(m) : m+maxam;
@@ -263,9 +270,6 @@ int main_guarded(int argc, char **argv) {
   for (size_t m=0; m<X.size(); m++)
     symmult[symblock[m]]++;
   if (cylindrical) {
-    for (size_t i = 0; i < atoms.size(); i++)
-      if (std::abs(atoms[i].x) > 1e-8 || std::abs(atoms[i].y) > 1e-8)
-        throw std::runtime_error("CylindricalSymmetry needs a linear molecule along the z axis.\n");
     const arma::mat & Smat = complexbas ? S_c : S;
     for (int m = 1; m <= maxam; m++) {
       const arma::uvec & ip = m_indices[maxam+m];
