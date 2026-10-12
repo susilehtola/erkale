@@ -112,6 +112,9 @@ configure_file(complex_orbs_b_ml.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs
 run_complex_orbs(complex_orbs_b_ml_0 "-24.3478542")
 run_complex_orbs(complex_orbs_b_ml_p "-24.3943705")
 run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
+# Current-corrected meta-GGA (TPSS) in a field, without and with the
+# trust-region solver
+run_complex_orbs(complex_orbs_b_tpss_ml_m "-24.6048081")
 # Cylindrical symmetry: m and -m share their orbitals and occupations
 run_complex_orbs(complex_orbs_o2_b3lyp_cyl "-150.23617")
 
@@ -121,6 +124,7 @@ if(ERKALE_TRUST_REGION)
   run_neo(neo_proton_tr "-75.98665")
   run_complex_orbs(complex_orbs_n2_b3lyp_tr "-109.53324")
   run_complex_orbs(complex_orbs_c_pbe_tr "-37.737104")
+  run_complex_orbs(complex_orbs_b_tpss_ml_p "-24.7048081")
   if(ERKALE_LIBXC_HAS_EPC)
     run_neo(neo_dft_epc_tr "-75.84436")
   endif()
