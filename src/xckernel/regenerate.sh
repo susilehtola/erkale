@@ -14,7 +14,7 @@
 set -e
 
 XCKERNEL_REPO=${XCKERNEL_REPO:-https://github.com/susilehtola/libxckernel.git}
-XCKERNEL_COMMIT=${XCKERNEL_COMMIT:-5d84d7a801fc30addfa2df418fd3365e8840d1bb}
+XCKERNEL_COMMIT=${XCKERNEL_COMMIT:-2ae20f4bf2129bcdf3f75483f729731275af90cb}
 FAMILIES=lda,gga,mgga_tau,mgga_lapl,mgga,cmgga_tau
 MAX_ORDER=2
 # The kernel kinds ERKALE calls: energy, Fock matrix, its diagonal,

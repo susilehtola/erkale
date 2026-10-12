@@ -1,7 +1,7 @@
 {
  "generator": "xckernel",
  "backend": "c",
- "version": "0.5.0",
+ "version": "0.6.0",
  "max_order": 2,
  "families": [
   "lda",
@@ -1200,7 +1200,7 @@
     "phi_o": 0,
     "phi_v": 0
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     1
    ]
@@ -1277,7 +1277,7 @@
     "phi_o": 0,
     "phi_v": 0
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     -1
    ]
@@ -1377,7 +1377,7 @@
     "phi_o_b": 0,
     "phi_v_b": 0
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_lda_ub_o2_mo",
@@ -1474,7 +1474,7 @@
     "phi_o_b": 0,
     "phi_v_b": 0
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_lda_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_lda_ua_o1",
@@ -4260,7 +4260,7 @@
     "phi_o": 1,
     "phi_v": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     1
    ]
@@ -4433,7 +4433,7 @@
     "phi_o": 1,
     "phi_v": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     -1
    ]
@@ -4654,7 +4654,7 @@
     "phi_o_b": 1,
     "phi_v_b": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_gga_ub_o2_mo",
@@ -4872,7 +4872,7 @@
     "phi_o_b": 1,
     "phi_v_b": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_gga_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_gga_ua_o1",
@@ -8897,7 +8897,7 @@
     "phi_o": 1,
     "phi_v": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     1
    ]
@@ -9141,7 +9141,7 @@
     "phi_o": 1,
     "phi_v": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     -1
    ]
@@ -9433,7 +9433,7 @@
     "phi_o_b": 1,
     "phi_v_b": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_mgga_tau_ub_o2_mo",
@@ -9722,7 +9722,7 @@
     "phi_o_b": 1,
     "phi_v_b": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_tau_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_mgga_tau_ua_o1",
@@ -14355,7 +14355,7 @@
     "phi_o": 2,
     "phi_v": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     1
    ]
@@ -14599,7 +14599,7 @@
     "phi_o": 2,
     "phi_v": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     -1
    ]
@@ -14891,7 +14891,7 @@
     "phi_o_b": 2,
     "phi_v_b": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_mgga_lapl_ub_o2_mo",
@@ -15180,7 +15180,7 @@
     "phi_o_b": 2,
     "phi_v_b": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_lapl_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_mgga_lapl_ua_o1",
@@ -20610,7 +20610,7 @@
     "phi_o": 2,
     "phi_v": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     1
    ]
@@ -20946,7 +20946,7 @@
     "phi_o": 2,
     "phi_v": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     -1
    ]
@@ -21330,7 +21330,7 @@
     "phi_o_b": 2,
     "phi_v_b": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_mgga_ub_o2_mo",
@@ -21711,7 +21711,7 @@
     "phi_o_b": 2,
     "phi_v_b": 2
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_mgga_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_mgga_ua_o1",
@@ -27441,7 +27441,7 @@
     "phi_o": 1,
     "phi_v": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_st_o2_p response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     1
    ]
@@ -27716,7 +27716,7 @@
     "phi_o": 1,
     "phi_v": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P) only.",
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_st_o2_m response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Spin-adapted: X are the alpha amplitudes; the beta perturbation is parity * X. Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel.",
    "parities": [
     -1
    ]
@@ -28063,7 +28063,7 @@
     "phi_o_b": 1,
     "phi_v_b": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_ua_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the a channel's sigma (nocc_a, nvir_a). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_cmgga_tau_ub_o2_mo",
@@ -28407,7 +28407,7 @@
     "phi_o_b": 1,
     "phi_v_b": 1
    },
-   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P) only."
+   "convention": "out[(x*nocc + i)*nvir + a] += sum_uv C_occ[u,i] F1_x[u,v] C_vir[v,a], F1_x the xck_cmgga_tau_ub_o2 response to P_x = C_occ X_x C_vir^T + C_vir X_x^T C_occ^T, for trial vectors x < nx; the kernel forms the perturbed fields of P_x from the MO collocation towers and the amplitudes itself. Unrestricted: both channels' towers and amplitudes; the output is the b channel's sigma (nocc_b, nvir_b). Real response (symmetric P); the imaginary one of a general density matrix is the _mo_imag kernel."
   },
   {
    "name": "xck_cmgga_tau_ua_o1",
