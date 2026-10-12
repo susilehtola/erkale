@@ -415,6 +415,8 @@ public:
   /// Toggle the use of spherical harmonics on shell ind
   void set_lm(size_t ind, bool lm);
 
+  /// Throw unless all nuclei are on the z axis, as blocking by m needs
+  void check_linear() const;
   /// Get m values of basis functions
   arma::ivec m_values() const;
   /// Unique m values in basis set

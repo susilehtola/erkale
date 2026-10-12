@@ -154,9 +154,6 @@ int main_guarded(int argc, char **argv) {
   potlib.load_basis(settings.get_string("SAPBasis"));
 
   auto atoms=load_system(settings.get_string("System"),!settings.get_bool("InputBohr"));
-  for (size_t i = 0; i < atoms.size(); i++)
-    if (std::abs(atoms[i].x) > 1e-8 || std::abs(atoms[i].y) > 1e-8)
-      throw std::runtime_error("LinearSymmetry needs a linear molecule along the z axis.\n");
 
   // Nucleus repulsion energy
   double Enucr = 0.0;
@@ -176,6 +173,7 @@ int main_guarded(int argc, char **argv) {
   // Construct the basis set
   BasisSet basis;
   construct_basis(basis, atoms, baslib);
+  basis.check_linear();
   chkpt.write(basis);
 
   int maxam = basis.max_am();
