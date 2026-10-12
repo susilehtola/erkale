@@ -1506,6 +1506,12 @@ void BasisSet::set_lm(size_t num, bool lm) {
   check_numbering();
 }
 
+void BasisSet::check_linear() const {
+  for(size_t i=0;i<nuclei_.size();i++)
+    if(nuclei_[i].r.x!=0.0 || nuclei_[i].r.y!=0.0)
+      throw std::logic_error("Nuclei must be along z axis for calculation on linear molecules!\n");
+}
+
 arma::ivec BasisSet::m_values() const {
   arma::ivec ret(Nbf());
   for(size_t is=0;is<Nshells();is++) {
