@@ -103,16 +103,11 @@ class ElectronicXC {
   double kshort() const { return kshort_; }
   /// Range-separation parameter (zero without range separation)
   double omega() const { return omega_; }
-  /// Does the functional depend on the kinetic energy density or the laplacian?
-  bool is_meta_gga() const {
-    for(int f : {x_func_, c_func_}) {
-      if(f<=0)
-        continue;
-      bool gga, mgga_t, mgga_l;
-      is_gga_mgga(f, gga, mgga_t, mgga_l);
-      if(mgga_t || mgga_l)
+  /// Does the functional depend on the laplacian?
+  bool needs_laplacian() const {
+    for(int f : {x_func_, c_func_})
+      if(f>0 && laplacian_needed(f))
         return true;
-    }
     return false;
   }
   /// Integration grid (for other terms evaluated on it)
@@ -143,6 +138,33 @@ class ElectronicXC {
     return Exc;
   }
 
+  /**
+   * Complex orbitals in the real basis (erkale_complex_orbs): XC energy
+   * and Hermitian matrix of the Hermitian density P = C n C^dagger.
+   * Meta-GGAs of tau are current corrected, tau -> tau - |j_p|^2/(2 rho)
+   * with the paramagnetic current of Im P; other functionals see only
+   * Re P.
+   */
+  double eval(const arma::cx_mat & P, arma::cx_mat & Vxc) {
+    double Exc=0.0, Nel;
+    if(active())
+      grid_.eval_Fxc(x_func_, c_func_, P, Vxc, Exc, Nel);
+    else
+      Vxc.zeros(P.n_rows, P.n_cols);
+    return Exc;
+  }
+  /// Same, unrestricted
+  double eval(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Vxca, arma::cx_mat & Vxcb) {
+    double Exc=0.0, Nel;
+    if(active())
+      grid_.eval_Fxc(x_func_, c_func_, Pa, Pb, Vxca, Vxcb, Exc, Nel);
+    else {
+      Vxca.zeros(Pa.n_rows, Pa.n_cols);
+      Vxcb.zeros(Pb.n_rows, Pb.n_cols);
+    }
+    return Exc;
+  }
+
   /// Restricted: first-order change of the XC matrix at the density P
   /// for the symmetric perturbation D
   arma::mat response(const arma::mat & P, const arma::mat & D) {
@@ -159,6 +181,26 @@ class ElectronicXC {
       return;
     }
     std::vector<arma::mat> Ka, Kb;
+    grid_.eval_Kxc(x_func_, c_func_, Pa, Pb, {Da}, {Db}, Ka, Kb);
+    dVa = Ka[0];
+    dVb = Kb[0];
+  }
+
+  /// Complex orbitals in the real basis, restricted: first-order change
+  /// of the Hermitian XC matrix at P for the Hermitian perturbation D
+  arma::cx_mat response(const arma::cx_mat & P, const arma::cx_mat & D) {
+    if(!active())
+      return arma::zeros<arma::cx_mat>(P.n_rows, P.n_cols);
+    return grid_.eval_Kxc(x_func_, c_func_, P, std::vector<arma::cx_mat>({D}))[0];
+  }
+  /// Same, unrestricted
+  void response(const arma::cx_mat & Pa, const arma::cx_mat & Pb, const arma::cx_mat & Da, const arma::cx_mat & Db, arma::cx_mat & dVa, arma::cx_mat & dVb) {
+    if(!active()) {
+      dVa.zeros(Pa.n_rows, Pa.n_cols);
+      dVb.zeros(Pb.n_rows, Pb.n_cols);
+      return;
+    }
+    std::vector<arma::cx_mat> Ka, Kb;
     grid_.eval_Kxc(x_func_, c_func_, Pa, Pb, {Da}, {Db}, Ka, Kb);
     dVa = Ka[0];
     dVb = Kb[0];
