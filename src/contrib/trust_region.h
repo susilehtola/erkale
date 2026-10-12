@@ -1078,8 +1078,12 @@ class TrustRegionSCF {
     // and whether the block is free, with the energy on entry
     std::vector<std::pair<std::vector<arma::uword>, double>> visited;
     for(int pass=0;;pass++) {
-      if(pass)
+      // A block that fills or empties continues with its lowest empty or
+      // highest full orbital, as the canonical orbitals say
+      if(pass) {
+        canonicalize();
         build_layout();
+      }
       std::vector<arma::uword> pattern(active_);
       for(const auto & fp : free_)
         for(size_t b : fp)
@@ -1149,8 +1153,13 @@ class TrustRegionSCF {
       }
       // Is the point a KKT point of the problem with free occupations? The
       // orbital energies are its multipliers once the orbitals are nearly
-      // converged
+      // converged. Those of the full and the empty orbitals are the
+      // eigenvalues of the Fock matrix within them: rotations among them
+      // are redundant, so the optimizer leaves them mixed, and a diagonal
+      // element can lie far from the edge of their spectrum.
       if(!pattern_changed_ && gradient_rms() <= std::max(convthr, kkt_gate)) {
+        canonicalize();
+        derive();
         const arma::vec q(release_kkt_violation());
         if(q.n_elem) {
           adopt(C_, q);
@@ -1173,6 +1182,7 @@ class TrustRegionSCF {
     fflush(stdout);
     if(!exact_precond_)
       build_exact_block();
+    canonicalize();
     report_occupations();
     return converged;
   }
