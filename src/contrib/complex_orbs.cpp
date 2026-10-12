@@ -202,10 +202,11 @@ int main_guarded(int argc, char **argv) {
   // Exact exchange: kfull K + kshort K_sr(omega); this also builds the
   // short-range integrals of a range-separated functional
   jk.set_range_separation(exc.kfull(), exc.kshort(), exc.omega());
-  // Without the current density, the kinetic energy density is not gauge
-  // invariant in a magnetic field.
-  if(linB != 0.0 && exc.is_meta_gga())
-    throw std::runtime_error("Meta-GGA functionals are not supported with a magnetic field (LinearB).\n");
+  // Meta-GGAs of tau are current corrected, which makes them gauge
+  // invariant in a magnetic field; there is no current correction for
+  // the laplacian.
+  if(linB != 0.0 && exc.needs_laplacian())
+    throw std::runtime_error("Meta-GGA functionals of the laplacian are not supported with a magnetic field (LinearB).\n");
 
   // Calculate matrices
   arma::mat S(basis.overlap());
@@ -440,8 +441,8 @@ int main_guarded(int argc, char **argv) {
     arma::cx_mat cP = complex_density(orbitals, occupations);
     arma::mat cbP = complex_basis_density(orbitals, occupations);
 
-    arma::mat Vxc;
-    double Exc = exc.eval(P, Vxc);
+    arma::cx_mat Vxc;
+    double Exc = exc.eval(cP, Vxc);
 
     // Form the Fock matrices
     arma::cx_mat F = T + V + J + 0.5*K + Vxc;
@@ -507,8 +508,8 @@ int main_guarded(int argc, char **argv) {
 
     arma::mat P = Pa + Pb;
 
-    arma::mat Vxca, Vxcb;
-    double Exc = exc.eval(Pa, Pb, Vxca, Vxcb);
+    arma::cx_mat Vxca, Vxcb;
+    double Exc = exc.eval(cPa, cPb, Vxca, Vxcb);
 
     arma::mat Ba = - 0.5 * linB * S;
     arma::mat Bb = + 0.5 * linB * S;
@@ -734,47 +735,43 @@ int main_guarded(int argc, char **argv) {
       }
       return arma::cx_mat(D*C);
     };
-    // Real transition density and its exact exchange
-    std::function<void(const arma::cx_mat &, const arma::cx_mat &, arma::mat &, arma::cx_mat &)> transition = [&](const arma::cx_mat & Lc, const arma::cx_mat & Rc, arma::mat & Dr, arma::cx_mat & dK) {
-      Dr = arma::real(Lc*Rc.t() + Rc*Lc.t());
+    // Hermitian transition density and its exact exchange. The Coulomb
+    // and most XC terms see its real part; the current of a
+    // current-corrected meta-GGA sees its imaginary part.
+    std::function<void(const arma::cx_mat &, const arma::cx_mat &, arma::cx_mat &, arma::cx_mat &)> transition = [&](const arma::cx_mat & Lc, const arma::cx_mat & Rc, arma::cx_mat & Dc, arma::cx_mat & dK) {
+      Dc = Lc*Rc.t() + Rc*Lc.t();
       const std::vector<double> ones(Lc.n_cols, 1.0);
       dK = 0.5*(exchange(Lc+Rc, ones) - exchange(Lc-Rc, ones));
     };
-    // Real density of the blocks b0, ..., b0+X.size()-1
-    std::function<arma::mat(const TrustRegionSCF::DensityMatrix &, size_t)> block_density = [&](const TrustRegionSCF::DensityMatrix & dm, size_t b0) {
+    // Density of the blocks b0, ..., b0+X.size()-1
+    std::function<arma::cx_mat(const TrustRegionSCF::DensityMatrix &, size_t)> block_density = [&](const TrustRegionSCF::DensityMatrix & dm, size_t b0) {
       std::vector<arma::mat> orbs(dm.first.begin()+b0, dm.first.begin()+b0+X.size());
       std::vector<arma::vec> occs(dm.second.begin()+b0, dm.second.begin()+b0+X.size());
-      arma::mat C;
-      arma::vec occ;
-      std::tie(C, occ) = collect_orbitals(orbs, occs);
-      const arma::cx_mat C_c = D*C;
-      return arma::mat(arma::real(C_c*arma::diagmat(occ)*C_c.t()));
+      return complex_density(orbs, occs);
     };
     const arma::mat nofield(Nbf, Nbf, arma::fill::zeros);
     TrustRegionSCF::ResponseBuilder response;
     if(!unrestricted)
       response = [&](const TrustRegionSCF::DensityMatrix & dm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
-        arma::mat Dr;
-        arma::cx_mat dK;
-        transition(ao_columns(L, 0), ao_columns(R, 0), Dr, dK);
-        arma::cx_mat dF = jk.calcJ(Dr) + 0.5*dK;
+        arma::cx_mat Dc, dK;
+        transition(ao_columns(L, 0), ao_columns(R, 0), Dc, dK);
+        arma::cx_mat dF = jk.calcJ(arma::real(Dc)) + 0.5*dK;
         if(exc.active())
-          dF += arma::cx_mat(exc.response(block_density(dm, 0), Dr), nofield);
+          dF += exc.response(block_density(dm, 0), Dc);
         return to_blocks(dF, nofield);
       };
     else
       response = [&](const TrustRegionSCF::DensityMatrix & dm, const std::vector<arma::mat> & L, const std::vector<arma::mat> & R) {
-        arma::mat Dra, Drb;
-        arma::cx_mat dKa, dKb;
-        transition(ao_columns(L, 0), ao_columns(R, 0), Dra, dKa);
-        transition(ao_columns(L, X.size()), ao_columns(R, X.size()), Drb, dKb);
-        const arma::mat dJ = jk.calcJ(Dra + Drb);
+        arma::cx_mat Dca, Dcb, dKa, dKb;
+        transition(ao_columns(L, 0), ao_columns(R, 0), Dca, dKa);
+        transition(ao_columns(L, X.size()), ao_columns(R, X.size()), Dcb, dKb);
+        const arma::mat dJ = jk.calcJ(arma::real(Dca + Dcb));
         arma::cx_mat dFa = dJ + dKa, dFb = dJ + dKb;
         if(exc.active()) {
-          arma::mat dVa, dVb;
-          exc.response(block_density(dm, 0), block_density(dm, X.size()), Dra, Drb, dVa, dVb);
-          dFa += arma::cx_mat(dVa, nofield);
-          dFb += arma::cx_mat(dVb, nofield);
+          arma::cx_mat dVa, dVb;
+          exc.response(block_density(dm, 0), block_density(dm, X.size()), Dca, Dcb, dVa, dVb);
+          dFa += dVa;
+          dFb += dVb;
         }
         std::vector<arma::mat> blocks = to_blocks(dFa, nofield);
         const std::vector<arma::mat> blocksb = to_blocks(dFb, nofield);
