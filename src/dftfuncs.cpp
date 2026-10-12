@@ -197,11 +197,28 @@ void print_info(int func_id) {
 #endif
     xc_func_end(&func);
 
+    // Classification: Libxc 6 merged the hybrid families into the
+    // semilocal ones, so the exact exchange is read off separately
     bool gga, mgga_t, mgga_l;
     is_gga_mgga(func_id,gga,mgga_t,mgga_l);
-    if(gga) printf("Functional is a GGA\n");
-    if(mgga_t) printf("Functional is a tau-mGGA\n");
-    if(mgga_l) printf("Functional is a lapl-mGGA\n");
+    std::string rung("LDA");
+    if(mgga_t && mgga_l)
+      rung="meta-GGA of tau and the laplacian";
+    else if(mgga_t)
+      rung="meta-GGA of tau";
+    else if(mgga_l)
+      rung="meta-GGA of the laplacian";
+    else if(gga)
+      rung="GGA";
+    std::string mixing;
+    if(is_range_separated(func_id))
+      mixing="range-separated hybrid ";
+    else if(exact_exchange(func_id)!=0.0)
+      mixing="global hybrid ";
+    const std::string kind(mixing + rung);
+    double b, C;
+    printf("Functional is %s %s%s\n", kind[0]=='L' ? "an" : "a", kind.c_str(), needs_VV10(func_id, b, C) ? " with VV10 nonlocal correlation" : "");
+    fflush(stdout);
   }
   if(!has_exc(func_id)) {
     printf("The functional doesn't have an energy density, so the calculated energy is incorrect.");
