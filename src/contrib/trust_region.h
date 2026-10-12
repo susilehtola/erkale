@@ -58,25 +58,32 @@
  *   most one fractional orbital, k_b, and fills continuously past it.
  * - Only blocks whose k_b is fractional are free; a block at an exact
  *   shell closing sits on a kink of E(q), and an empty one on the bound
- *   q = 0. Opening a shell is for the first-order solver to decide.
+ *   q = 0. Whether such a block opens follows from the KKT conditions
+ *   below.
  * - The electron count of each particle type is conserved, so the free
  *   q_b move in the sum-zero subspace, in an orthonormal (Helmert) basis
- *   that keeps the trust-region metric isotropic. q >= 0 is imposed by
- *   Euclidean projection onto the simplex of the free blocks.
+ *   that keeps the trust-region metric isotropic.
  * - dE/dq_b = F_kk (Janak). The uncoupled Hessian diagonal vanishes
  *   along every occupation direction, so the occupation block of the
  *   Hessian is built exactly at every accepted step and inverted exactly
  *   in the preconditioner, with its small curvatures floored: the
  *   minimum can be a valley of equivalent ensembles, such as charge
  *   moving between the complex m and -m orbitals in a pure functional.
- * - When a free block's fractional orbital fills or empties, the solve
- *   stops and the parametrization is rebuilt around the new pattern.
+ * - A step does not carry a free block past the filling or emptying of
+ *   its fractional orbital: E(q) has a kink there, and the quadratic
+ *   model does not hold across it. The occupation part of the step is cut
+ *   short at the first kink, so that a step overshooting a shell closing
+ *   does not leave a sliver of charge in the next orbital, to be drained
+ *   back by the next step in an endless back and forth. When such a step
+ *   lowers the energy, the solve stops there, and the parametrization is
+ *   rebuilt with that block integer and frozen.
  * - A frozen block that violates the KKT conditions of the occupation
  *   problem (a full orbital above the Fermi level, an empty one below
  *   it, or with no free blocks, a full orbital above an empty one in
  *   another block) is released by moving a little charge, so that the
  *   solve does not stop at a stationary point of the problem with that
- *   block pinned.
+ *   block pinned. The orbital energies serve as the multipliers, so this
+ *   is done only once the orbital gradient is small.
  * - A step that lowered the energy but that OpenTrustRegion declined is
  *   retaken, Hessian-vector products per macroiteration are capped, and
  *   convergence is judged from the gradient, since OpenTrustRegion
@@ -375,6 +382,10 @@ class TrustRegionSCF {
   /// count, and whether it was hit
   size_t hess_budget_=0, hess_this_macro_=0;
   bool budget_spent_=false;
+  /// Has an objective evaluation stopped the solve at a kink, and the
+  /// step that reached it
+  bool kink_stop_=false;
+  arma::vec kink_step_;
   /// The lowest-energy point any objective evaluation has reached since
   /// the last accepted step
   arma::vec best_step_;
@@ -396,9 +407,13 @@ class TrustRegionSCF {
   static constexpr double valley_floor=1e-3;
   /// Electrons moved to release a block frozen against the KKT conditions
   static constexpr double kkt_nudge=1e-3;
-  /// Restarts of the solver after a pattern change, a declined step or a
-  /// KKT release
-  static constexpr int max_restarts=5;
+  /// RMS orbital gradient below which the orbital energies are trusted as
+  /// the multipliers of the KKT conditions
+  static constexpr double kkt_gate=1e-4;
+  /// Safety cap on the restarts of the solver after a pattern change, a
+  /// declined step or a KKT release; a pattern that recurs without a
+  /// lower energy stops the optimization before that
+  static constexpr int max_restarts=100;
 
   /// The optimizer whose callbacks OpenTrustRegion calls; its C interface
   /// passes no user data.
@@ -471,22 +486,44 @@ class TrustRegionSCF {
     return occ;
   }
   /// Orbitals, occupations and fillings displaced from the reference by
-  /// the parameters x, scaled by s. The free fillings are projected back
-  /// onto q >= 0; only they move, so no charge leaks into a frozen block.
-  void displaced(const double * x, double s, std::vector<arma::mat> & C, std::vector<arma::vec> & occ, arma::vec & q) const {
+  /// the parameters x, scaled by s. Only the free fillings move, so no
+  /// charge leaks into a frozen block. The occupation part of the step is
+  /// cut short where a free block's fractional orbital fills or empties,
+  /// and that block is put exactly on the kink; kink says whether it was.
+  void displaced(const double * x, double s, std::vector<arma::mat> & C, std::vector<arma::vec> & occ, arma::vec & q, bool * kink=nullptr) const {
     C=rotated(x, s);
+    if(kink)
+      *kink=false;
     if(!free_occ_) {
       occ=occ_;
       return;
     }
     q=q_+s*filling_change(x);
     for(size_t p=0;p<pblocks_.size();p++) {
-      if(free_[p].empty())
-        continue;
-      const arma::uvec idx(arma::conv_to<arma::uvec>::from(free_[p]));
-      arma::vec sub(q(idx));
-      project_simplex(sub, arma::accu(q_(idx)));
-      q(idx)=sub;
+      // The largest fraction t of the step that keeps every free block's
+      // filling within the segment of its fractional orbital; scaling the
+      // whole step keeps the electron count
+      double t=1.0, qkink=0.0;
+      size_t bkink=0;
+      for(size_t b : free_[p]) {
+        const double lo=active_[b]*maxocc_[b], hi=lo+maxocc_[b], d=q(b)-q_(b);
+        const double bound=(d < 0.0) ? lo : hi;
+        if((d < 0.0 && q(b) < lo) || (d > 0.0 && q(b) > hi)) {
+          const double tb=(bound-q_(b))/d;
+          if(tb < t) {
+            t=tb;
+            bkink=b;
+            qkink=bound;
+          }
+        }
+      }
+      if(t < 1.0) {
+        for(size_t b : free_[p])
+          q(b)=q_(b)+t*(q(b)-q_(b));
+        q(bkink)=qkink;
+        if(kink)
+          *kink=true;
+      }
     }
     occ=fillings(q);
   }
@@ -630,21 +667,6 @@ class TrustRegionSCF {
 
   /* Free occupations */
 
-  /// Euclidean projection onto the simplex {q >= 0, sum q = total}. A
-  /// feasible point is returned untouched, not shifted by roundoff.
-  static void project_simplex(arma::vec & q, double total) {
-    if(!q.n_elem || q.min() >= 0.0)
-      return;
-    const arma::vec u(arma::sort(q, "descend"));
-    double csum=0.0, theta=(arma::accu(q)-total)/q.n_elem;
-    for(size_t j=0;j<u.n_elem;j++) {
-      csum+=u(j);
-      const double t=(csum-total)/(j+1);
-      if(u(j)-t > 0.0)
-        theta=t;
-    }
-    q=arma::clamp(q-theta, 0.0, std::numeric_limits<double>::max());
-  }
   /// Orthonormal (Helmert) basis of the sum-zero subspace of R^n
   static arma::mat helmert(size_t n) {
     arma::mat H(n, n ? n-1 : 0, arma::fill::zeros);
@@ -1052,9 +1074,26 @@ class TrustRegionSCF {
     n_update_=n_objective_=n_hessian_=0;
 
     int nrestart=0;
+    // Occupation patterns visited, as the fractional orbital of each block
+    // and whether the block is free, with the energy on entry
+    std::vector<std::pair<std::vector<arma::uword>, double>> visited;
     for(int pass=0;;pass++) {
       if(pass)
         build_layout();
+      std::vector<arma::uword> pattern(active_);
+      for(const auto & fp : free_)
+        for(size_t b : fp)
+          pattern.push_back(b);
+      bool cycle=false;
+      for(const auto & v : visited)
+        if(v.first==pattern && E_ >= v.second-1e-10*std::abs(E_))
+          cycle=true;
+      if(cycle) {
+        printf("\nThe occupation pattern recurs without a lower energy; stopping.\n");
+        fflush(stdout);
+        break;
+      }
+      visited.emplace_back(pattern, E_);
       size_t nfree=0;
       for(const auto & fp : free_)
         nfree+=fp.size();
@@ -1064,13 +1103,14 @@ class TrustRegionSCF {
         break;
 
       budget_spent_=false;
+      kink_stop_=false;
       c_int err;
       {
         Activate guard(this);
         err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) nparam_, settings);
         guard.rethrow();
       }
-      if(err!=0 && !budget_spent_)
+      if(err!=0 && !budget_spent_ && !kink_stop_)
         throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
       if(budget_spent_) {
         printf("A macroiteration spent %i Hessian-vector products without accepting a step.\n", (int) hess_budget_);
@@ -1078,6 +1118,20 @@ class TrustRegionSCF {
       }
       if(pass >= max_restarts)
         break;
+
+      // A step that reached a kink lowered the energy: restart from there,
+      // with the block that reached it integer
+      if(kink_stop_) {
+        std::vector<arma::mat> C;
+        std::vector<arma::vec> occ;
+        arma::vec q;
+        displaced(kink_step_.memptr(), 1.0, C, occ, q);
+        adopt(C, q);
+        printf("\nA step filled or emptied a fractional orbital, lowering the energy to % .10f; restarting at the shell closing.\n", E_);
+        fflush(stdout);
+        nrestart++;
+        continue;
+      }
 
       // OpenTrustRegion returns success on a stalled line search. If the
       // pass ends unconverged having declined a step that lowered the
@@ -1093,8 +1147,10 @@ class TrustRegionSCF {
         nrestart++;
         continue;
       }
-      // Is the point a KKT point of the problem with free occupations?
-      if(!pattern_changed_) {
+      // Is the point a KKT point of the problem with free occupations? The
+      // orbital energies are its multipliers once the orbitals are nearly
+      // converged
+      if(!pattern_changed_ && gradient_rms() <= std::max(convthr, kkt_gate)) {
         const arma::vec q(release_kkt_violation());
         if(q.n_elem) {
           adopt(C_, q);
@@ -1159,7 +1215,8 @@ class TrustRegionSCF {
       std::vector<arma::vec> occ;
       arma::vec q;
       double E;
-      self->displaced(kappa, 1.0, C, occ, q);
+      bool kink;
+      self->displaced(kappa, 1.0, C, occ, q, &kink);
       self->evaluate(C, occ, E, Fmo);
       *func=E;
       if(self->free_occ_) {
@@ -1167,6 +1224,14 @@ class TrustRegionSCF {
         if(E < self->best_energy_) {
           self->best_energy_=E;
           self->best_step_=arma::vec(kappa, self->nparam_);
+        }
+        // The step was cut short at a kink and still lowered the energy:
+        // stop the solve to restart from there. (Failing here is the clean
+        // way out; optimize_free() treats it as a stop, not an error.)
+        if(kink && E < self->E_) {
+          self->kink_stop_=true;
+          self->kink_step_=arma::vec(kappa, self->nparam_);
+          return 1;
         }
       }
       return 0;
