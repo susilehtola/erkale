@@ -271,6 +271,10 @@ class AngularGrid {
   bool do_mgga_t_;
   /// Meta-GGA lapl used? (Set in compute_xc, only affects eval_Fxc)
   bool do_mgga_l_;
+  /// Is the paramagnetic current in use? (Set in update_current) Then
+  /// tau_ holds the current-corrected tau - |j_p|^2/(2 rho), and a tau
+  /// functional is evaluated with the cmgga_tau kernels.
+  bool do_current_=false;
 
   // LDA stuff:
 
@@ -296,6 +300,9 @@ class AngularGrid {
   arma::mat lapl_;
   /// Kinetic energy density
   arma::mat tau_;
+  /// Paramagnetic current density, (3 x Nrho) x Npts, and the inverse
+  /// densities the cmgga_tau kernels take, Nrho x Npts
+  arma::mat jp_, inv_rho_;
 
   /// Functional derivative of energy wrt laplacian of electron density
   arma::mat vlapl_;
@@ -328,6 +335,14 @@ class AngularGrid {
   /// spin suffix "" (restricted), "_a" or "_b"; in the basis of tab if
   /// given
   void xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops, const BFTable * tab=nullptr) const;
+  /// Paramagnetic current of the antisymmetric part of the AO matrix
+  /// -Im P (P = C n C^dagger) on the batch, 3 x Npts
+  arma::mat current(const arma::mat & ImP) const;
+  /// Perturbed-current operands of the imaginary part ImPx of a
+  /// perturbation, spin suffix "" (restricted), "_a" or "_b"
+  void xck_pert_current(const arma::mat & ImPx, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const;
+  /// Current-correct the kinetic energy density of channel s
+  void correct_tau(size_t s);
   /// Run kernel name on the batch, returning the matrix over the nbf
   /// functions of the batch
   arma::mat xck_local(const std::string & name, const xck_coll_t & coll, const std::map<std::string, arma::rowvec> & ops, size_t nbf) const;
@@ -480,6 +495,13 @@ class AngularGrid {
   void update_density_from(const arma::mat & Pa, const arma::mat & Pb, const BasisSet * dens_basis);
   /// Update values of density, self-interaction correction
   void update_density(const arma::cx_vec & C);
+  /// Add the paramagnetic current of the imaginary part ImP of a
+  /// Hermitian density matrix P = C n C^dagger (complex orbitals in the
+  /// real basis), after update_density with its real part: tau becomes
+  /// tau - |j_p|^2/(2 rho), and tau functionals are current corrected
+  void update_current(const arma::mat & ImP);
+  /// Same, unrestricted
+  void update_current(const arma::mat & ImPa, const arma::mat & ImPb);
 
   /// Get density list; used to determine isosurface values for orbital plots
   void density(std::vector<dens_list_t> & list) const;
@@ -566,11 +588,14 @@ class AngularGrid {
   /// XC response (libxckernel order 2) to the symmetric perturbation
   /// densities Px, accumulated into Hx; restricted. Needs compute_xc
   /// with fxc.
-  void eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const;
+  void eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx, const std::vector<arma::mat> * ImPx=nullptr) const;
   /// XC response to the perturbation densities (Pxa[i], Pxb[i]),
   /// accumulated into (Hxa[i], Hxb[i]); unrestricted. With tab_b,
-  /// channel b is in that second basis.
-  void eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b=nullptr) const;
+  /// channel b is in that second basis. With the current in use, ImPx
+  /// (ImPxa, ImPxb) are the imaginary parts of the perturbations, and
+  /// the accumulated matrices are general: see DFTGrid::eval_Fxc for
+  /// complex densities.
+  void eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b=nullptr, const std::vector<arma::mat> * ImPxa=nullptr, const std::vector<arma::mat> * ImPxb=nullptr) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
@@ -631,6 +656,15 @@ class DFTGrid {
   /// XC force of the restricted (one matrix) or unrestricted (two)
   /// density, with grid response
   arma::vec eval_force_any(int x_func, int c_func, const std::vector<arma::mat> & P);
+
+  /// The XC matrix and response drivers. With the imaginary parts ImP
+  /// of complex densities given, tau functionals are current corrected
+  /// and the matrices are the general kernel outputs, from which the
+  /// complex overloads assemble the Hermitian XC matrices.
+  void eval_Fxc_impl(int x_func, int c_func, const arma::mat & P, const arma::mat * ImP, arma::mat & H, double & Exc, double & Nel, const BasisSet * dens_basis);
+  void eval_Fxc_impl(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const arma::mat * ImPa, const arma::mat * ImPb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b, bool fock_a, bool fock_b, const BasisSet * dens_basis);
+  std::vector<arma::mat> eval_Kxc_impl(int x_func, int c_func, const arma::mat & P, const arma::mat * ImP, const std::vector<arma::mat> & Px, const std::vector<arma::mat> * ImPx);
+  void eval_Kxc_impl(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const arma::mat * ImPa, const arma::mat * ImPb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, const std::vector<arma::mat> * ImPxa, const std::vector<arma::mat> * ImPxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b);
 
  public:
   /// Dummy constructor
@@ -710,6 +744,22 @@ class DFTGrid {
   /// channel involves only that channel's basis functions; the other
   /// channel enters through its density and derivatives on the grid.
   void eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b=nullptr);
+
+  /**
+   * Complex orbitals in the real basis: XC energy and Hermitian XC
+   * matrix of the Hermitian density matrix P = C n C^dagger. Meta-GGAs
+   * of tau are current corrected, tau -> tau - |j_p|^2/(2 rho) with the
+   * paramagnetic current j_p of Im P, which makes them gauge invariant
+   * in a magnetic field; other functionals see only Re P.
+   */
+  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & P, arma::cx_mat & H, double & Exc, double & Nel);
+  /// Same, unrestricted
+  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ha, arma::cx_mat & Hb, double & Exc, double & Nel);
+  /// XC response of complex orbitals in the real basis: the change of
+  /// the Hermitian XC matrix at P for each Hermitian perturbation Px[i]
+  std::vector<arma::cx_mat> eval_Kxc(int x_func, int c_func, const arma::cx_mat & P, const std::vector<arma::cx_mat> & Px);
+  /// Same, unrestricted
+  void eval_Kxc(int x_func, int c_func, const arma::cx_mat & Pa, const arma::cx_mat & Pb, const std::vector<arma::cx_mat> & Pxa, const std::vector<arma::cx_mat> & Pxb, std::vector<arma::cx_mat> & Hxa, std::vector<arma::cx_mat> & Hxb);
 
   /**
    * Compute Fock matrix, exchange-correlation energy and integrated

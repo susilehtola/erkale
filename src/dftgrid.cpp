@@ -535,8 +535,9 @@ void AngularGrid::update_density(const arma::mat & P0, const BFTable * tab) {
   const arma::mat  & BFl = tab ? tab->bf_lapl : bf_lapl_;
   const arma::uvec & BFI = tab ? tab->bf_ind  : bf_ind_;
 
-  // Non-polarized calculation.
+  // Non-polarized calculation, without the current until update_current
   polarized_=false;
+  do_current_=false;
 
   // Update density vector
   arma::mat P(P0.submat(BFI,BFI));
@@ -626,8 +627,9 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, c
   const arma::mat  & BFbl = tab_b ? tab_b->bf_lapl : bf_lapl_;
   const arma::uvec & BFIb = tab_b ? tab_b->bf_ind  : bf_ind_;
 
-  // Polarized calculation.
+  // Polarized calculation, without the current until update_current
   polarized_=true;
+  do_current_=false;
 
   // Update density vector
   arma::mat Pa(Pa0.submat(BFIa,BFIa));
@@ -706,8 +708,9 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
     throw std::runtime_error("Error - coefficient vector is empty!\n");
   }
 
-  // Polarized calculation.
+  // Polarized calculation, without the current until update_current
   polarized_=true;
+  do_current_=false;
 
   // Compute value of orbital
   arma::cx_vec C(bf_ind_.n_elem);
@@ -819,6 +822,54 @@ double AngularGrid::compute_Nel() const {
 void AngularGrid::print_grid() const {
   for(size_t ip=0;ip<grid_.size();ip++)
     printf("%5i % f % f % f %e\n",(int) ip+1,grid_[ip].r.x,grid_[ip].r.y,grid_[ip].r.z,grid_[ip].w_);
+}
+
+arma::mat AngularGrid::current(const arma::mat & ImP) const {
+  // j_p = Im sum_i n_i psi_i^* grad psi_i = sum_uv A_uv chi_u grad chi_v
+  // with the antisymmetric A = -Im P, as P_uv = sum_i n_i C_ui C_vi^*
+  const arma::mat ImPb(ImP(bf_ind_,bf_ind_));
+  const arma::mat A(-0.5*(ImPb - ImPb.t()));
+  arma::mat j(3, grid_.size());
+  j.row(0) = arma::sum(bf_ % (A*bf_x_), 0);
+  j.row(1) = arma::sum(bf_ % (A*bf_y_), 0);
+  j.row(2) = arma::sum(bf_ % (A*bf_z_), 0);
+  return j;
+}
+
+void AngularGrid::correct_tau(size_t s) {
+  // tau - |j_p|^2/(2 rho), which the cmgga_tau kernels differentiate
+  // through j_p and 1/rho; points below the density threshold are
+  // screened out of the kernels and keep tau
+  const double thr=settings.get_double("DFTDensityThr");
+  for(size_t ip=0;ip<grid_.size();ip++)
+    if(rho_(s,ip)>=thr) {
+      inv_rho_(s,ip)=1.0/rho_(s,ip);
+      const arma::vec j(jp_.submat(3*s,ip,3*s+2,ip));
+      tau_(s,ip)-=0.5*arma::dot(j,j)*inv_rho_(s,ip);
+    }
+}
+
+void AngularGrid::update_current(const arma::mat & ImP) {
+  if(polarized_)
+    throw std::logic_error("update_current: restricted current for an unrestricted density.\n");
+  if(!do_tau_ || do_lapl_)
+    throw std::runtime_error("The current correction is only implemented for meta-GGAs of tau without the laplacian.\n");
+  jp_=current(ImP);
+  inv_rho_.zeros(1,grid_.size());
+  correct_tau(0);
+  do_current_=true;
+}
+
+void AngularGrid::update_current(const arma::mat & ImPa, const arma::mat & ImPb) {
+  if(!polarized_)
+    throw std::logic_error("update_current: unrestricted current for a restricted density.\n");
+  if(!do_tau_ || do_lapl_)
+    throw std::runtime_error("The current correction is only implemented for meta-GGAs of tau without the laplacian.\n");
+  jp_=arma::join_cols(current(ImPa), current(ImPb));
+  inv_rho_.zeros(2,grid_.size());
+  correct_tau(0);
+  correct_tau(1);
+  do_current_=true;
 }
 
 void AngularGrid::init_xc() {
@@ -1769,7 +1820,7 @@ std::string AngularGrid::xck_family() const {
   if(do_mgga_t_ && do_mgga_l_)
     return "mgga";
   if(do_mgga_t_)
-    return "mgga_tau";
+    return do_current_ ? "cmgga_tau" : "mgga_tau";
   if(do_mgga_l_)
     return "mgga_lapl";
   if(do_gga_)
@@ -1879,6 +1930,25 @@ void AngularGrid::xck_ground_operands(std::map<std::string, arma::rowvec> & ops)
         ops["rho" + xyz[ic]] = grho_.row(ic);
     }
   }
+
+  // The paramagnetic current and inverse density of cmgga_tau
+  if(do_current_ && do_mgga_t_) {
+    const std::string xyz[] = {"x", "y", "z"};
+    const std::string spin[] = {"_a", "_b"};
+    for(size_t s=0;s<inv_rho_.n_rows;s++) {
+      const std::string sfx(polarized_ ? spin[s] : "");
+      for(int ic=0;ic<3;ic++)
+        ops["jp" + xyz[ic] + sfx] = jp_.row(3*s+ic);
+      ops["inv_rho" + sfx] = inv_rho_.row(s);
+    }
+  }
+}
+
+void AngularGrid::xck_pert_current(const arma::mat & ImPx, const std::string & spin, std::map<std::string, arma::rowvec> & ops) const {
+  const arma::mat j(current(ImPx));
+  const std::string xyz[] = {"x", "y", "z"};
+  for(int ic=0;ic<3;ic++)
+    ops["jp" + xyz[ic] + spin + "_p1"] = j.row(ic);
 }
 
 void AngularGrid::xck_pert_operands(const arma::mat & Px, const std::string & spin, std::map<std::string, arma::rowvec> & ops, const BFTable * tab) const {
@@ -1997,7 +2067,7 @@ void AngularGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool alpha, bool beta
     xck_contract("ub_o1", tab_b ? xck_collocation("ub_o1", tab_b) : coll, ops, Hb, tab_b);
 }
 
-void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx) const {
+void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::mat> & Hx, const std::vector<arma::mat> * ImPx) const {
   if(polarized_)
     throw std::runtime_error("Refusing to compute restricted XC response with unrestricted density.\n");
 
@@ -2006,11 +2076,13 @@ void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Px, std::vector<arma::
   const xck_coll_t coll(xck_collocation("r_o2"));
   for(size_t i=0;i<Px.size();i++) {
     xck_pert_operands(Px[i], "", ops);
+    if(ImPx)
+      xck_pert_current((*ImPx)[i], "", ops);
     xck_contract("r_o2", coll, ops, Hx[i]);
   }
 }
 
-void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b) const {
+void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BFTable * tab_b, const std::vector<arma::mat> * ImPxa, const std::vector<arma::mat> * ImPxb) const {
   if(!polarized_)
     throw std::runtime_error("Refusing to compute unrestricted XC response with restricted density.\n");
   std::map<std::string, arma::rowvec> ops;
@@ -2020,6 +2092,10 @@ void AngularGrid::eval_Kxc(const std::vector<arma::mat> & Pxa, const std::vector
   for(size_t i=0;i<Pxa.size();i++) {
     xck_pert_operands(Pxa[i], "_a", ops);
     xck_pert_operands(Pxb[i], "_b", ops, tab_b);
+    if(ImPxa) {
+      xck_pert_current((*ImPxa)[i], "_a", ops);
+      xck_pert_current((*ImPxb)[i], "_b", ops);
+    }
     xck_contract("ua_o2", coll, ops, Hxa[i]);
     xck_contract("ub_o2", tab_b ? coll_b : coll, ops, Hxb[i], tab_b);
   }
@@ -4032,6 +4108,10 @@ arma::vec DFTGrid::compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat &
 }
 
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Excv, double & Nelv, const BasisSet * dens_basis) {
+  eval_Fxc_impl(x_func, c_func, P, nullptr, H, Excv, Nelv, dens_basis);
+}
+
+void DFTGrid::eval_Fxc_impl(int x_func, int c_func, const arma::mat & P, const arma::mat * ImP, arma::mat & H, double & Excv, double & Nelv, const BasisSet * dens_basis) {
   // Clear Hamiltonian (in the primary / assembly basis)
   H.zeros(basp_->Nbf(),basp_->Nbf());
   // Clear exchange-correlation energy
@@ -4076,6 +4156,8 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // XC matrix below is still assembled in the primary basis.
       Timer tp;
       wrk_[ith].update_density_from(P, dens_basis);
+      if(ImP)
+        wrk_[ith].update_current(*ImP);
       // Update number of electrons
       Nel+=wrk_[ith].compute_Nel();
 
@@ -4128,6 +4210,10 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 
 
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b, bool fock_a, bool fock_b, const BasisSet * dens_basis) {
+  eval_Fxc_impl(x_func, c_func, Pa, Pb, nullptr, nullptr, Ha, Hb, Excv, Nelv, basis_b, fock_a, fock_b, dens_basis);
+}
+
+void DFTGrid::eval_Fxc_impl(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const arma::mat * ImPa, const arma::mat * ImPb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b, bool fock_a, bool fock_b, const BasisSet * dens_basis) {
   if(basis_b && dens_basis)
     throw std::logic_error("eval_Fxc: basis_b and dens_basis are mutually exclusive.\n");
   // Clear Hamiltonian. Channel a is the primary basis; channel b is the
@@ -4202,6 +4288,8 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 
       // Update density
       wrk_[ith].update_density(Pa,Pb,dtab_bd,dtab_a);
+      if(ImPa)
+        wrk_[ith].update_current(*ImPa, *ImPb);
       // Update number of electrons
       Nel+=wrk_[ith].compute_Nel();
 
@@ -4258,6 +4346,10 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 }
 
 std::vector<arma::mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & P, const std::vector<arma::mat> & Px) {
+  return eval_Kxc_impl(x_func, c_func, P, nullptr, Px, nullptr);
+}
+
+std::vector<arma::mat> DFTGrid::eval_Kxc_impl(int x_func, int c_func, const arma::mat & P, const arma::mat * ImP, const std::vector<arma::mat> & Px, const std::vector<arma::mat> * ImPx) {
   const size_t Nbf(basp_->Nbf());
   std::vector<arma::mat> Hx(Px.size(), arma::zeros<arma::mat>(Nbf,Nbf));
 
@@ -4282,13 +4374,15 @@ std::vector<arma::mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat
       wrk_[ith].set_shell(grids_[i]);
       wrk_[ith].form_grid();
       wrk_[ith].update_density(P);
+      if(ImP)
+        wrk_[ith].update_current(*ImP);
 
       wrk_[ith].init_xc();
       if(x_func>0)
         wrk_[ith].compute_xc(x_func,true,true);
       if(c_func>0)
         wrk_[ith].compute_xc(c_func,true,true);
-      wrk_[ith].eval_Kxc(Px,Hth);
+      wrk_[ith].eval_Kxc(Px,Hth,ImPx);
 
       wrk_[ith].free();
     }
@@ -4304,6 +4398,10 @@ std::vector<arma::mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat
 }
 
 void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b) {
+  eval_Kxc_impl(x_func, c_func, Pa, Pb, nullptr, nullptr, Pxa, Pxb, nullptr, nullptr, Hxa, Hxb, basis_b);
+}
+
+void DFTGrid::eval_Kxc_impl(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const arma::mat * ImPa, const arma::mat * ImPb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, const std::vector<arma::mat> * ImPxa, const std::vector<arma::mat> * ImPxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b) {
   if(Pxa.size() != Pxb.size())
     throw std::logic_error("eval_Kxc: inconsistent numbers of alpha and beta perturbations.\n");
 
@@ -4341,13 +4439,15 @@ void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma:
         tab_b = &dtab_b;
       }
       wrk_[ith].update_density(Pa,Pb,tab_b);
+      if(ImPa)
+        wrk_[ith].update_current(*ImPa, *ImPb);
 
       wrk_[ith].init_xc();
       if(x_func>0)
         wrk_[ith].compute_xc(x_func,true,true);
       if(c_func>0)
         wrk_[ith].compute_xc(c_func,true,true);
-      wrk_[ith].eval_Kxc(Pxa,Pxb,Hath,Hbth,tab_b);
+      wrk_[ith].eval_Kxc(Pxa,Pxb,Hath,Hbth,tab_b,ImPxa,ImPxb);
 
       wrk_[ith].free();
     }
@@ -4360,6 +4460,89 @@ void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       Hxb[j]+=Hbwrk[i][j];
     }
 #endif
+}
+
+namespace {
+  /// Is the functional current corrected? Meta-GGAs of tau are; the
+  /// laplacian has no current-corrected kernels, so functionals that
+  /// need it are not, and nor are those that do not depend on tau.
+  bool current_corrected(int x_func, int c_func) {
+    bool tau=false, lapl=false;
+    for(int f : {x_func, c_func})
+      if(f>0) {
+        tau = tau || tau_needed(f);
+        lapl = lapl || laplacian_needed(f);
+      }
+    return tau && !lapl;
+  }
+
+  /// The Hermitian XC matrix from the kernel output H. With the current,
+  /// the kernel gives the general G = dE/dM, M = Re P - Im P, and the
+  /// matrix is sym(G) - i asym(G). The kernels write G row-major, so H
+  /// is G^T, which flips the sign of the antisymmetric part:
+  /// sym(H) + i asym(H). Otherwise H is the real XC matrix.
+  arma::cx_mat hermitian_xc(const arma::mat & H, bool current) {
+    if(!current)
+      return arma::cx_mat(H, arma::zeros<arma::mat>(H.n_rows, H.n_cols));
+    return arma::cx_mat(0.5*(H + H.t()), 0.5*(H - H.t()));
+  }
+
+  /// Imaginary parts of complex matrices
+  std::vector<arma::mat> imag_parts(const std::vector<arma::cx_mat> & M) {
+    std::vector<arma::mat> I;
+    for(const auto & m : M)
+      I.push_back(arma::imag(m));
+    return I;
+  }
+  /// Real parts of complex matrices
+  std::vector<arma::mat> real_parts(const std::vector<arma::cx_mat> & M) {
+    std::vector<arma::mat> R;
+    for(const auto & m : M)
+      R.push_back(arma::real(m));
+    return R;
+  }
+}
+
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & P, arma::cx_mat & H, double & Exc, double & Nel) {
+  const arma::mat ImP(arma::imag(P));
+  const bool cur(current_corrected(x_func, c_func));
+  arma::mat G;
+  eval_Fxc_impl(x_func, c_func, arma::real(P), cur ? &ImP : nullptr, G, Exc, Nel, nullptr);
+  H = hermitian_xc(G, cur);
+}
+
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ha, arma::cx_mat & Hb, double & Exc, double & Nel) {
+  const arma::mat ImPa(arma::imag(Pa)), ImPb(arma::imag(Pb));
+  const bool cur(current_corrected(x_func, c_func));
+  arma::mat Ga, Gb;
+  eval_Fxc_impl(x_func, c_func, arma::real(Pa), arma::real(Pb), cur ? &ImPa : nullptr, cur ? &ImPb : nullptr, Ga, Gb, Exc, Nel, nullptr, true, true, nullptr);
+  Ha = hermitian_xc(Ga, cur);
+  Hb = hermitian_xc(Gb, cur);
+}
+
+std::vector<arma::cx_mat> DFTGrid::eval_Kxc(int x_func, int c_func, const arma::cx_mat & P, const std::vector<arma::cx_mat> & Px) {
+  const arma::mat ImP(arma::imag(P));
+  const std::vector<arma::mat> ImPx(imag_parts(Px));
+  const bool cur(current_corrected(x_func, c_func));
+  const std::vector<arma::mat> G(eval_Kxc_impl(x_func, c_func, arma::real(P), cur ? &ImP : nullptr, real_parts(Px), cur ? &ImPx : nullptr));
+  std::vector<arma::cx_mat> Hx;
+  for(const auto & g : G)
+    Hx.push_back(hermitian_xc(g, cur));
+  return Hx;
+}
+
+void DFTGrid::eval_Kxc(int x_func, int c_func, const arma::cx_mat & Pa, const arma::cx_mat & Pb, const std::vector<arma::cx_mat> & Pxa, const std::vector<arma::cx_mat> & Pxb, std::vector<arma::cx_mat> & Hxa, std::vector<arma::cx_mat> & Hxb) {
+  const arma::mat ImPa(arma::imag(Pa)), ImPb(arma::imag(Pb));
+  const std::vector<arma::mat> ImPxa(imag_parts(Pxa)), ImPxb(imag_parts(Pxb));
+  const bool cur(current_corrected(x_func, c_func));
+  std::vector<arma::mat> Ga, Gb;
+  eval_Kxc_impl(x_func, c_func, arma::real(Pa), arma::real(Pb), cur ? &ImPa : nullptr, cur ? &ImPb : nullptr, real_parts(Pxa), real_parts(Pxb), cur ? &ImPxa : nullptr, cur ? &ImPxb : nullptr, Ga, Gb, nullptr);
+  Hxa.clear();
+  Hxb.clear();
+  for(size_t i=0;i<Ga.size();i++) {
+    Hxa.push_back(hermitian_xc(Ga[i], cur));
+    Hxb.push_back(hermitian_xc(Gb[i], cur));
+  }
 }
 
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & CW, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {
