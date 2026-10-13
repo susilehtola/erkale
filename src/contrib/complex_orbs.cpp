@@ -711,6 +711,7 @@ int main_guarded(int argc, char **argv) {
 
   auto fock = scfsolver.get_fock_matrix();
   double E = scfsolver.get_energy();
+  auto dm = scfsolver.get_solution();
 
 #ifdef ERKALE_TRUST_REGION
   // Second-order trust-region optimization and stability analysis. The
@@ -827,7 +828,8 @@ int main_guarded(int argc, char **argv) {
         printf("The solution is stable within its symmetry.\n");
       fflush(stdout);
     }
-    auto ret = fock_builder(tr.density_matrix());
+    dm = tr.density_matrix();
+    auto ret = fock_builder(dm);
     E = ret.first;
     fock = ret.second;
   }
@@ -835,6 +837,41 @@ int main_guarded(int argc, char **argv) {
   // The checkpoint holds the Fock matrices of the m blocks
   save_matrices(cylindrical ? unfold_blocks(fock) : fock);
 
+  // The solution: the occupations of each block over its canonical
+  // orbitals, the eigenvectors of the Fock matrix, which at convergence
+  // span the occupied space
+  printf("\nCanonical orbital energies (occupations) of the occupied blocks, up to the lowest empty orbital\n");
+  for (size_t b=0; b<fock.size(); b++) {
+    const double nb = arma::sum(dm.second[b]);
+    if (nb == 0.0)
+      continue;
+    arma::vec eps;
+    arma::mat V;
+    arma::eig_sym(eps, V, fock[b]);
+    const arma::vec n(arma::square(V.t()*dm.first[b]) * dm.second[b]);
+    const arma::uvec occupied(arma::find(n > 1e-6));
+    const size_t nprint = std::min<size_t>(occupied.max()+2, n.n_elem);
+    printf("%s: %.6f electrons\n", block_descriptions[b].c_str(), nb);
+    for (size_t k=0; k<nprint; k++) {
+      printf(" % 12.6f (%.6f)", eps(k), n(k));
+      if (k%4==3 || k+1==nprint)
+        printf("\n");
+    }
+    fflush(stdout);
+  }
+  // <S^2> = Sz(Sz+1) + Nb - sum_ij na_i nb_j |<a_i|b_j>|^2, within each m
+  // block; a folded |m| block carries the electrons of m and -m
+  if (unrestricted) {
+    const double Sz = 0.5*(Nela-Nelb);
+    double S2 = Sz*(Sz+1) + Nelb;
+    for (size_t b=0; b<nsym; b++) {
+      const arma::mat O(dm.first[b].t()*dm.first[nsym+b]);
+      S2 -= arma::as_scalar(dm.second[b].t()*arma::square(O)*dm.second[nsym+b]) / symmult[b];
+    }
+    printf("<S^2> = %.6f\n", S2);
+    fflush(stdout);
+  }
+  printf("\n");
   printf("SCF converged. Total energy is % .10f\n", E);
   fflush(stdout);
 
