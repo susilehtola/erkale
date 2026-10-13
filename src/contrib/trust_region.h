@@ -205,12 +205,18 @@ class TrustRegionSCF {
     settings.stability=stability;
     settings.conv_tol=convthr;
     settings.verbose=verbose;
-    Activate guard(this);
-    const c_int err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) n_param(), settings);
-    guard.rethrow();
-    if(err!=0)
-      throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
-    return true;
+    while(true) {
+      c_int err;
+      {
+        Activate guard(this);
+        err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) n_param(), settings);
+        guard.rethrow();
+      }
+      if(err==0)
+        return true;
+      if(!follow_instability(convthr, verbose))
+        throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
+    }
   }
 
   /**
@@ -219,7 +225,7 @@ class TrustRegionSCF {
    * structure are examined, along with the occupation transfers if the
    * occupations are free.
    */
-  bool is_stable(double convthr, int verbose) {
+  bool is_stable(double convthr, int verbose, arma::vec * mode=nullptr) {
     if(!n_param())
       return true;
     stability_settings_type settings=stability_settings_init();
@@ -231,12 +237,56 @@ class TrustRegionSCF {
       settings.precond=&TrustRegionSCF::cb_precond;
     arma::vec kappa(n_param(), arma::fill::zeros);
     c_bool stable=true;
-    Activate guard(this);
-    const c_int err=stability_check(h_diag.memptr(), &TrustRegionSCF::cb_hess_x, (c_int) n_param(), &stable, settings, kappa.memptr());
-    guard.rethrow();
+    // The cap on Hessian-vector products is for the solver's
+    // macroiterations, not for the eigensolver
+    const size_t budget=hess_budget_;
+    hess_budget_=0;
+    c_int err;
+    {
+      Activate guard(this);
+      err=stability_check(h_diag.memptr(), &TrustRegionSCF::cb_hess_x, (c_int) n_param(), &stable, settings, kappa.memptr());
+      hess_budget_=budget;
+      guard.rethrow();
+    }
     if(err!=0)
       throw std::runtime_error("OpenTrustRegion stability check failed with error code " + std::to_string((long long) err) + ".\n");
+    if(mode)
+      *mode=kappa;
     return stable;
+  }
+
+  /**
+   * OpenTrustRegion looks for a saddle point only once the gradient has
+   * converged. Near a saddle point whose negative mode the gradient does
+   * not touch, as with a spin-symmetry breaking instability of a
+   * symmetric solution, its augmented-Hessian step has no gradient
+   * component and the solver fails. Check the stability, and if the
+   * point is unstable, go down along the lowest mode with the
+   * logarithmic line search OpenTrustRegion uses at a converged saddle
+   * point. Returns whether the energy was lowered.
+   */
+  bool follow_instability(double convthr, int verbose) {
+    arma::vec mode;
+    if(is_stable(convthr, verbose, &mode))
+      return false;
+    for(int i=0;i<21;i++) {
+      const double s=std::pow(10.0, -0.5*i);
+      std::vector<arma::mat> C, Fmo;
+      std::vector<arma::vec> occ;
+      arma::vec q;
+      double E;
+      displaced(mode.memptr(), s, C, occ, q);
+      evaluate(C, occ, E, Fmo);
+      if(E < E_) {
+        const double E0=E_;
+        arma::vec step(s*mode);
+        take_step(step.memptr());
+        printf("\nThe solver failed at a saddle point; following the unstable mode lowered the energy by %.3e. Restarting.\n", E0-E_);
+        fflush(stdout);
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -856,6 +906,21 @@ class TrustRegionSCF {
     best_step_.reset();
   }
 
+  /// Move the reference by a step of the parameters
+  void take_step(const double * kappa) {
+    if(free_occ_) {
+      std::vector<arma::mat> C;
+      std::vector<arma::vec> occ;
+      arma::vec q;
+      displaced(kappa, 1.0, C, occ, q);
+      adopt(C, q);
+    } else {
+      C_=rotated(kappa);
+      evaluate(C_, occ_, E_, Fmo_);
+      grad_=gradient(Fmo_, occ_);
+    }
+  }
+
   /**
    * Preconditioner: the inverse of the diagonal shifted by mu, with the
    * occupation block inverted exactly in its eigenbasis. At mu = 0
@@ -1114,8 +1179,12 @@ class TrustRegionSCF {
         err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) nparam_, settings);
         guard.rethrow();
       }
-      if(err!=0 && !budget_spent_ && !kink_stop_)
-        throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
+      if(err!=0 && !budget_spent_ && !kink_stop_) {
+        if(!follow_instability(convthr, verbose))
+          throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
+        nrestart++;
+        continue;
+      }
       if(budget_spent_) {
         printf("A macroiteration spent %i Hessian-vector products without accepting a step.\n", (int) hess_budget_);
         fflush(stdout);
@@ -1192,23 +1261,13 @@ class TrustRegionSCF {
   static c_int cb_update(const c_real * kappa, c_real * func, c_real * grad, c_real * h_diag, hess_x_fp * hess_x) {
     TrustRegionSCF * self=active();
     try {
+      self->take_step(kappa);
+      std::copy(self->grad_.begin(), self->grad_.end(), grad);
       if(self->free_occ_) {
-        std::vector<arma::mat> C;
-        std::vector<arma::vec> occ;
-        arma::vec q;
-        self->displaced(kappa, 1.0, C, occ, q);
-        self->adopt(C, q);
-        std::copy(self->grad_.begin(), self->grad_.end(), grad);
         std::copy(self->hdiag_.begin(), self->hdiag_.end(), h_diag);
       } else {
-        self->C_=self->rotated(kappa);
-        self->evaluate(self->C_, self->occ_, self->E_, self->Fmo_);
-        self->grad_=self->gradient(self->Fmo_, self->occ_);
         const arma::vec h(self->hessian_diagonal(self->Fmo_));
-        for(size_t k=0;k<self->pairs_.size();k++) {
-          grad[k]=self->grad_(k);
-          h_diag[k]=h(k);
-        }
+        std::copy(h.begin(), h.end(), h_diag);
       }
       *func=self->E_;
       *hess_x=&TrustRegionSCF::cb_hess_x;
