@@ -14,4 +14,5 @@ JKMethod Cholesky
 ConvThr 1e-7
 MaxIter 60
 TrustRegion true
+FractionalOccupations true
 SaveChk complex_orbs_c_pbe_tr.chk
