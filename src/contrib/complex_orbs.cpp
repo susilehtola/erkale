@@ -101,6 +101,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_bool("TrustRegion", "Finish the SCF with second-order trust-region optimization (OpenTrustRegion)?", false);
   settings.add_bool("StabilityAnalysis", "Check the stability of the solution within its symmetry, following instabilities if TrustRegion is used?", false);
   settings.add_double("TrustRegionHandover", "Convergence threshold at which the first-order SCF hands over to the trust-region solver (0: ConvThr)", 0.0);
+  settings.add_bool("FractionalOccupations", "Let the trust-region solver optimize the occupations of the m blocks, allowing fractional occupations at a common Fermi level? Otherwise it keeps the occupations of the first-order SCF", false);
   settings.add_bool("TrustRegionExactPrecond", "Precondition the trust-region occupation directions with the exact occupation Hessian? (Off only to measure what it buys)", true);
   settings.add_double("TrustRegionCheck", "Check the trust-region gradient and Hessian against finite differences of the energy with this step at the handover (0: no check)", 0.0);
 
@@ -135,9 +136,12 @@ int main_guarded(int argc, char **argv) {
   double handover = settings.get_double("TrustRegionHandover");
   double trcheck = settings.get_double("TrustRegionCheck");
   bool trexact = settings.get_bool("TrustRegionExactPrecond");
+  bool fractional = settings.get_bool("FractionalOccupations");
   // The orbital Zeeman term splits m from -m
   if(cylindrical && linB != 0.0)
     throw std::runtime_error("CylindricalSymmetry is incompatible with a magnetic field (LinearB).\n");
+  if(fractional && readlinocc < 0)
+    throw std::runtime_error("FractionalOccupations optimizes the occupations, so it cannot be combined with occupations read in with LinearOccupations.\n");
 #ifndef ERKALE_TRUST_REGION
   if(trustregion || stability)
     throw std::runtime_error("TrustRegion and StabilityAnalysis need ERKALE built with OpenTrustRegion.\n");
@@ -796,14 +800,14 @@ int main_guarded(int argc, char **argv) {
 
     printf("\nFirst-order SCF energy % .10f\n", E);
     fflush(stdout);
-    // Without LinearOccupations, the aufbau distributes the electrons of
-    // each particle type over the m blocks, and the trust-region solver
-    // optimizes that distribution along with the orbitals
+    // With FractionalOccupations, the trust-region solver optimizes the
+    // distribution of the electrons of each particle type over the m
+    // blocks along with the orbitals
     TrustRegionSCF::FreeOccupations free_occupations;
     free_occupations.blocks_per_particle = arma::conv_to<std::vector<size_t>>::from(number_of_blocks_per_particle_type);
     free_occupations.maxocc = arma::conv_to<std::vector<double>>::from(maximum_occupation);
     free_occupations.descriptions = block_descriptions;
-    TrustRegionSCF tr = (readlinocc < 0) ? TrustRegionSCF(fock_builder, scfsolver.get_solution(), response) : TrustRegionSCF(fock_builder, scfsolver.get_solution(), free_occupations, response);
+    TrustRegionSCF tr = !fractional ? TrustRegionSCF(fock_builder, scfsolver.get_solution(), response) : TrustRegionSCF(fock_builder, scfsolver.get_solution(), free_occupations, response);
     tr.exact_preconditioner(trexact);
     if(trcheck > 0.0)
       tr.check_derivatives(trcheck, 1e-4);
