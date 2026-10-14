@@ -641,18 +641,38 @@ size_t GaussianShell::last_ind() const {
   return indstart_+Nbf()-1;
 }
 
+std::string GaussianShell::contraction_pattern() const {
+  const char l=(char) tolower(shell_types[am_]);
+  return "(" + std::to_string(c_.size()) + l + ")/[" + std::to_string(Nctr()) + l + "]";
+}
+
 void GaussianShell::print() const {
 
-  printf("\t%c shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[am_],(int) (center_ind()+1),(int) first_ind()+1,(int) last_ind()+1);
+  printf("\t%c shell at nucleus %3i, %s, with basis functions %4i-%-4i\n",shell_types[am_],(int) (center_ind()+1),contraction_pattern().c_str(),(int) first_ind()+1,(int) last_ind()+1);
   printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen_.x/ANGSTROMINBOHR,cen_.y/ANGSTROMINBOHR,cen_.z/ANGSTROMINBOHR);
 
-  // Get contraction of normalized primitives
-  std::vector<contr_t> cn(contr_normalized());
+  if(Nctr()==1) {
+    // Get contraction of normalized primitives
+    std::vector<contr_t> cn(contr_normalized());
 
-  printf("\t\tExponential contraction is\n");
-  printf("\t\t\tzeta\t\tprimitive coeff\ttotal coeff\n");
-  for(size_t i=0;i<c_.size();i++)
-    printf("\t\t\t%e\t% e\t% e\n",c_[i].z,cn[i].c,c_[i].c);
+    printf("\t\tExponential contraction is\n");
+    printf("\t\t\tzeta\t\tprimitive coeff\ttotal coeff\n");
+    for(size_t i=0;i<c_.size();i++)
+      printf("\t\t\t%e\t% e\t% e\n",c_[i].z,cn[i].c,c_[i].c);
+  } else {
+    // Coefficients of the normalized primitives in each contraction
+    std::vector< std::vector<contr_t> > cn(Nctr());
+    for(size_t ic=0;ic<Nctr();ic++)
+      cn[ic]=contr_normalized(ic);
+    printf("\t\tGeneral contraction of normalized primitives is\n");
+    printf("\t\t\tzeta\t\tcoefficients of contractions 1-%i\n",(int) Nctr());
+    for(size_t i=0;i<c_.size();i++) {
+      printf("\t\t\t%e",c_[i].z);
+      for(size_t ic=0;ic<Nctr();ic++)
+        printf(" % e",cn[ic][i].c);
+      printf("\n");
+    }
+  }
   if(uselm_) {
     printf("\t\tThe functions on this shell are:\n\t\t\t");
     for(int m=-am_;m<=am_;m++)
@@ -1959,7 +1979,7 @@ void BasisSet::print(bool verbose) const {
 
 
       printf("Shell %4i",(int) i+1);
-      printf("\t%c %4s shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[shells_[i].am()],type.c_str(),(int) (shells_[i].center_ind()+1),(int) shells_[i].first_ind()+1,(int) shells_[i].last_ind()+1);
+      printf("\t%c %4s shell at nucleus %3i, %-12s with basis functions %4i-%-4i\n",shell_types[shells_[i].am()],type.c_str(),(int) (shells_[i].center_ind()+1),shells_[i].contraction_pattern().c_str(),(int) shells_[i].first_ind()+1,(int) shells_[i].last_ind()+1);
     }
   }
 
