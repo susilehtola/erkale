@@ -330,7 +330,7 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
     // confirms the functions match.
     size_t Nprim=0;
     for(size_t ish=0; ish<Nsh; ish++)
-      Nprim += seg[ish].sh->contr(seg[ish].ic).size();
+      Nprim += seg[ish].sh->contr(seg[ish].ic, true).size();
 
     TX(trexio_write_basis_type(tf, "Gaussian", 16));
     TX(trexio_write_basis_shell_num(tf, (int32_t) Nsh));
@@ -355,7 +355,7 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
       // (ERKALE's own convention), and the contracted AO comes out
       // unit-normalized with shell_factor = 1.
       const double fac = pow(M_2_PI, 0.75) * pow(2.0, l) / std::sqrt(doublefact(2*l-1));
-      const std::vector<contr_t> c = seg[ish].sh->contr_normalized(seg[ish].ic);
+      const std::vector<contr_t> c = seg[ish].sh->contr_normalized(seg[ish].ic, true);
       for(size_t k=0; k<c.size(); k++) {
         shell_index[ip] = (int32_t) ish;
         exponent[ip]    = c[k].z;

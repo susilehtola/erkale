@@ -17,9 +17,11 @@
 
 
 #include <algorithm>
+#include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <string>
 // For exceptions
 #include <sstream>
@@ -410,10 +412,10 @@ std::vector<contr_t> GaussianShell::contr_normalized() const {
   return contr_normalized(0);
 }
 
-std::vector<contr_t> GaussianShell::contr_normalized(size_t ictr) const {
+std::vector<contr_t> GaussianShell::contr_normalized(size_t ictr, bool nonzero) const {
   // The ictr'th contraction, its coefficients converted to those of
   // normalized primitives
-  std::vector<contr_t> cn(contr(ictr));
+  std::vector<contr_t> cn(contr(ictr, nonzero));
 
   // Note - these refer to cartesian functions!
   double fac=pow(M_2_PI,0.75)*pow(2,am_)/sqrt(doublefact(2*am_-1));
@@ -433,33 +435,61 @@ size_t GaussianShell::Nctr() const {
   return cf_.n_cols;
 }
 
-bool GaussianShell::same_primitives(const GaussianShell & rhs) const {
+bool GaussianShell::shares_primitives(const GaussianShell & rhs) const {
   if(cenind_ != rhs.cenind_ || am_ != rhs.am_ || uselm_ != rhs.uselm_)
     return false;
-  if(c_.size() != rhs.c_.size())
-    return false;
   for(size_t i=0;i<c_.size();i++)
-    if(c_[i].z != rhs.c_[i].z)
-      return false;
-  return true;
+    for(size_t j=0;j<rhs.c_.size();j++)
+      if(c_[i].z == rhs.c_[j].z)
+        return true;
+  return false;
 }
 
 void GaussianShell::merge_contraction(const GaussianShell & rhs) {
-  if(!same_primitives(rhs))
-    throw std::logic_error("GaussianShell::merge_contraction: the shells do not share the same primitives.\n");
-  // Append rhs's contraction columns after ours, preserving order
-  cf_=arma::join_rows(cf_,rhs.cf_);
+  if(cenind_ != rhs.cenind_ || am_ != rhs.am_ || uselm_ != rhs.uselm_)
+    throw std::logic_error("GaussianShell::merge_contraction: the shells differ in center, angular momentum or harmonics.\n");
+  // The union of the exponents: the row of each of rhs's primitives
+  std::vector<contr_t> cu(c_);
+  std::vector<size_t> row(rhs.c_.size());
+  for(size_t j=0;j<rhs.c_.size();j++) {
+    size_t i;
+    for(i=0;i<cu.size();i++)
+      if(cu[i].z == rhs.c_[j].z)
+        break;
+    if(i==cu.size()) {
+      contr_t p;
+      p.z=rhs.c_[j].z;
+      p.c=0.0;
+      cu.push_back(p);
+    }
+    row[j]=i;
+  }
+  // rhs's contraction columns after ours, zero on the primitives a
+  // contraction lacks
+  arma::mat cf(cu.size(), cf_.n_cols+rhs.cf_.n_cols, arma::fill::zeros);
+  cf.submat(0, 0, cf_.n_rows-1, cf_.n_cols-1)=cf_;
+  for(size_t j=0;j<rhs.c_.size();j++)
+    cf.submat(row[j], cf_.n_cols, row[j], cf.n_cols-1)=rhs.cf_.row(j);
+  c_=cu;
+  cf_=cf;
+  sort();
+  sync_c();
 }
 
 const arma::mat & GaussianShell::coefs() const {
   return cf_;
 }
 
-std::vector<contr_t> GaussianShell::contr(size_t ictr) const {
-  std::vector<contr_t> ret(c_.size());
+std::vector<contr_t> GaussianShell::contr(size_t ictr, bool nonzero) const {
+  std::vector<contr_t> ret;
+  ret.reserve(c_.size());
   for(size_t i=0;i<c_.size();i++) {
-    ret[i].z=c_[i].z;
-    ret[i].c=cf_(i,ictr);
+    if(nonzero && cf_(i,ictr)==0.0)
+      continue;
+    contr_t p;
+    p.z=c_[i].z;
+    p.c=cf_(i,ictr);
+    ret.push_back(p);
   }
   return ret;
 }
@@ -1129,25 +1159,48 @@ void BasisSet::sort() {
 }
 
 void BasisSet::merge_generally_contracted() {
-  // Group consecutive shells that share the same center, angular
-  // momentum, harmonics flag and primitive exponents into one generally
-  // contracted shell. The shells arrive already in their final order, in
-  // which the segmented sort has made every generally contracted block
-  // contiguous, so a single consecutive-merge pass captures all general
-  // contraction without disturbing the basis function order (the merged
-  // shell emits [ctr0][ctr1]... in the same span the segmented shells
-  // occupied).
+  // Group the shells of the same center, angular momentum and harmonics
+  // flag that are connected by shared exponents: a basis given in a
+  // Davidson-reduced form, in which each contraction omits some of the
+  // primitives, or a segmented basis whose free primitives repeat
+  // exponents of the contracted functions, then evaluates its primitive
+  // integrals once for all the contractions. The shells of a center and
+  // angular momentum are contiguous in the sorted order, so a merged
+  // shell taking the place of its first member keeps the order of the
+  // functions of the others; a basis in which no shells share an
+  // exponent is left untouched.
   if(shells_.empty())
     return;
 
+  // Union-find over the shells
+  std::vector<size_t> root(shells_.size());
+  for(size_t i=0;i<root.size();i++)
+    root[i]=i;
+  std::function<size_t(size_t)> find=[&](size_t i) {
+    while(root[i]!=i)
+      i=root[i]=root[root[i]];
+    return i;
+  };
+  for(size_t i=0;i<shells_.size();i++)
+    for(size_t j=i+1;j<shells_.size() && shells_[j].center_ind()==shells_[i].center_ind() && shells_[j].am()==shells_[i].am();j++)
+      if(shells_[i].shares_primitives(shells_[j])) {
+        // Link the later root to the earlier one, so that the root of a
+        // group is its first member
+        const size_t ri=find(i), rj=find(j);
+        root[std::max(ri,rj)]=std::min(ri,rj);
+      }
+
+  // The members join the shell of their first member
   std::vector<GaussianShell> merged;
   merged.reserve(shells_.size());
-  merged.push_back(shells_[0]);
-  for(size_t i=1;i<shells_.size();i++) {
-    if(merged.back().same_primitives(shells_[i]))
-      merged.back().merge_contraction(shells_[i]);
-    else
+  std::vector<size_t> pos(shells_.size());
+  for(size_t i=0;i<shells_.size();i++) {
+    const size_t r=find(i);
+    if(r==i) {
+      pos[i]=merged.size();
       merged.push_back(shells_[i]);
+    } else
+      merged[pos[r]].merge_contraction(shells_[i]);
   }
   shells_=std::move(merged);
 

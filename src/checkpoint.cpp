@@ -494,7 +494,9 @@ void Checkpoint::write(const BasisSet & basis, const std::string & role) {
     const GaussianShell & sh=wshells[i];
     const size_t Nlm=sh.lm_in_use() ? sh.Nlm() : sh.Ncart();
     for(size_t ic=0;ic<sh.Nctr();ic++) {
-      excontr.push_back(sh.contr(ic));
+      // Without the primitives the contraction lacks, as in the
+      // segmented basis that the shell was merged from
+      excontr.push_back(sh.contr(ic, true));
       shell_data_t sd;
       sd.indstart=sh.first_ind()+ic*Nlm;
       sd.am=sh.am();

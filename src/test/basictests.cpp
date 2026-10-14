@@ -215,55 +215,37 @@ void test_checkpoint() {
 
 Settings settings;
 
-/// Check that a natively generally contracted shell (built by merging
-/// two same-exponent contractions) reproduces the two separate
-/// segmented shells, both when its functions are evaluated in real
-/// space and when its integrals are computed.
-void check_general_contraction() {
-  // Two d-shells sharing three exponents but with different
-  // contraction coefficients: a generally contracted block, built in
-  // memory so the test needs no basis-set library.
-  std::vector<contr_t> c0(3), c1(3);
-  const double z[3]={4.0, 1.1, 0.35};
-  const double a0[3]={0.20, 0.55, 0.35};
-  const double a1[3]={-0.09, 0.31, 0.82};
-  for(int i=0;i<3;i++) {
-    c0[i].z=z[i]; c0[i].c=a0[i];
-    c1[i].z=z[i]; c1[i].c=a1[i];
-  }
-
-  const coords_t orig{0.0,0.0,0.0};
-  GaussianShell s0(2,true,c0), s1(2,true,c1);
-  s0.set_center(orig,0); s1.set_center(orig,0);
-  s0.normalize(); s1.normalize();
-  s0.first_ind(0); s1.first_ind(0);
-
-  GaussianShell gc=s0;
-  gc.merge_contraction(s1);
+/// Check that a generally contracted shell merged from segmented shells
+/// reproduces them, both when its functions are evaluated in real space
+/// and when its integrals are computed.
+static void compare_general_contraction(const std::string & what, const std::vector<GaussianShell> & seg) {
+  GaussianShell gc=seg[0];
+  for(size_t i=1;i<seg.size();i++)
+    gc.merge_contraction(seg[i]);
   gc.first_ind(0);
-
-  if(gc.Nctr()!=2 || gc.Nbf()!=2*(2*2+1))
-    throw std::runtime_error("check_general_contraction: merged shell has the wrong shape.\n");
+  const size_t nlm=seg[0].Nbf();
+  if(gc.Nctr()!=seg.size() || gc.Nbf()!=seg.size()*nlm)
+    throw std::runtime_error("check_general_contraction: " + what + ": merged shell has the wrong shape.\n");
 
   // Real-space evaluation
   const double px=0.3, py=-0.2, pz=0.15;
-  const arma::vec fgc=gc.eval_func(px,py,pz);
-  const arma::vec fstack=arma::join_cols(s0.eval_func(px,py,pz), s1.eval_func(px,py,pz));
-  if(arma::abs(fgc-fstack).max() > 1e-12)
-    throw std::runtime_error("check_general_contraction: eval_func of the generally contracted shell disagrees.\n");
+  arma::vec fstack;
+  for(const GaussianShell & sh : seg)
+    fstack=arma::join_cols(fstack, sh.eval_func(px,py,pz));
+  if(arma::abs(gc.eval_func(px,py,pz)-fstack).max() > 1e-12)
+    throw std::runtime_error("check_general_contraction: " + what + ": eval_func of the generally contracted shell disagrees.\n");
 
-  // Integrals: the native-GC self-quartet against the segmented one
+  // Integrals: the native-GC self-quartet against the segmented ones
   std::vector<GaussianShell> gcv{gc};
   CintEnv egc(gcv,false); ERIWorker wgc(egc);
   wgc.compute(0,0,0,0);
   const std::vector<double> igc(*wgc.getp());
 
-  std::vector<GaussianShell> segv{s0,s1};
-  CintEnv eseg(segv,false); ERIWorker wseg(eseg);
+  CintEnv eseg(seg,false); ERIWorker wseg(eseg);
   const size_t nb=gc.Nbf();
-  const size_t nlm=nb/gc.Nctr();
+  const int nc=(int) seg.size();
   double maxd=0.0;
-  for(int ci=0;ci<2;ci++)for(int cj=0;cj<2;cj++)for(int ck=0;ck<2;ck++)for(int cl=0;cl<2;cl++) {
+  for(int ci=0;ci<nc;ci++)for(int cj=0;cj<nc;cj++)for(int ck=0;ck<nc;ck++)for(int cl=0;cl<nc;cl++) {
     wseg.compute(ci,cj,ck,cl);
     const std::vector<double> * p=wseg.getp();
     for(size_t fi=0;fi<nlm;fi++)for(size_t fj=0;fj<nlm;fj++)for(size_t fk=0;fk<nlm;fk++)for(size_t fl=0;fl<nlm;fl++) {
@@ -274,7 +256,31 @@ void check_general_contraction() {
     }
   }
   if(maxd > 1e-10)
-    throw std::runtime_error("check_general_contraction: generally contracted integrals disagree with the segmented ones.\n");
+    throw std::runtime_error("check_general_contraction: " + what + ": generally contracted integrals disagree with the segmented ones.\n");
+}
+
+void check_general_contraction() {
+  // d shells built in memory, so the test needs no basis-set library
+  const coords_t orig{0.0,0.0,0.0};
+  auto shell=[&](const std::vector<double> & z, const std::vector<double> & a) {
+    std::vector<contr_t> c(z.size());
+    for(size_t i=0;i<z.size();i++) {
+      c[i].z=z[i];
+      c[i].c=a[i];
+    }
+    GaussianShell sh(2,true,c);
+    sh.set_center(orig,0);
+    sh.normalize();
+    sh.first_ind(0);
+    return sh;
+  };
+  // Two contractions of the same three exponents
+  compare_general_contraction("shared exponents", {shell({4.0, 1.1, 0.35}, {0.20, 0.55, 0.35}), shell({4.0, 1.1, 0.35}, {-0.09, 0.31, 0.82})});
+  // A set reduced at both ends (Davidson rotations, P-orthogonalization),
+  // in which the contractions lack steep or diffuse primitives or both,
+  // and a free primitive: the merged shell spans the union of the
+  // exponents, with zero coefficients on the missing ones
+  compare_general_contraction("partly shared exponents", {shell({4.0, 1.1, 0.35}, {0.20, 0.55, 0.35}), shell({1.1, 0.35, 0.12}, {-0.09, 0.31, 0.82}), shell({1.1, 0.35}, {0.6, -0.4}), shell({0.12}, {1.0})});
 }
 
 /// Load minimal BSE-format JSON and verify (1) a segmented STO-3G

@@ -257,8 +257,9 @@ void write_basis(const BasisSet & basis, FILE *out) {
       shcoords.push_back(r.y);
       shcoords.push_back(r.z);
 
-      // Contraction of *normalized* primitives for this contraction
-      std::vector<contr_t> c=shells[i].contr_normalized(ic);
+      // Contraction of *normalized* primitives for this contraction,
+      // without the primitives it lacks
+      std::vector<contr_t> c=shells[i].contr_normalized(ic, true);
       nprim.push_back((int) c.size());
       for(size_t j=0;j<c.size();j++) {
         exps.push_back(c[j].z);
