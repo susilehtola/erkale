@@ -699,6 +699,8 @@ public:
   void merge_contraction(const GaussianShell & rhs);
   /// May the other shell be merged in, sharing at least one exponent?
   bool shares_primitives(const GaussianShell & rhs) const;
+  /// Contraction pattern, e.g. (17s)/[9s] for 17 primitives in 9 contractions
+  std::string contraction_pattern() const;
   /// The coefficient matrix (nprim x nctr) of the generally contracted shell
   const arma::mat & coefs() const;
   /// Get cartesians
