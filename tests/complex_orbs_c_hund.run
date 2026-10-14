@@ -1,0 +1,13 @@
+# Unrestricted C atom: the aufbau puts the two 2p electrons in m=+1 and
+# m=-1 (3Sigma_g-, M_L=0). HundBias fills +m before -m, giving the M_L=1
+# component of 3P, 3Pi_g.
+System C.xyz
+Basis cc-pVDZ
+Method lda_x-lda_c_vwn
+Multiplicity 3
+Restricted false
+ComplexBasis true
+JKMethod Cholesky
+DFTGrid 75 -302
+HundBias 0.01
+SaveChk complex_orbs_c_hund.chk
