@@ -1224,6 +1224,39 @@ void check_cross_basis() {
     throw std::runtime_error("check_cross_basis: the cross-basis matrices are inconsistent.\n");
 }
 
+void check_diffuse_eri() {
+  // On one center, the integrals of normalized primitives of a common
+  // exponent a scale as sqrt(a). libcint's estimate of the size of a pair
+  // of primitives leaves out a factor that is large for diffuse functions
+  // of high angular momentum, and it dropped the (gg|gg) integrals of
+  // exponents below 3e-4 unless CintEnv raises its cutoff.
+  auto gg=[](double z) {
+    std::vector<contr_t> c(1);
+    c[0].z=z;
+    c[0].c=1.0;
+    BasisSet basis;
+    nucleus_t nuc;
+    nuc.ind=0;
+    nuc.r.x=nuc.r.y=nuc.r.z=0.0;
+    nuc.bsse=false;
+    nuc.symbol="Be";
+    nuc.Z=4;
+    nuc.Q=0;
+    basis.add_nucleus(nuc);
+    basis.add_shell(0, 4, true, c, false);
+    basis.finalize();
+    return eri_tensor(basis);
+  };
+  const double z=1e-4;
+  const arma::mat G1(gg(1.0)), Gz(gg(z));
+  const double d=arma::abs(Gz-std::sqrt(z)*G1).max()/arma::abs(std::sqrt(z)*G1).max();
+  if(d>1e-10) {
+    std::ostringstream oss;
+    oss << "check_diffuse_eri: the (gg|gg) integrals of exponent " << z << " differ from the scaled ones of exponent 1 by " << d << " relative.\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -1243,6 +1276,9 @@ int main(void) {
   // A basis mixing spherical and cartesian shells
   check_mixed_basis();
   printf("Mixed spherical and cartesian basis OK.\n");
+  // Integrals of diffuse functions of high angular momentum
+  check_diffuse_eri();
+  printf("Diffuse high angular momentum integrals OK.\n");
   // m labels of the functions for linear symmetry
   check_m_values();
   printf("Linear-symmetry m values OK.\n");
