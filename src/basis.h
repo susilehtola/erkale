@@ -324,11 +324,14 @@ public:
 
   /// Sort shells in nuclear order, then by angular momentum, then by exponents
   void sort();
-  /// Merge consecutive shells that share the same center, angular
-  /// momentum, harmonics flag and primitive exponents into a single
-  /// generally contracted shell. The shells must already be in their
-  /// final order, in which every generally contracted block is
-  /// contiguous, so the merge preserves the basis function order.
+  /// Merge the shells of the same center, angular momentum and
+  /// harmonics flag that are connected by shared exponents into single
+  /// generally contracted shells over the union of their exponents, so
+  /// that the primitive integrals are evaluated once for all of their
+  /// contractions; shells that share no exponents stay apart. The
+  /// shells must already be in their final order, in which the shells
+  /// of a center and angular momentum are contiguous; a merged shell
+  /// takes the place of its first member.
   void merge_generally_contracted();
   /// Check numbering of basis functions
   void check_numbering();
@@ -676,23 +679,26 @@ public:
   /// Get the exponential contraction (the first contraction, for a
   /// generally contracted shell)
   std::vector<contr_t> contr() const;
-  /// Get the ictr'th contraction (exponents zipped with cf.col(ictr))
-  std::vector<contr_t> contr(size_t ictr) const;
+  /// Get the ictr'th contraction (exponents zipped with cf.col(ictr)).
+  /// A merged generally contracted shell has zero coefficients on the
+  /// primitives a contraction lacks; nonzero leaves them out, giving the
+  /// contraction as a segmented shell.
+  std::vector<contr_t> contr(size_t ictr, bool nonzero=false) const;
   /// Get the exponential contraction (reference, no copy). For a
   /// generally contracted shell this is the first contraction; use
   /// contr(ictr) or coefs() for the rest.
   const std::vector<contr_t> & contr_ref() const;
   /// Number of contractions (columns of the coefficient matrix)
   size_t Nctr() const;
-  /// Merge another shell in as an additional contraction: rhs must
-  /// share this shell's center, angular momentum, spherical/cartesian
-  /// choice and primitive exponents. Its contraction columns are
-  /// appended after this shell's, forming a generally contracted shell.
-  /// This is how add_shells and the checkpoint regroup build generally
-  /// contracted shells out of same-exponent segmented ones.
+  /// Merge another shell in as additional contractions: rhs must share
+  /// this shell's center, angular momentum and spherical/cartesian
+  /// choice. The primitives become the union of the exponents of both,
+  /// a contraction having zero coefficients on the primitives it lacks,
+  /// and rhs's contraction columns are appended after this shell's,
+  /// forming a generally contracted shell.
   void merge_contraction(const GaussianShell & rhs);
-  /// May the other shell be merged in as an additional contraction?
-  bool same_primitives(const GaussianShell & rhs) const;
+  /// May the other shell be merged in, sharing at least one exponent?
+  bool shares_primitives(const GaussianShell & rhs) const;
   /// The coefficient matrix (nprim x nctr) of the generally contracted shell
   const arma::mat & coefs() const;
   /// Get cartesians
@@ -708,8 +714,8 @@ public:
    */
   std::vector<contr_t> contr_normalized() const;
   /// Get contraction coefficients of normalized primitives for the
-  /// ictr'th contraction
-  std::vector<contr_t> contr_normalized(size_t ictr) const;
+  /// ictr'th contraction; nonzero as in contr()
+  std::vector<contr_t> contr_normalized(size_t ictr, bool nonzero=false) const;
 
   /// Number of functions on shell
   size_t Nbf() const;
