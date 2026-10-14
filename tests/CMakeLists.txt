@@ -62,6 +62,11 @@ function(run_complex_orbs target energy)
   set_property(TEST ${target} APPEND PROPERTY DEPENDS erkale_complex_orbs)
   set_property(TEST ${target} PROPERTY PASS_REGULAR_EXPRESSION "Total energy is ${energy}")
 endfunction()
+# Also check the term symbol (a regular expression: escape the + of Sigma+)
+function(run_complex_orbs_term target term energy)
+  run_complex_orbs(${target} ${energy})
+  set_property(TEST ${target} PROPERTY PASS_REGULAR_EXPRESSION "Term symbol ${term} .*Total energy is ${energy}")
+endfunction()
 
 # First, compile and run the basic test
 add_test(build_basictests  "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target basictests)
@@ -118,6 +123,7 @@ run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
 run_complex_orbs(complex_orbs_b_tpss_ml_m "-24.6048081")
 # Cylindrical symmetry: m and -m share their orbitals and occupations
 run_complex_orbs(complex_orbs_o2_b3lyp_cyl "-150.23617")
+run_complex_orbs_term(complex_orbs_o2_b3lyp_triplet "3Sigma_g-" "-150.334038")
 
 # Second-order trust-region SCF and stability analysis (OpenTrustRegion)
 if(ERKALE_TRUST_REGION)

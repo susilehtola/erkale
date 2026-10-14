@@ -73,6 +73,65 @@ arma::cx_mat basis_transform_mat(int l) {
   return Lmat;
 }
 
+/**
+ * Matrix of the reflection y -> -y through the molecular axis in the
+ * real basis: the functions of m < 0 go as sin(|m| phi) and change sign.
+ */
+arma::mat reflection_matrix(const arma::ivec & mvals) {
+  arma::vec sign(mvals.n_elem, arma::fill::ones);
+  sign(arma::find(mvals < 0)).fill(-1.0);
+  return arma::diagmat(sign);
+}
+
+/**
+ * Matrix of the inversion through the centroid of the nuclei in the real
+ * basis, which maps a function of angular momentum l on one nucleus to
+ * (-1)^l times the same function on the image nucleus. Empty if the
+ * molecule, basis included, has no inversion center; the overlap and
+ * nuclear attraction matrices S and V must be invariant.
+ */
+arma::mat inversion_matrix(const BasisSet & basis, const arma::mat & S, const arma::mat & V) {
+  const std::vector<nucleus_t> nuclei(basis.nuclei());
+  coords_t c = {0.0, 0.0, 0.0};
+  for (const auto & nuc : nuclei)
+    c = c + nuc.r;
+  c = c / (double) nuclei.size();
+
+  arma::mat I(basis.Nbf(), basis.Nbf(), arma::fill::zeros);
+  for (const auto & a : nuclei) {
+    const coords_t image = c*2.0 - a.r;
+    bool found = false;
+    for (const auto & b : nuclei) {
+      if (norm(b.r - image) > 1e-6 || b.Z != a.Z || b.bsse != a.bsse || b.shells.size() != a.shells.size())
+        continue;
+      for (size_t is=0; is<a.shells.size(); is++) {
+        const GaussianShell & sa = *a.shells[is];
+        const GaussianShell & sb = *b.shells[is];
+        if (sa.am() != sb.am() || sa.Nbf() != sb.Nbf())
+          return arma::mat();
+        const double sign = (sa.am() % 2) ? -1.0 : 1.0;
+        for (size_t k=0; k<sa.Nbf(); k++)
+          I(sb.first_ind()+k, sa.first_ind()+k) = sign;
+      }
+      found = true;
+      break;
+    }
+    if (!found)
+      return arma::mat();
+  }
+  // Same nuclei and shells, but are the exponents and contractions the same?
+  const double tol = 1e-8;
+  if (arma::abs(I*S*I.t() - S).max() > tol || arma::abs(I*V*I.t() - V).max() > tol)
+    return arma::mat();
+  return I;
+}
+
+/// Name of the term with angular momentum Lambda about the axis
+std::string lambda_label(int Lambda) {
+  static const char * names[] = {"Sigma", "Pi", "Delta", "Phi", "Gamma", "H", "I", "K", "L", "M"};
+  return Lambda < 10 ? names[Lambda] : "Lambda=" + std::to_string(Lambda);
+}
+
 int main_guarded(int argc, char **argv) {
 
   print_header();
@@ -861,14 +920,93 @@ int main_guarded(int argc, char **argv) {
   }
   // <S^2> = Sz(Sz+1) + Nb - sum_ij na_i nb_j |<a_i|b_j>|^2, within each m
   // block; a folded |m| block carries the electrons of m and -m
+  const double Sz = unrestricted ? 0.5*(Nela-Nelb) : 0.0;
+  double S2 = 0.0;
   if (unrestricted) {
-    const double Sz = 0.5*(Nela-Nelb);
-    double S2 = Sz*(Sz+1) + Nelb;
+    S2 = Sz*(Sz+1) + Nelb;
     for (size_t b=0; b<nsym; b++) {
       const arma::mat O(dm.first[b].t()*dm.first[nsym+b]);
       S2 -= arma::as_scalar(dm.second[b].t()*arma::square(O)*dm.second[nsym+b]) / symmult[b];
     }
     printf("<S^2> = %.6f\n", S2);
+    fflush(stdout);
+  }
+
+  // Term symbol of the determinant. The orbitals have definite m, so M_L
+  // is exact; S is taken as |Sz|. The inversion parity and, for
+  // a Sigma term, the character of the reflection through the axis are
+  // <D|O D>, the product over the particle types of det(C^T S O C) over
+  // the occupied orbitals; the character of a determinant that is not an
+  // eigenfunction of O lies strictly between -1 and 1.
+  {
+    const auto mdm = cylindrical ? unfold_density(dm) : dm;
+    const double perorb = unrestricted ? 1.0 : 2.0;
+    bool integer = true;
+    for (const auto & o : mdm.second)
+      for (double n : o)
+        if (std::min(std::abs(n), std::abs(n-perorb)) > 1e-6)
+          integer = false;
+    if (!integer) {
+      printf("The occupations are fractional: the solution is an ensemble of states, with no term symbol.\n");
+    } else {
+      std::vector<arma::cx_mat> Cocc(nparticle);
+      double ML = 0.0;
+      for (size_t p=0; p<nparticle; p++) {
+        std::vector<arma::cx_mat> cols;
+        for (size_t k=0; k<X.size(); k++) {
+          const size_t b = p*X.size() + k;
+          const arma::uvec occ(arma::find(mdm.second[b] > 0.5*perorb));
+          arma::mat C(Nbf, occ.n_elem, arma::fill::zeros);
+          C.rows(m_indices[k]) = X[k]*mdm.first[b].cols(occ);
+          cols.push_back(arma::cx_mat(C, arma::mat(C.n_rows, C.n_cols, arma::fill::zeros)));
+          ML += perorb*occ.n_elem*((int) k - maxam);
+        }
+        Cocc[p] = cols[0];
+        for (size_t k=1; k<cols.size(); k++)
+          Cocc[p] = arma::join_rows(Cocc[p], cols[k]);
+      }
+      const arma::cx_mat Sw(D.t()*S*D);
+      std::function<double(const arma::mat &)> character = [&](const arma::mat & O) {
+        const arma::cx_mat Ow(arma::solve(D, arma::cx_mat(O*D)));
+        std::complex<double> chi = 1.0;
+        for (size_t p=0; p<nparticle; p++) {
+          if (!Cocc[p].n_cols)
+            continue;
+          const std::complex<double> d = arma::det(arma::cx_mat(Cocc[p].t()*Sw*Ow*Cocc[p]));
+          chi *= unrestricted ? d : d*d;
+        }
+        return chi.real();
+      };
+      const double tol = 1e-4;
+      const int Lambda = (int) std::lround(std::abs(ML));
+      std::string term = lambda_label(Lambda);
+      std::string notes;
+      const arma::mat Inv(inversion_matrix(basis, S, V));
+      if (!Inv.is_empty()) {
+        const double chi = character(Inv);
+        if (std::abs(chi-1.0) < tol)
+          term += "_g";
+        else if (std::abs(chi+1.0) < tol)
+          term += "_u";
+        else
+          notes += "; no definite parity (<D|i D> = " + std::to_string(chi) + ")";
+      }
+      if (Lambda == 0) {
+        const double chi = character(reflection_matrix(mvals));
+        if (std::abs(chi-1.0) < tol)
+          term += "+";
+        else if (std::abs(chi+1.0) < tol)
+          term += "-";
+        else
+          notes += "; no definite reflection symmetry (<D|sigma_v D> = " + std::to_string(chi) + ")";
+      }
+      // <S^2> of Kohn-Sham orbitals is only a diagnostic, so note
+      // contamination above a small threshold
+      term = std::to_string((int) std::lround(2*std::abs(Sz)+1)) + term;
+      if (S2 - Sz*(Sz+1) > 1e-2)
+        notes += "; spin contaminated, <S^2> exceeds Sz(Sz+1) by " + std::to_string(S2 - Sz*(Sz+1));
+      printf("Term symbol %s (M_L = %i%s)\n", term.c_str(), (int) std::lround(ML), notes.c_str());
+    }
     fflush(stdout);
   }
   printf("\n");
