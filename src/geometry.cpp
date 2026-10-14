@@ -1182,7 +1182,7 @@ int main_guarded(int argc, char **argv) {
 
   // Run calculation to get final checkpoint
   settings=settings0;
-  settings.set_string("LoadChk",savechk0);
+  settings.set_string("LoadChk",getchk(iref));
   settings.set_string("SaveChk",savechk0);
   calculate(x,pars,E,f,false);
   save_xyz(get_atoms(x,pars),"Optimized configuration",result,false);
