@@ -18,6 +18,8 @@
 #include "mathf.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <stdexcept>
 
 extern "C" {
@@ -39,6 +41,49 @@ extern CINTOptimizerFunction int2c2e_optimizer;
 #undef bas
 
 
+
+/**
+ * Does the libcint in use drop the integrals of diffuse primitives of high
+ * angular momentum? Its estimate of the size of a pair of primitives
+ * leaves out the factor aij^(-(li+lj)/2) of its own bound on the pair,
+ * (d+1/sqrt(aij))^(li+lj) (pi/aij)^(3/2), so that, for instance, the
+ * one-center (gg|gg) integrals of exponents below 3e-4 come out zero.
+ * Integrals of normalized primitives of a common exponent a on one center
+ * scale exactly as sqrt(a): compare (gg|gg) at a=1e-4 with a=1, with the
+ * default screening. Evaluated once.
+ */
+static bool cint_drops_diffuse_pairs() {
+  static const bool drops=[]() {
+    const int l=4;
+    auto gggg=[](double a) {
+      int atm[ATM_SLOTS]={0};
+      atm[PTR_COORD]=PTR_ENV_START;
+      int bas[BAS_SLOTS]={0};
+      bas[ANG_OF]=l;
+      bas[NPRIM_OF]=1;
+      bas[NCTR_OF]=1;
+      bas[PTR_EXP]=PTR_ENV_START+3;
+      bas[PTR_COEFF]=PTR_ENV_START+4;
+      std::vector<double> env(PTR_ENV_START+5, 0.0);
+      env[PTR_ENV_START+3]=a;
+      env[PTR_ENV_START+4]=CINTgto_norm(l,a);
+      int shls[4]={0, 0, 0, 0};
+      const int n=2*l+1;
+      std::vector<double> buf(n*n*n*n);
+      int2e_sph(buf.data(), NULL, shls, atm, 1, bas, 1, env.data(), NULL, NULL);
+      // (00|00) of the first function
+      return buf[0];
+    };
+    const double a=1e-4;
+    const bool wrong=std::abs(gggg(a)-std::sqrt(a)*gggg(1.0)) > 1e-6*std::sqrt(a)*gggg(1.0);
+    if(wrong) {
+      printf("Note: this libcint drops integrals of diffuse primitives of high angular momentum; raising its screening cutoff for bases that need it.\n");
+      fflush(stdout);
+    }
+    return wrong;
+  }();
+  return drops;
+}
 
 int cint_1e_ncomp(cint_1e_kernel_t kernel) {
   switch(kernel) {
@@ -202,6 +247,36 @@ void CintEnv::build(const std::vector<GaussianShell> & sh, size_t Nsh_orbital, b
     shell_first_[is]=ibf;
     ibf+=shell_Nbf_[is];
     max_Nbf_=std::max(max_Nbf_,shell_Nbf_[is]);
+  }
+
+  // libcint skips a pair of primitives when its estimate of the size of
+  // the pair falls below exp(-expcutoff), 60 by default; in a four-center
+  // integral, the estimates of the two pairs are added. If the library
+  // leaves out the factor for diffuse primitives (see
+  // cint_drops_diffuse_pairs), a calculation in a basis with such
+  // functions collapses far below the variational limit. With the factor
+  // of the most diffuse pair missing from the estimates of both pairs, the
+  // effective cutoff is expcutoff - 2*deficit. Keep it at least 40, the
+  // smallest cutoff libcint accepts. This leaves the default untouched for
+  // common basis sets, such as aug-cc-pV5Z, whose effective cutoff stays
+  // above 50, and screens less only where the estimates fall short.
+  if(cint_drops_diffuse_pairs()) {
+    std::vector<double> amin;
+    for(const GaussianShell & sh : shells_) {
+      const int l=sh.am();
+      if((int) amin.size()<=l)
+        amin.resize(l+1, 0.0);
+      for(const contr_t & c : sh.contr_normalized(0))
+        if(amin[l]==0.0 || c.z<amin[l])
+          amin[l]=c.z;
+    }
+    double deficit=0.0;
+    for(size_t li=0;li<amin.size();li++)
+      for(size_t lj=0;lj<amin.size();lj++)
+        if(amin[li]>0.0 && amin[lj]>0.0)
+          deficit=std::max(deficit, -0.5*(li+lj)*std::log(amin[li]+amin[lj]));
+    if(40.0+2.0*deficit>60.0)
+      cint_env_[PTR_EXPCUTOFF]=40.0+2.0*deficit;
   }
 
   // Measure the normalization of the basis functions against ERKALE's:
