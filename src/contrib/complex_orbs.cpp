@@ -160,6 +160,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_bool("TrustRegion", "Finish the SCF with second-order trust-region optimization (OpenTrustRegion)?", false);
   settings.add_bool("StabilityAnalysis", "Check the stability of the solution within its symmetry, following instabilities if TrustRegion is used?", false);
   settings.add_double("TrustRegionHandover", "Convergence threshold at which the first-order SCF hands over to the trust-region solver (0: ConvThr)", 0.0);
+  settings.add_double("HundBias", "Hund-like aufbau: lower the orbital energies of the m block by HundBias*m during the first-order SCF, so that +m fills before -m and open shells maximize M_L; the energy of an m/-m pair is unchanged (0: off)", 0.0);
   settings.add_bool("FractionalOccupations", "Let the trust-region solver optimize the occupations of the m blocks, allowing fractional occupations at a common Fermi level? Otherwise it keeps the occupations of the first-order SCF", false);
   settings.add_bool("TrustRegionExactPrecond", "Precondition the trust-region occupation directions with the exact occupation Hessian? (Off only to measure what it buys)", true);
   settings.add_double("TrustRegionCheck", "Check the trust-region gradient and Hessian against finite differences of the energy with this step at the handover (0: no check)", 0.0);
@@ -196,11 +197,14 @@ int main_guarded(int argc, char **argv) {
   double trcheck = settings.get_double("TrustRegionCheck");
   bool trexact = settings.get_bool("TrustRegionExactPrecond");
   bool fractional = settings.get_bool("FractionalOccupations");
+  double hundbias = settings.get_double("HundBias");
   // The orbital Zeeman term splits m from -m
   if(cylindrical && linB != 0.0)
     throw std::runtime_error("CylindricalSymmetry is incompatible with a magnetic field (LinearB).\n");
   if(fractional && readlinocc < 0)
     throw std::runtime_error("FractionalOccupations optimizes the occupations, so it cannot be combined with occupations read in with LinearOccupations.\n");
+  if(hundbias != 0.0 && (readlinocc < 0 || cylindrical))
+    throw std::runtime_error("HundBias steers the aufbau between m and -m, so it needs neither LinearOccupations nor CylindricalSymmetry.\n");
 #ifndef ERKALE_TRUST_REGION
   if(trustregion || stability)
     throw std::runtime_error("TrustRegion and StabilityAnalysis need ERKALE built with OpenTrustRegion.\n");
@@ -747,9 +751,27 @@ int main_guarded(int argc, char **argv) {
     Fguess = fold_fock(Fguess);
   }
 
+  // Hund-like aufbau: the first-order SCF sees the orbital energies of
+  // block m lowered by HundBias*m. A constant shift of a block leaves its
+  // orbitals and their convergence unchanged, and changes only which
+  // blocks the aufbau fills.
+  std::function<void(std::vector<arma::mat> &, double)> shift_m = [&](std::vector<arma::mat> & F, double s) {
+    for (size_t b=0; b<F.size(); b++)
+      F[b].diag() -= s*((int) (b % nsym) - maxam);
+  };
+  OpenOrbitalOptimizer::Armadillo::FockBuilder<double, double> scf_fock_builder = fock_builder;
+  if (hundbias != 0.0) {
+    scf_fock_builder = [&](const OpenOrbitalOptimizer::Armadillo::DensityMatrix<double, double> & dm) {
+      auto ret = fock_builder(dm);
+      shift_m(ret.second, hundbias);
+      return ret;
+    };
+    shift_m(Fguess, hundbias);
+  }
+
   printf("\n\n\nSolving SCF\n");
   fflush(stdout);
-  OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+  OpenOrbitalOptimizer::Armadillo::SCFSolver<double,double> scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, scf_fock_builder, block_descriptions);
   if (readlinocc < 0)
     scfsolver.fixed_number_of_particles_per_block(number_of_particles_per_block);
   scfsolver.initialize_with_fock(Fguess);
@@ -769,6 +791,7 @@ int main_guarded(int argc, char **argv) {
     throw std::runtime_error("SCF did not converge in " + std::to_string(maxiter) + " iterations!\n");
 
   auto fock = scfsolver.get_fock_matrix();
+  shift_m(fock, -hundbias);
   double E = scfsolver.get_energy();
   auto dm = scfsolver.get_solution();
 
