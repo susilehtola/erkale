@@ -1,0 +1,12 @@
+# Unrestricted triplet O2: the two pi_g electrons in m=+1 and m=-1 of
+# the same spin form the 3Sigma_g- ground state.
+System O2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_b3lyp
+Multiplicity 3
+Restricted false
+ComplexBasis true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-7
+SaveChk complex_orbs_o2_b3lyp_triplet.chk
