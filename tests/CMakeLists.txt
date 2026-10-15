@@ -174,6 +174,7 @@ run_complex_orbs(complex_orbs_o2_camb3lyp "-150.2878160")
 # file is read from the working directory.
 configure_file(complex_orbs_b_ml.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_b_ml.linocc COPYONLY)
 configure_file(complex_orbs_be_hf_saddle.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_be_hf_saddle.linocc COPYONLY)
+configure_file(complex_orbs_be_hf_inversion.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_be_hf_inversion.linocc COPYONLY)
 run_complex_orbs(complex_orbs_b_ml_0 "-24.3478542")
 run_complex_orbs(complex_orbs_b_ml_p "-24.3943705")
 run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
@@ -199,6 +200,14 @@ derived_input(complex_orbs_o2_tpss complex_orbs_o2_tpss_guess_Load "Guess Load" 
 run_complex_orbs(complex_orbs_o2_tpss_guess_Load "-150.35981" LOAD complex_orbs_o2_b3lyp_triplet)
 derived_input(complex_orbs_o2_b3lyp_cyl complex_orbs_o2_b3lyp_cyl_guess_Load "Guess Load" "LoadChk complex_orbs_o2_b3lyp_triplet.chk")
 run_complex_orbs(complex_orbs_o2_b3lyp_cyl_guess_Load "-150.23617" LOAD complex_orbs_o2_b3lyp_triplet)
+# Inversion symmetry: the orbitals of each m are blocked further into
+# gerade and ungerade ones
+run_complex_orbs(complex_orbs_o2_b3lyp_cyl_inversion "-150.23617")
+# Guess Load between calculations with and without the parity blocks
+derived_input(complex_orbs_o2_b3lyp_cyl_inversion complex_orbs_o2_b3lyp_cyl_inversion_guess_Load "Guess Load" "LoadChk complex_orbs_o2_b3lyp_triplet.chk")
+run_complex_orbs(complex_orbs_o2_b3lyp_cyl_inversion_guess_Load "-150.23617" LOAD complex_orbs_o2_b3lyp_triplet)
+derived_input(complex_orbs_o2_b3lyp_cyl complex_orbs_o2_b3lyp_cyl_guess_Load_inversion "Guess Load" "LoadChk complex_orbs_o2_b3lyp_cyl_inversion.chk")
+run_complex_orbs(complex_orbs_o2_b3lyp_cyl_guess_Load_inversion "-150.23617" LOAD complex_orbs_o2_b3lyp_cyl_inversion)
 
 # Second-order trust-region SCF and stability analysis (OpenTrustRegion)
 if(ERKALE_TRUST_REGION)
@@ -209,6 +218,8 @@ if(ERKALE_TRUST_REGION)
   run_complex_orbs(complex_orbs_b_tpss_ml_p "-24.7048081")
   run_complex_orbs(complex_orbs_fe2_pbe_tr "-2526.386959")
   run_complex_orbs(complex_orbs_be_hf_saddle "-14.57261104")
+  run_complex_orbs_term(complex_orbs_h2_inversion "1Sigma_g\\+" "-0.92190859")
+  run_complex_orbs_term(complex_orbs_be_hf_inversion "1Sigma_g\\+" "-14.57233763")
   if(ERKALE_LIBXC_HAS_EPC)
     run_neo(neo_dft_epc_tr "-75.84436")
   endif()

@@ -1,0 +1,14 @@
+# complex_orbs_o2_b3lyp_cyl with the orbitals blocked by parity as well
+# as by |m|: the same energy.
+System O2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_b3lyp
+Multiplicity 1
+Restricted true
+ComplexBasis true
+CylindricalSymmetry true
+InversionSymmetry true
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-7
+SaveChk complex_orbs_o2_b3lyp_cyl_inversion.chk
