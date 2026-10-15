@@ -1,0 +1,17 @@
+# Be as in complex_orbs_be_hf_saddle, with the orbitals blocked by
+# parity (for an atom, that of l), which the occupation file gives in
+# its fourth column. The broken-symmetry minimum polarizes the 2s
+# orbitals of the two spins with 2p0 in opposite directions; within the
+# symmetry, the spin-symmetric solution is the minimum.
+System Be.xyz
+Basis cc-pVDZ
+Method HF
+Multiplicity 1
+Restricted false
+ComplexBasis true
+InversionSymmetry true
+LinearOccupations -1
+LinearOccupationFile complex_orbs_be_hf_inversion.linocc
+JKMethod Cholesky
+TrustRegion true
+SaveChk complex_orbs_be_hf_inversion.chk

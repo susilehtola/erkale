@@ -1,0 +1,15 @@
+# Stretched H2 as in complex_orbs_h2_instability, but with the orbitals
+# blocked by parity: the broken-symmetry solution mixes sigma_g and
+# sigma_u, so the spin-symmetric 1Sigma_g+ solution is now stable.
+System H2_stretched.xyz
+Basis cc-pVDZ
+Method HF
+Multiplicity 1
+Restricted false
+ComplexBasis true
+InversionSymmetry true
+JKMethod Cholesky
+ConvThr 1e-8
+TrustRegion true
+StabilityAnalysis true
+SaveChk complex_orbs_h2_inversion.chk
