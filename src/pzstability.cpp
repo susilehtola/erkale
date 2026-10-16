@@ -1043,6 +1043,10 @@ void PZStability::print_info() {
   printf("%-21s energy: % .16e\n","Nuclear repulsion",en.Enucr);
   printf("%-21s energy: % .16e\n","Coulomb",en.Ecoul);
   printf("%-21s energy: % .16e\n","Exchange-correlation",en.Exc);
+  if(en.Exx != 0.0) {
+    printf("%-21s energy: % .16e\n","  exact exchange",en.Exx);
+    printf("%-21s energy: % .16e\n","  density functional",en.Exc-en.Exx);
+  }
   printf("%-21s energy: % .16e\n","Non-local correlation",en.Enl);
   printf("%-21s energy: % .16e\n","SI correction",en.Esic);
   printf("-----------------------------------------------------\n");

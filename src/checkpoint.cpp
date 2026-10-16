@@ -741,6 +741,7 @@ void Checkpoint::write(const energy_t & en) {
   H5Tinsert(datatype, "Ekin" , HOFFSET(energy_t, Ekin) , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Enuca", HOFFSET(energy_t, Enuca), H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Exc"  , HOFFSET(energy_t, Exc)  , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Exx"  , HOFFSET(energy_t, Exx)  , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Eone" , HOFFSET(energy_t, Eone) , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Eel"  , HOFFSET(energy_t, Eel)  , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Enucr", HOFFSET(energy_t, Enucr), H5T_NATIVE_DOUBLE);
@@ -781,6 +782,7 @@ void Checkpoint::read(energy_t & en) {
   H5Tinsert(datatype, "Ekin" , HOFFSET(energy_t, Ekin) , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Enuca", HOFFSET(energy_t, Enuca), H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Exc"  , HOFFSET(energy_t, Exc)  , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Exx"  , HOFFSET(energy_t, Exx)  , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Eone" , HOFFSET(energy_t, Eone) , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Eel"  , HOFFSET(energy_t, Eel)  , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Enucr", HOFFSET(energy_t, Enucr), H5T_NATIVE_DOUBLE);
@@ -796,7 +798,8 @@ void Checkpoint::read(energy_t & en) {
   if(type!=H5S_SCALAR)
     throw std::runtime_error("Error - dataspace is not of scalar type!\n");
 
-  // Read
+  // Read; checkpoints from older versions have no Exx
+  en.Exx=0.0;
   H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &en);
 
   // Close dataspace
