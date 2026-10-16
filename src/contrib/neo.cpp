@@ -163,6 +163,11 @@ int main_guarded(int argc, char **argv) {
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
+  // The guess: the orbitals of the calculation in LoadChk projected onto
+  // the basis, the core Hamiltonian, or the superposition of atomic
+  // potentials
+  const std::string guess = settings.get_string("Guess");
+  const bool loadguess = load_guess(guess, loadchk, "erkale_neo");
   bool finiteproton = settings.get_bool("FiniteProton");
   bool density_fitting = (JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting);
   std::string vppstr = settings.get_string("vpp");
@@ -505,6 +510,8 @@ int main_guarded(int argc, char **argv) {
   };
 
   // Guess Fock
+  if(stricmp(guess,"Core")==0)
+    Vsap.zeros();
   arma::mat Fguess(X.t()*(T+Vfull+Vsap)*X);
 
   if(nstepwise==0 and quantum_protons.size()==0) {
@@ -892,7 +899,9 @@ int main_guarded(int argc, char **argv) {
 
   // Set up protonic guess
   if(quantum_protons.size()) {
-    if(loadchk != "") {
+    // The checkpoint of a calculation without quantum protons, like one
+    // of erkale, only gives the electronic guess
+    if(loadguess && Checkpoint(loadchk,false).exist("Cp")) {
       Checkpoint load(loadchk,false);
 
       BasisSet oldpbasis;
@@ -963,54 +972,43 @@ int main_guarded(int argc, char **argv) {
   };
 
   // Set up electronic guess
-  if(loadchk != "") {
+  if(loadguess) {
     Checkpoint load(loadchk,false);
 
     BasisSet oldbasis;
     load.read(oldbasis);
 
+    // The occupied orbitals of the old calculation in the orthonormal
+    // basis; the solver forms the Fock matrix of their density. A
+    // restricted calculation starts from the alpha orbitals of an
+    // unrestricted one, and an unrestricted one from the orbitals of a
+    // restricted one for both spins.
+    const bool oldrestr = load.exist("C");
+    std::function<arma::mat(const std::string &, int)> project = [&](const std::string & name, int nocc) {
+      arma::mat oldC;
+      load.read(name,oldC);
+      arma::mat C(arma::trans(X) * basis.overlap(oldbasis) * oldC);
+      if(C.n_rows < C.n_cols)
+        C=C.cols(0,nocc-1);
+      return C;
+    };
+    std::function<arma::vec(const arma::mat &, int, double)> occupations = [&](const arma::mat & C, int nocc, double occ) {
+      arma::vec o(C.n_cols,arma::fill::zeros);
+      if(nocc)
+        o.subvec(0,nocc-1).fill(occ);
+      return o;
+    };
+
     if(M==1) {
-      arma::mat oldC, C;
-      load.read("C",oldC);
-      C = arma::trans(X) * basis.overlap(oldbasis) * oldC;
-      if(C.n_rows < C.n_cols) {
-        C=C.cols(0,Nela-1);
-      }
-      std::vector<arma::mat> old_orbs({C});
-
-      // Occupations
-      arma::vec occ(C.n_cols,arma::fill::zeros);
-      occ.subvec(0,Nela-1).ones();
-      occ *= 2.0;
-      std::vector<arma::vec> old_occs({occ});
-
-      electronic_dm = std::make_pair(old_orbs, old_occs);
-
+      const arma::mat C(project(oldrestr ? "C" : "Ca", Nela));
+      electronic_dm = std::make_pair(std::vector<arma::mat>({C}), std::vector<arma::vec>({occupations(C, Nela, 2.0)}));
     } else {
-      arma::mat oldCa, oldCb, Ca, Cb;
-      load.read("Ca",oldCa);
-      load.read("Cb",oldCb);
-
-      Ca = arma::trans(X) * basis.overlap(oldbasis) * oldCa;
-      Cb = arma::trans(X) * basis.overlap(oldbasis) * oldCb;
-      if(Ca.n_rows < Ca.n_cols) {
-        Ca = Ca.cols(0,Nela-1);
-        Cb = Cb.cols(0,Nela-1);
-      }
-      std::vector<arma::mat> old_orbs({Ca, Cb});
-
-      // Occupations
-      arma::vec occa(Ca.n_cols,arma::fill::zeros);
-      arma::vec occb(Cb.n_cols,arma::fill::zeros);
-      occa.subvec(0,Nela-1).ones();
-      if(Nelb)
-        occb.subvec(0,Nelb-1).ones();
-      std::vector<arma::vec> old_occs({occa, occb});
-
-      electronic_dm = std::make_pair(old_orbs, old_occs);
+      const arma::mat Ca(project(oldrestr ? "C" : "Ca", Nela));
+      const arma::mat Cb(project(oldrestr ? "C" : "Cb", Nela));
+      electronic_dm = std::make_pair(std::vector<arma::mat>({Ca, Cb}), std::vector<arma::vec>({occupations(Ca, Nela, 1.0), occupations(Cb, Nelb, 1.0)}));
     }
   } else {
-    // Guess from SAP
+    // Guess from SAP or the core Hamiltonian
     arma::vec E;
     arma::mat C;
     arma::eig_sym(E,C,Fguess);

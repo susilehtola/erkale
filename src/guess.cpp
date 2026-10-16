@@ -422,6 +422,15 @@ arma::mat minimal_basis_projection(const BasisSet & basis) {
 
 
 
+bool load_guess(const std::string & guess, const std::string & loadchk, const std::string & program) {
+  if(stricmp(guess,"Auto")!=0 && stricmp(guess,"Load")!=0 && stricmp(guess,"Core")!=0 && stricmp(guess,"SAP")!=0)
+    throw std::runtime_error(program+" supports the Auto, Load, Core and SAP guesses.\n");
+  const bool load = stricmp(guess,"Load")==0 || (stricmp(guess,"Auto")==0 && !loadchk.empty());
+  if(load && loadchk.empty())
+    throw std::runtime_error("The Load guess starts from an old calculation: give it in LoadChk.\n");
+  return load;
+}
+
 bool operator<(const el_conf_t & lhs, const el_conf_t & rhs) {
   if(lhs.n + lhs.l < rhs.n + rhs.l)
     return true;

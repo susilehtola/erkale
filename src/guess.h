@@ -61,6 +61,14 @@ arma::mat huckel_guess(const BasisSet & basis, double Kgwh);
 arma::mat minimal_basis_projection(const BasisSet & basis);
 
 /**
+ * The guess of a program that offers the Auto, Load, Core and SAP
+ * guesses: is it Load, which starts from the calculation in LoadChk?
+ * Auto is Load with LoadChk and SAP otherwise. Throws for the other
+ * guesses and for Load without LoadChk.
+ */
+bool load_guess(const std::string & guess, const std::string & loadchk, const std::string & program);
+
+/**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.
  *
  * Returns the shells on the atom, with shellidx containing the
