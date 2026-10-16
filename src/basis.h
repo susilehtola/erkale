@@ -77,9 +77,6 @@ typedef struct {
   int Z;
   /// Net charge in system (used for atomic guess)
   int Q;
-
-  /// List of shells located on nucleus
-  std::vector<const GaussianShell *> shells;
 } nucleus_t;
 
 /// Comparison operator
@@ -243,8 +240,6 @@ public:
   BasisSet();
   /// Construct basis set with Nat atoms, using given settings
   BasisSet(size_t Nat);
-  /// Destructor
-  ~BasisSet();
 
   /**
    * Generate density fitting basis
@@ -335,8 +330,6 @@ public:
   void merge_generally_contracted();
   /// Check numbering of basis functions
   void check_numbering();
-  /// Update the nuclear list of shells
-  void update_nuclear_shell_list();
 
   /* Finalization routines */
 

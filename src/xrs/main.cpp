@@ -148,8 +148,6 @@ void augmented_solution(const BasisSet & basis, const uscf_t & sol, size_t nocca
   Timer ttot;
 
   augbas=augment_basis(basis);
-  // Need to update pointers in augbas
-  augbas.update_nuclear_shell_list();
 
 
   // Amount of functions in original basis set is

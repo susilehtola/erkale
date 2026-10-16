@@ -1082,13 +1082,8 @@ BasisSet::BasisSet(size_t Nat) {
   nuclei_.reserve(Nat);
 }
 
-BasisSet::~BasisSet() {
-}
-
 void BasisSet::add_nucleus(const nucleus_t & nuc) {
   nuclei_.push_back(nuc);
-  // Clear list of functions
-  nuclei_[nuclei_.size()-1].shells.clear();
   // Set nuclear index
   nuclei_[nuclei_.size()-1].ind=nuclei_.size()-1;
 }
@@ -1108,9 +1103,8 @@ void BasisSet::add_shell(size_t nucind, const GaussianShell & sh, bool dosort) {
   if(dosort)
     sort();
   else {
-    // Just do the numbering and shell list updates.
+    // Just do the numbering.
     check_numbering();
-    update_nuclear_shell_list();
   }
 }
 
@@ -1151,20 +1145,6 @@ void BasisSet::check_numbering() {
   }
 }
 
-void BasisSet::update_nuclear_shell_list() {
-  // First, clear the list on all nuclei.
-  for(size_t inuc=0;inuc<nuclei_.size();inuc++)
-    nuclei_[inuc].shells.clear();
-
-  // Then, update the lists. Loop over shells
-  for(size_t ish=0;ish<shells_.size();ish++) {
-    // Find out nuclear index
-    size_t inuc=shells_[ish].center_ind();
-    // Add pointer to the nucleus
-    nuclei_[inuc].shells.push_back(&shells_[ish]);
-  }
-}
-
 void BasisSet::sort() {
   // Sort the shells first by increasing index of center, then by
   // increasing angular momentum and last by decreasing exponent.
@@ -1172,10 +1152,6 @@ void BasisSet::sort() {
 
   // Check the numbering of the basis functions
   check_numbering();
-
-  // and since we probably have changed the order of the basis
-  // functions, we need to update the list of functions on the nuclei.
-  update_nuclear_shell_list();
 }
 
 void BasisSet::merge_generally_contracted() {
@@ -1224,9 +1200,8 @@ void BasisSet::merge_generally_contracted() {
   }
   shells_=std::move(merged);
 
-  // Renumber the basis functions and rebuild the per-nucleus shell lists.
+  // Renumber the basis functions
   check_numbering();
-  update_nuclear_shell_list();
 }
 
 void BasisSet::compute_nuclear_distances() {
@@ -1382,9 +1357,6 @@ void BasisSet::finalize(bool convert, bool donorm) {
 
   // Form list of unique shell pairs
   form_unique_shellpairs();
-  // and update the nuclear shell list (in case the basis set was
-  // loaded from checkpoint)
-  update_nuclear_shell_list();
 }
 
 int BasisSet::am(size_t ind) const {
@@ -1738,9 +1710,8 @@ std::string BasisSet::symbol_hr(size_t inuc) const {
 
 std::vector<GaussianShell> BasisSet::funcs(size_t inuc) const {
   std::vector<GaussianShell> ret;
-  for(size_t i=0;i<nuclei_[inuc].shells.size();i++)
-    ret.push_back(*(nuclei_[inuc].shells[i]));
-
+  for(size_t ish : shell_inds(inuc))
+    ret.push_back(shells_[ish]);
   return ret;
 }
 
