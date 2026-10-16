@@ -434,74 +434,55 @@ void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
 void UnitaryOptimizer::polynomial_step_f(std::unique_ptr<UnitaryFunction> & fp) {
   // Amount of points to use is
   int npoints=polynomial_degree_;
-  // Spacing
-  double deltaTmu=Tmu_/(npoints-1);
-  // Step size
-  double step=0.0;
   arma::cx_mat W=fp->W();
+  double J=fp->cost();
+  // Helper for evaluating the function
+  std::unique_ptr<UnitaryFunction> hlp=fp->copy();
 
-  std::vector< std::unique_ptr<UnitaryFunction> > fline(npoints);
-  for(int i=0;i<npoints;i++)
-    fline[i]=fp->copy();
-
-  while(step==0.0) {
-    // Evaluate the cost function at the expansion points
-    arma::vec mu(npoints);
+  // Tmu bounds the step, but grows as the search direction vanishes, and
+  // the extremum may then lie well inside the first sampling interval.
+  // Shorten the interval until one of the samples improves the function,
+  // so that the extremum is bracketed and the polynomial interpolates it.
+  double interval=Tmu_;
+  for(int ihalve=0;ihalve<50;ihalve++, interval/=2.0) {
+    // The 0th point is the current one
+    arma::vec mu(arma::linspace<arma::vec>(0.0,interval,npoints));
     arma::vec f(npoints);
-
-    // 0th point is current point!
-    for(int i=0;i<npoints;i++) {
-      // Mu in the point is
-      mu(i)=i*deltaTmu;
-
-      // Trial matrix is
-      arma::cx_mat Wtr=make_rotation(mu(i)*fp->sign())*W;
-      // and the function is
-      f(i)=fline[i]->cost_func(Wtr);
-    }
-
-    // Fit to polynomial of order p
-    arma::vec coeff=fit_polynomial(mu,f);
-
-    // Find out zeros of the derivative polynomial
-    arma::vec roots=solve_roots(derivative_coefficients(coeff));
-    // get the smallest positive one
-    step=smallest_positive(roots);
-    if(step==0.0) {
-      deltaTmu/=2.0;
-      printf("No root found, halving step size to %e.\n",deltaTmu);
+    f(0)=J;
+    for(int i=1;i<npoints;i++)
+      f(i)=hlp->cost_func(make_rotation(mu(i)*fp->sign())*W);
+    arma::uword ibest=arma::index_max(fp->sign()*f);
+    if(ibest==0)
       continue;
-    }
 
-    // Is the step length in the allowed region?
-    if(step>0.0 && step <=Tmu_) {
-      // Yes. Calculate the new value
-      arma::cx_mat Wtr=make_rotation(step*fp->sign())*W;
-      std::unique_ptr<UnitaryFunction> newf=fp->copy();
-
-      double J=fp->cost();
-      double Jtr=newf->cost_func(Wtr);
-
-      // Accept the step?
-      if( fp->sign()*(Jtr-J) > 0.0) {
-	// Yes.
-	fp=std::move(newf);
-	return;
+    // Step to the first extremum of the fit in the direction of the
+    // optimization, the first stationary point where the curvature has
+    // the opposite sign to the direction, if it beats the best sample
+    arma::vec der(derivative_coefficients(fit_polynomial(mu,f)));
+    arma::vec der2(derivative_coefficients(der));
+    arma::vec roots(solve_roots(der));
+    for(size_t i=0;i<roots.n_elem;i++)
+      // Omit extremely small steps because they might get you stuck
+      if(roots(i)>sqrt(DBL_EPSILON) && roots(i)<=Tmu_ && fp->sign()*polynomial_value(der2,roots(i))<0.0) {
+        std::unique_ptr<UnitaryFunction> newf=fp->copy();
+        double Jtr=newf->cost_func(make_rotation(roots(i)*fp->sign())*W);
+        if(fp->sign()*(Jtr-f(ibest)) > 0.0) {
+          fp=std::move(newf);
+          return;
+        }
+        break;
       }
-    }
 
-    // If we are still here, then just get the minimum value
-    if(step==0.0 || step > Tmu_) {
-      fprintf(stderr,"Line search interpolation failed.\n");
-      fflush(stderr);
-      double minval=arma::max(fp->sign()*f);
-      for(size_t i=0;i<mu.n_elem;i++)
-	if(minval==f(i)) {
-	  fp=std::move(fline[i]);
-	  break;
-	}
-    }
+    // Take the best sample
+    std::unique_ptr<UnitaryFunction> newf=fp->copy();
+    newf->cost_func(make_rotation(mu(ibest)*fp->sign())*W);
+    fp=std::move(newf);
+    return;
   }
+
+  fprintf(stderr,"Line search interpolation failed, taking an Armijo step.\n");
+  fflush(stderr);
+  armijo_step(fp);
 }
 
 void UnitaryOptimizer::polynomial_step_df(std::unique_ptr<UnitaryFunction> & fp) {
@@ -949,6 +930,14 @@ double smallest_positive(const arma::vec & a) {
   }
 
   return step;
+}
+
+double polynomial_value(const arma::vec & c, double x) {
+  // Horner's rule
+  double y=0.0;
+  for(size_t i=c.n_elem;i>0;i--)
+    y=y*x+c(i-1);
+  return y;
 }
 
 arma::vec derivative_coefficients(const arma::vec & c) {
