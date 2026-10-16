@@ -146,7 +146,7 @@ class Boys : public UnitaryFunction {
   /// Destructor
   ~Boys();
   /// Copy
-  Boys * copy() const;
+  std::unique_ptr<UnitaryFunction> copy() const;
 
   /// Reset penalty
   void set_n(int n);
@@ -181,7 +181,7 @@ class FMLoc : public UnitaryFunction {
   /// Destructor
   ~FMLoc();
   /// Copy
-  FMLoc * copy() const;
+  std::unique_ptr<UnitaryFunction> copy() const;
 
   /// Reset penalty
   void set_n(int n);
@@ -224,7 +224,7 @@ class Pipek : public UnitaryFunction {
   /// Destructor
   ~Pipek();
   /// Copy
-  Pipek * copy() const;
+  std::unique_ptr<UnitaryFunction> copy() const;
 
   /// Clean up files on disk
   void cleanup_disk();
@@ -256,7 +256,7 @@ class Edmiston : public UnitaryFunction {
   /// Destructor
   ~Edmiston();
   /// Copy
-  Edmiston * copy() const;
+  std::unique_ptr<UnitaryFunction> copy() const;
   /// Set transformation matrix
   void update_W(const arma::cx_mat & W);
 

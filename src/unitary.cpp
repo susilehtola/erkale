@@ -166,7 +166,7 @@ void UnitaryOptimizer::update_search_direction(int q) {
   Tmu_=2.0*M_PI/(q*wmax);
 }
 
-double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enum unitacc acc, size_t maxiter) {
+double UnitaryOptimizer::optimize(std::unique_ptr<UnitaryFunction> & f, enum unitmethod met, enum unitacc acc, size_t maxiter) {
   // Get the matrix
   arma::cx_mat W=f->W();
   if(real_)
@@ -188,17 +188,17 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
   // Check matrix
   ::check_unitarity(W);
   // Check derivative
-  check_derivative(f);
+  check_derivative(f.get());
 
   // Info from previous iteration
-  UnitaryFunction *oldf=NULL;
+  std::unique_ptr<UnitaryFunction> oldf;
 
   // Iteration number
   size_t k=0;
 
   // Print out the legend
   if(verbose_)
-    print_legend(f);
+    print_legend(f.get());
 
   if(maxiter>0)
     while(true) {
@@ -209,7 +209,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       oldH=H_;
 
       // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
-      update_gradient(W,f);
+      update_gradient(W,f.get());
 
       // Compute update coefficient
       double gamma=0.0;
@@ -248,8 +248,6 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       update_search_direction(f->q());
 
       // Save old iteration data
-      if(oldf)
-	delete oldf;
       oldf=f->copy();
 
       // Take a step
@@ -273,7 +271,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
 
       // Print progress
       if(verbose_) {
-	print_progress(k,f,oldf);
+	print_progress(k,f.get(),oldf.get());
 	print_time(t);
       }
 
@@ -282,7 +280,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       // bad saddle point
       double J=f->cost();
 
-      double oldJ = (oldf==NULL) ? 0.0 : oldf->cost();
+      double oldJ = oldf ? oldf->cost() : 0.0;
       if( k>1 && (f->converged() || (bracket(G_,G_)<Gthr_ && fabs(J-oldJ)<Fthr_))) {
 	if(verbose_) {
 	  printf("Converged.\n");
@@ -306,7 +304,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
 	char fname[80];
 	sprintf(fname,"unitary_%04i.dat",(int) k);
 	FILE *p=fopen(fname,"w");
-	UnitaryFunction *uf=f->copy();
+	std::unique_ptr<UnitaryFunction> uf=f->copy();
 	for(int i=-80;i<=80;i++) {
 	  double x=i*0.05;
 	  double xT=x*Tmu_;
@@ -315,12 +313,8 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
 	  fprintf(p,"% e % e % e\n",x,xT,y);
 	}
 	fclose(p);
-	delete uf;
       }
     }
-
-  if(oldf)
-    delete oldf;
 
   return f->cost();
 }
@@ -398,12 +392,12 @@ void UnitaryOptimizer::classify(const arma::cx_mat & W) const {
 }
 
 void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
-  UnitaryFunction *fp=fp0->copy();
+  std::unique_ptr<UnitaryFunction> fp=fp0->copy();
 
   arma::cx_mat W0=fp0->W();
 
   // Compute gradient
-  update_gradient(W0,fp);
+  update_gradient(W0,fp.get());
   // and the search direction
   arma::cx_mat Hs=G_;
   update_search_direction(fp->q());
@@ -435,11 +429,9 @@ void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
     fprintf(stderr,"Relative error in changes    % e\n",(dfest-dfreal)/dfest);
     throw std::runtime_error("Derivative mismatch! Check your cost function and its derivative.\n");
   }
-
-  delete fp;
 }
 
-void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
+void UnitaryOptimizer::polynomial_step_f(std::unique_ptr<UnitaryFunction> & fp) {
   // Amount of points to use is
   int npoints=polynomial_degree_;
   // Spacing
@@ -448,7 +440,7 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
   double step=0.0;
   arma::cx_mat W=fp->W();
 
-  UnitaryFunction* fline[npoints];
+  std::vector< std::unique_ptr<UnitaryFunction> > fline(npoints);
   for(int i=0;i<npoints;i++)
     fline[i]=fp->copy();
 
@@ -485,7 +477,7 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
     if(step>0.0 && step <=Tmu_) {
       // Yes. Calculate the new value
       arma::cx_mat Wtr=make_rotation(step*fp->sign())*W;
-      UnitaryFunction *newf=fp->copy();
+      std::unique_ptr<UnitaryFunction> newf=fp->copy();
 
       double J=fp->cost();
       double Jtr=newf->cost_func(Wtr);
@@ -493,15 +485,9 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
       // Accept the step?
       if( fp->sign()*(Jtr-J) > 0.0) {
 	// Yes.
-	delete fp;
-	fp=newf;
-	// Free memory
-	for(int i=0;i<npoints;i++)
-	  delete fline[i];
-
+	fp=std::move(newf);
 	return;
-      } else
-	delete newf;
+      }
     }
 
     // If we are still here, then just get the minimum value
@@ -511,20 +497,14 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
       double minval=arma::max(fp->sign()*f);
       for(size_t i=0;i<mu.n_elem;i++)
 	if(minval==f(i)) {
-	  delete fp;
-	  fp=fline[i];
+	  fp=std::move(fline[i]);
 	  break;
 	}
     }
   }
-
-  for(int i=0;i<npoints;i++)
-    delete fline[i];
-
-  return;
 }
 
-void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
+void UnitaryOptimizer::polynomial_step_df(std::unique_ptr<UnitaryFunction> & fp) {
   // Matrix
   arma::cx_mat W=fp->W();
   // Amount of points to use is
@@ -533,7 +513,7 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
   double deltaTmu=Tmu_/(npoints-1);
   int halved=0;
 
-  UnitaryFunction* fline[npoints];
+  std::vector< std::unique_ptr<UnitaryFunction> > fline(npoints);
   for(int i=0;i<npoints;i++)
     fline[i]=fp->copy();
 
@@ -585,7 +565,7 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
     if(step>0.0 && step <=Tmu_) {
       // Yes. Calculate the new value
       arma::cx_mat Wtr=make_rotation(step*fp->sign())*W;
-      UnitaryFunction *newf=fp->copy();
+      std::unique_ptr<UnitaryFunction> newf=fp->copy();
 
       double J=fp->cost();
       double Jtr=newf->cost_func(Wtr);
@@ -594,14 +574,12 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
       if( fp->sign()*(Jtr-J) > 0.0) {
 	// Yes.
 	//	printf("Function value changed by %e, accept.\n",Jtr-J);
-	delete fp;
-	fp=newf;
+	fp=std::move(newf);
 	break;
       } else {
 	fprintf(stderr,"Line search interpolation failed.\n");
 	fflush(stderr);
 	if(halved<1) {
-	  delete newf;
 	  halved++;
 	  deltaTmu/=2.0;
 	  continue;
@@ -615,8 +593,6 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
 	  */
 	}
       }
-
-      delete newf;
     } else {
       fprintf(stderr,"Line search interpolation failed.\n");
       fflush(stderr);
@@ -630,16 +606,13 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
       }
     }
   }
-
-  for(int i=0;i<npoints;i++)
-    delete fline[i];
 }
 
 double UnitaryOptimizer::step_der(const arma::cx_mat & W, const arma::cx_mat & der) const {
   return 2.0*std::real(arma::trace(der*arma::trans(W)*arma::trans(H_)));
 }
 
-void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
+void UnitaryOptimizer::armijo_step(std::unique_ptr<UnitaryFunction> & fp) {
   // Start with half of maximum.
   double step=Tmu_/2.0;
 
@@ -647,7 +620,7 @@ void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
   arma::cx_mat R=make_rotation(step*fp->sign());
 
   // Helper
-  UnitaryFunction *hlp=fp->copy();
+  std::unique_ptr<UnitaryFunction> hlp=fp->copy();
 
   // Original rotation
   arma::cx_mat W(fp->W());
@@ -713,8 +686,7 @@ void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
     throw std::runtime_error("Invalid optimization direction!\n");
 
   // Update solution
-  delete fp;
-  fp=hlp;
+  fp=std::move(hlp);
 }
 
 arma::cx_vec fourier_shift(const arma::cx_vec & c) {
@@ -738,7 +710,7 @@ arma::cx_vec fourier_shift(const arma::cx_vec & c) {
   return ret;
 }
 
-void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
+void UnitaryOptimizer::fourier_step_df(std::unique_ptr<UnitaryFunction> & f) {
   // Length of DFT interval
   double fourier_interval=fourier_periods_*Tmu_;
   // and of the transform. We want integer division here!
@@ -748,7 +720,7 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   double deltaTmu=fourier_interval/fourier_length;
 
   // Helpers
-  UnitaryFunction * fs[fourier_length];
+  std::vector< std::unique_ptr<UnitaryFunction> > fs(fourier_length);
   for(int i=0;i<fourier_length;i++)
     fs[i]=f->copy();
   arma::cx_mat W=f->W();
@@ -857,7 +829,7 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   if(step>0.0 && step <=fourier_interval) {
     // Yes. Calculate the new value
     arma::cx_mat Wtr=make_rotation(step*f->sign())*W;
-    UnitaryFunction *newf=f->copy();
+    std::unique_ptr<UnitaryFunction> newf=f->copy();
 
     double J=f->cost();
     double Jtr=newf->cost_func(Wtr);
@@ -865,15 +837,9 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
     // Accept the step?
     if( f->sign()*(Jtr-J) > 0.0) {
       // Yes.
-      delete f;
-      f=newf;
-      // Free memory
-      for(int i=0;i<fourier_length;i++)
-	delete fs[i];
-
+      f=std::move(newf);
       return;
-    } else
-      delete newf;
+    }
   }
 
   // If we are still here, then just get the minimum value
@@ -881,16 +847,10 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
     double minval=arma::max(f->sign()*fv);
     for(size_t i=0;i<mu.n_elem;i++)
       if(minval==fv(i)) {
-	delete f;
-	f=fs[i];
-	// Detach from fs so the cleanup below doesn't free the new f.
-	fs[i]=nullptr;
+	f=std::move(fs[i]);
 	break;
       }
   }
-
-  for(int i=0;i<fourier_length;i++)
-    delete fs[i];
 }
 
 double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) {
@@ -1113,8 +1073,8 @@ Brockett::Brockett(size_t N, unsigned long int seed) : UnitaryFunction(2, true) 
 Brockett::~Brockett() {
 }
 
-Brockett* Brockett::copy() const {
-  return new Brockett(*this);
+std::unique_ptr<UnitaryFunction> Brockett::copy() const {
+  return std::make_unique<Brockett>(*this);
 }
 
 double Brockett::cost_func(const arma::cx_mat & Wv) {

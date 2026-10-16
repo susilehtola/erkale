@@ -20,6 +20,7 @@
 #include "global.h"
 class Timer;
 #include <armadillo>
+#include <memory>
 
 
 /**
@@ -89,7 +90,7 @@ class UnitaryFunction {
   int sign() const;
 
   /// Copy constructor
-  virtual UnitaryFunction *copy() const=0;
+  virtual std::unique_ptr<UnitaryFunction> copy() const=0;
   /// Evaluate cost function
   virtual double cost_func(const arma::cx_mat & W)=0;
   /// Evaluate derivative of cost function
@@ -169,13 +170,13 @@ class UnitaryOptimizer {
   double step_der(const arma::cx_mat & W, const arma::cx_mat & der) const;
 
   /// Armijo step
-  void armijo_step(UnitaryFunction* & f);
+  void armijo_step(std::unique_ptr<UnitaryFunction> & f);
   /// Polynomial step (fit function)
-  void polynomial_step_f(UnitaryFunction* & f);
+  void polynomial_step_f(std::unique_ptr<UnitaryFunction> & f);
   /// Polynomial step (fit only derivative)
-  void polynomial_step_df(UnitaryFunction* & f);
+  void polynomial_step_df(std::unique_ptr<UnitaryFunction> & f);
   /// Fourier step
-  void fourier_step_df(UnitaryFunction* & f);
+  void fourier_step_df(std::unique_ptr<UnitaryFunction> & f);
 
  public:
   /// Constructor
@@ -196,7 +197,7 @@ class UnitaryOptimizer {
   void set_thr(double Gtol, double Ftol);
 
   /// Unitary optimization
-  double optimize(UnitaryFunction* & f, enum unitmethod met, enum unitacc acc, size_t maxiter);
+  double optimize(std::unique_ptr<UnitaryFunction> & f, enum unitmethod met, enum unitacc acc, size_t maxiter);
 };
 
 
@@ -246,7 +247,7 @@ class Brockett : public UnitaryFunction {
   ~Brockett();
 
   /// Copy constructor
-  Brockett *copy() const;
+  std::unique_ptr<UnitaryFunction> copy() const;
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
   /// Evaluate derivative of cost function
