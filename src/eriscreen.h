@@ -95,9 +95,9 @@ class ERIscreen {
   /// Run calculation with given digestor. D is the shell-pair density
   /// bound matrix (see density_bounds) used for density-weighted
   /// screening of the integral contributions.
-  void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, const arma::mat & D, double tol) const;
+  void calculate(std::vector< std::vector< std::unique_ptr<IntegralDigestor> > > & digest, const arma::mat & D, double tol) const;
   /// Run force calculation with given digestor
-  arma::vec calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const;
+  arma::vec calculate_force(std::vector< std::vector< std::unique_ptr<ForceDigestor> > > & digest, double tol) const;
 
 public:
   /// Constructor
