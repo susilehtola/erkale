@@ -214,6 +214,8 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
 
 /// Convert coefficients of y(x) = c0 + c1*x + ... + c^N x^N to those of y'(x)
 arma::vec derivative_coefficients(const arma::vec & c);
+/// Value of y(x) = c0 + c1*x + ... + c^N x^N
+double polynomial_value(const arma::vec & c, double x);
 
 /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
 arma::cx_vec solve_roots_cplx(const arma::cx_vec & v);
