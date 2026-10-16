@@ -31,6 +31,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cfloat>
+#include <memory>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -182,14 +183,12 @@ int main_guarded(int argc, char **argv) {
 
 	Timer temd;
 
-	GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,Pdum,l,std::abs(m));
-	GaussianEMDEvaluator *negeval;
+	std::unique_ptr<GaussianEMDEvaluator> poseval(std::make_unique<GaussianEMDEvaluator>(basis,Pdum,l,std::abs(m)));
+	std::unique_ptr<GaussianEMDEvaluator> negeval;
 	if(m!=0)
-	  negeval=new GaussianEMDEvaluator(basis,Pdum,l,-std::abs(m));
-	else
-	  negeval=NULL;
+	  negeval=std::make_unique<GaussianEMDEvaluator>(basis,Pdum,l,-std::abs(m));
 
-	EMD emd(poseval, negeval, 1, l, m);
+	EMD emd(poseval.get(), negeval.get(), 1, l, m);
 	if(adaptive) {
 	  emd.initial_fill();
 	  if(l==0 && m==0) emd.find_electrons();
@@ -204,8 +203,6 @@ int main_guarded(int argc, char **argv) {
 	  emd.compton_profile_interp(Jintname.str());
 	}
 
-	delete poseval;
-	if(m!=0) delete negeval;
       }
     }
   }
@@ -230,15 +227,13 @@ int main_guarded(int argc, char **argv) {
 
     // Construct EMD evaluators
     Timer temd;
-    GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
-    GaussianEMDEvaluator *negeval;
+    std::unique_ptr<GaussianEMDEvaluator> poseval(std::make_unique<GaussianEMDEvaluator>(basis,P,l,std::abs(m)));
+    std::unique_ptr<GaussianEMDEvaluator> negeval;
     if(m!=0)
-      negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
-    else
-      negeval=NULL;
+      negeval=std::make_unique<GaussianEMDEvaluator>(basis,P,l,-std::abs(m));
 
     temd.set();
-    EMD emd(poseval, negeval, Nel, l, m);
+    EMD emd(poseval.get(), negeval.get(), Nel, l, m);
     if(adaptive) {
       emd.initial_fill();
       if(l==0 && m==0) emd.find_electrons();
@@ -265,8 +260,6 @@ int main_guarded(int argc, char **argv) {
     else
       printf("Calculating projected EMD properties took %s.\n",temd.elapsed().c_str());
 
-    delete poseval;
-    if(m!=0) delete negeval;
   }
 
   // Do EMD on a cube?

@@ -192,10 +192,10 @@ std::vector<double> evaluate_projection(const BasisSet & basis, const arma::cx_m
   // Use unique_ptr so a throw from the second GaussianEMDEvaluator
   // construction (or anywhere later in the function) won't leak the
   // first allocation.
-  std::unique_ptr<GaussianEMDEvaluator> poseval(new GaussianEMDEvaluator(basis,P,l,std::abs(m)));
+  std::unique_ptr<GaussianEMDEvaluator> poseval(std::make_unique<GaussianEMDEvaluator>(basis,P,l,std::abs(m)));
   std::unique_ptr<GaussianEMDEvaluator> negeval;
   if(m!=0)
-    negeval.reset(new GaussianEMDEvaluator(basis,P,l,-std::abs(m)));
+    negeval=std::make_unique<GaussianEMDEvaluator>(basis,P,l,-std::abs(m));
   EMD emd(poseval.get(), negeval.get(), Nel, l, m);
 
   std::vector<double> ret(rad.size());

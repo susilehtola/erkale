@@ -731,11 +731,11 @@ void JKBuilder::configure(const Settings & set) {
   // Build the backend for the resolved method (still empty; init fills it).
   switch(method) {
   case Method::FourIndex:
-    if(cfg.direct) impl.reset(new DirectJK(cfg));
-    else           impl.reset(new InCoreJK(cfg));
+    if(cfg.direct) impl=std::make_unique<DirectJK>(cfg);
+    else           impl=std::make_unique<InCoreJK>(cfg);
     break;
   default:
-    impl.reset(new DensityFitJK(cfg, method));
+    impl=std::make_unique<DensityFitJK>(cfg, method);
     break;
   }
 }
