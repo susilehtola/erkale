@@ -175,6 +175,8 @@ enum guess_t {
   MINSAP_GUESS,
   /// Gaussian-basis fit SAP
   SAPFIT_GUESS,
+  /// Orbitals loaded with LoadChk, projected onto the new basis
+  LOAD_GUESS,
   /// Projection-free guess: the Fock matrix in the new basis of the
   /// density loaded with LoadChk in the old basis
   PROJFREE_GUESS
@@ -233,8 +235,6 @@ protected:
   /// Multiplicity
   int mult;
 
-  /// Which guess to use
-  enum guess_t guess;
   /// GWH scaling constant
   double Kgwh;
 

@@ -49,8 +49,12 @@ extern "C" {
 // Threshold for Cholesky decomposition of SAD density matrix
 #define CHOLCTHR 1e-6
 
-enum guess_t parse_guess(const std::string & val) {
-  if(stricmp(val,"Core")==0)
+/// The guess; Auto is Load when there is an old calculation to load,
+/// and SAD otherwise
+enum guess_t parse_guess(const std::string & val, bool loadchk) {
+  if(stricmp(val,"Auto")==0)
+    return loadchk ? LOAD_GUESS : SAD_GUESS;
+  else if(stricmp(val,"Core")==0)
     return CORE_GUESS;
   else if(stricmp(val,"SAD")==0 || stricmp(val,"Atomic")==0)
     return SAD_GUESS;
@@ -66,6 +70,8 @@ enum guess_t parse_guess(const std::string & val) {
     return GWH_GUESS;
   else if(stricmp(val,"HUCKEL")==0)
     return HUCKEL_GUESS;
+  else if(stricmp(val,"Load")==0)
+    return LOAD_GUESS;
   else if(stricmp(val,"ProjFree")==0)
     return PROJFREE_GUESS;
   else
@@ -87,8 +93,6 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   // Amount of electrons
   Nel=basis.Ztot()-settings.get_int("Charge");
 
-  // Parse guess
-  guess=parse_guess(settings.get_string("Guess"));
   // GWH scaling constant
   Kgwh=settings.get_double("Kgwh");
 
@@ -1657,8 +1661,13 @@ void calculate(const BasisSet & basis, bool force) {
       throw std::runtime_error("The AutoABS automatic auxiliary basis is J-only and cannot represent exact exchange.\nUse FittingBasis Auto (CD-derived) or an explicit JK-fitting basis.\n");
     }
 
-  // Load starting guess?
-  bool doload=(stricmp(loadname,"")!=0);
+  // Which guess to use; the Load and ProjFree guesses start from the
+  // calculation in LoadChk
+  enum guess_t guess=parse_guess(settings.get_string("Guess"), !loadname.empty());
+  const bool doload=(guess==LOAD_GUESS || guess==PROJFREE_GUESS);
+  if(doload && loadname.empty())
+    throw std::runtime_error("The Load and ProjFree guesses start from an old calculation: give it in LoadChk.\n");
+  const bool projfree=(guess==PROJFREE_GUESS);
   BasisSet oldbas;
   bool oldrestr;
   arma::vec Eold, Eaold, Ebold;
@@ -1667,12 +1676,6 @@ void calculate(const BasisSet & basis, bool force) {
 
   arma::cx_mat CW, CWa, CWb;
   bool doCW=false;
-
-  // Which guess to use
-  enum guess_t guess=parse_guess(settings.get_string("Guess"));
-  if(guess==PROJFREE_GUESS && !doload)
-    throw std::runtime_error("The ProjFree guess builds the Fock matrix of a loaded density: give the old calculation in LoadChk.\n");
-  const bool projfree=(guess==PROJFREE_GUESS);
 
   // Amount of electrons
   int Nel_alpha=-1;
