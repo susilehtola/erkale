@@ -228,8 +228,8 @@ void Settings::add_scf_settings() {
   // Occupancies
   add_string("Occupancies", "Orbital occupancies", "");
 
-  // Use core guess? Default is atomic.
-  add_string("Guess","Used guess: SAD (default), SADNO, core, GWH, SAP, SAPfit, or ProjFree (with LoadChk)","SAD");
+  // Initial guess
+  add_string("Guess","Used guess: Auto (default: Load with LoadChk, SAD otherwise), SAD, SADNO, Core, GWH, Huckel, SAP, SAPfit, MinSAP, or from the calculation in LoadChk Load (projected orbitals) or ProjFree (projection-free Fock matrix)","Auto");
   add_double("Kgwh","Scaling constant for GWH",1.75);
 
   // Verbose run?

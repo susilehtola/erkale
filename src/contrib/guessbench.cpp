@@ -186,7 +186,7 @@ int main_guarded(int argc, char **argv) {
     // Approximate Hamiltonian is
     diag(E,C,Hcore+Vsap,Sinvh);
 
-  } else if(stricmp(guess,"sad")==0 || stricmp(guess,"no")==0) {
+  } else if(stricmp(guess,"auto")==0 || stricmp(guess,"sad")==0 || stricmp(guess,"no")==0) {
     // Get SAD guess
     Pag=sad_guess(basis)/2.0;
     Pbg=Pag;
