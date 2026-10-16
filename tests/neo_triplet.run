@@ -1,0 +1,10 @@
+# Triplet methylene with a quantum proton: unrestricted electrons
+System CH2.xyz
+Basis cc-pVDZ
+ProtonBasis PB4-D
+QuantumProtons 2
+Method HF
+Multiplicity 3
+SaveChk neo_triplet.chk
+NEODump neo_triplet.h5
+NEODumpVerify true

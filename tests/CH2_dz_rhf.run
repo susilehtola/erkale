@@ -1,0 +1,10 @@
+# Singlet methylene, restricted, to start the triplet CH2_tz_hf from
+System CH2.xyz
+Method HF
+Basis cc-pVDZ
+Direct false
+IntegralThresh 1e-14
+
+Logfile CH2_dz_rhf.log
+SaveChk CH2_dz_rhf.chk
+BasisRotate false

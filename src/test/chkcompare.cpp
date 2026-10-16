@@ -105,9 +105,9 @@ int main(int argc, char ** argv) {
   fprintf(stderr,"Reference directory is set to \"%s\".\n",refdir);
   fflush(stderr);
 
-  if(argc != 2) {
+  if(argc != 2 && argc != 3) {
     std::ostringstream oss;
-    oss << "Usage: " << argv[0] << " chkpt\n";
+    oss << "Usage: " << argv[0] << " chkpt (reference)\n";
     throw std::runtime_error(oss.str());
   }
 
@@ -120,8 +120,8 @@ int main(int argc, char ** argv) {
   }
   Checkpoint cur(curfile,false);
 
-  // Reference file
-  std::string reffile=std::string(refdir)+"/"+curfile;
+  // Reference file: by default, the one of the same name
+  std::string reffile=std::string(refdir)+"/"+(argc==3 ? std::string(argv[2]) : curfile);
   if(!file_exists(reffile)) {
     std::ostringstream oss;
     oss << "Reference checkpoint file \"" << reffile << "\" does not exist!\n";
