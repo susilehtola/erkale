@@ -76,8 +76,10 @@ typedef struct {
   double Ekin;
   /// Nuclear attraction energy
   double Enuca;
-  /// Exchange(-correlation) energy
+  /// Exchange(-correlation) energy, including exact exchange
   double Exc;
+  /// Exact exchange energy
+  double Exx;
   /// One-electron contribution
   double Eone;
 
