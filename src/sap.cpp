@@ -36,7 +36,8 @@ SAP::SAP() {
   // Read atoms
   for(size_t Z=1;Z<atoms.size();Z++) {
     std::string fname=loc+"/v_"+element_symbols[Z]+".dat";
-    atoms[Z].load(fname,arma::raw_ascii);
+    if(!atoms[Z].load(fname,arma::raw_ascii))
+      throw std::runtime_error("Could not read the SAP potential from \""+fname+"\": set ERKALE_SAP_LIBRARY to the sap directory of ERKALE.\n");
   }
 }
 
