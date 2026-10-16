@@ -226,7 +226,7 @@ run_test(H2O+_projfree_hf LOAD H2O+_tz_hf)
 # smaller basis, which for methylene is also an unrestricted or a
 # restricted singlet one, and Auto is Load when LoadChk is given.
 foreach(ref H2O_tz_hf CH2_tz_hf)
-  foreach(guess Core SADNO GWH Huckel SAP SAPfit MinSAP)
+  foreach(guess Core SADNO GWH Huckel SAP SAPfit)
     derived_input(${ref} ${ref}_guess_${guess} "Guess ${guess}")
     run_test(${ref}_guess_${guess} REF ${ref})
   endforeach()

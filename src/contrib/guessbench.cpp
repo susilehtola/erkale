@@ -213,36 +213,6 @@ int main_guarded(int argc, char **argv) {
     // Get Huckel guess
     diag(E,C,huckel_guess(basis,K),Sinvh);
 
-  } else if(stricmp(guess,"minsap")==0) {
-    DFTGrid grid(&basis);
-    bool grad=false;
-    bool tau=false;
-    bool lapl=false;
-    bool nl=false;
-    grid.construct(nrad,lmax,grad,tau,lapl,nl);
-
-    // Get SAP potential
-    arma::mat Vsap(grid.eval_SAP());
-    // SAP Hamiltonian
-    arma::mat Hsap(Hcore+Vsap);
-
-    // Get minimal basis
-    arma::mat Cmin(minimal_basis_projection(basis));
-
-    // Convert to minimal basis
-    Hsap=Cmin.t()*Hsap*Cmin;
-    // Scale off-diagonal elements
-    for(size_t j=0;j<Hsap.n_cols;j++)
-      for(size_t i=0;i<j;i++) {
-        Hsap(i,j) *= 0.5*K;
-        Hsap(j,i) *= 0.5*K;
-      }
-    // Go back to AO basis
-    Hsap=Cmin*Hsap*Cmin.t();
-
-    // Diagonalize
-    diag(E,C,Hsap,Sinvh);
-
   } else {
     throw std::logic_error("Unsupported guess!\n");
   }

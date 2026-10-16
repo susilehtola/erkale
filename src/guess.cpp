@@ -162,15 +162,13 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 typedef enum {
               FORM_SAD,
               FORM_SAP,
-              FORM_HUCKEL,
-              FORM_MINBAS
+              FORM_HUCKEL
 } atomic_guess_t;
 
 static const std::string guesstypes[]={
                                        "SAD",
                                        "SAP",
-                                       "Huckel",
-                                       "Minimal basis"
+                                       "Huckel"
 };
 
 arma::mat atomic_guess_wrk(const BasisSet & basis, atomic_guess_t type, double Kgwh) {
@@ -282,7 +280,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, atomic_guess_t type, double K
         }
     }
 
-  } else if(type == FORM_HUCKEL || type == FORM_MINBAS) {
+  } else if(type == FORM_HUCKEL) {
     // Number of functions on each nucleus
     arma::uvec numorb(basis.Nnuc());
     numorb.zeros();
@@ -379,12 +377,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, atomic_guess_t type, double K
     }
 
     // Convert Huckel matrix to full AO basis
-    if(type == FORM_HUCKEL)
-      M=ShuC*Hu*ShuC.t();
-    else if(type == FORM_MINBAS) {
-      M=ShuC;
-    } else
-      throw std::logic_error("Case not handled!\n");
+    M=ShuC*Hu*ShuC.t();
   }
 
   /*
@@ -414,10 +407,6 @@ arma::mat sap_guess(const BasisSet & basis) {
 
 arma::mat huckel_guess(const BasisSet & basis, double Kgwh) {
   return atomic_guess_wrk(basis,FORM_HUCKEL,Kgwh);
-}
-
-arma::mat minimal_basis_projection(const BasisSet & basis) {
-  return atomic_guess_wrk(basis,FORM_MINBAS,0.0);
 }
 
 

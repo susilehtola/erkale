@@ -56,11 +56,6 @@ arma::mat sap_guess(const BasisSet & basis);
 arma::mat huckel_guess(const BasisSet & basis, double Kgwh);
 
 /**
- * Forms a projection to a minimal atomic basis set.
- */
-arma::mat minimal_basis_projection(const BasisSet & basis);
-
-/**
  * The guess of a program that offers the Auto, Load, Core and SAP
  * guesses: is it Load, which starts from the calculation in LoadChk?
  * Auto is Load with LoadChk and SAP otherwise. Throws for the other
