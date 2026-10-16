@@ -1,0 +1,11 @@
+# Triplet methylene in a smaller basis, to start CH2_tz_hf from
+System CH2.xyz
+Method HF
+Basis cc-pVDZ
+Direct false
+IntegralThresh 1e-14
+Multiplicity 3
+
+Logfile CH2_dz_hf.log
+SaveChk CH2_dz_hf.chk
+BasisRotate false

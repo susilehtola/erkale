@@ -1,16 +1,53 @@
 # Each test is already designed to run in parallel so ctest should not parallellize
 set(CTEST_PARALLEL_LEVEL 1)
 
+# The input of a test: in the source directory, or derived from that of
+# another test in the build directory
+function(test_input target var)
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)
+    set(${var} ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run PARENT_SCOPE)
+  else()
+    set(${var} ${CMAKE_CURRENT_BINARY_DIR}/${target}.run PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Derive the input of target from that of the test source: its output
+# files are renamed for target, and the keyword lines in ARGN are
+# appended, which take precedence over those of source.
+function(derived_input source target)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${source}.run input)
+  string(REPLACE "${source}." "${target}." input "${input}")
+  string(APPEND input "\n")
+  foreach(line IN LISTS ARGN)
+    string(APPEND input "${line}\n")
+  endforeach()
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${target}.run "${input}")
+endfunction()
+
+# Each test provides its checkpoint as a fixture. The checkpoint is
+# compared against the reference of the same name, or of REF; a test
+# that starts from the checkpoint of another test gives it in LOAD.
 function(run_test target)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "REF;LOAD" "")
+  if(NOT arg_REF)
+    set(arg_REF ${target})
+  endif()
+  test_input(${target} input)
+
   # Run ERKALE to get checkpoint file
-  add_test(NAME ${target}_chk COMMAND erkale ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)# &> ${target}.stdout)
+  add_test(NAME ${target}_chk COMMAND erkale ${input})
   set_property(TEST ${target}_chk APPEND PROPERTY ENVIRONMENT "ERKALE_SYSDIR=${CMAKE_CURRENT_SOURCE_DIR}/xyz")
   set_property(TEST ${target}_chk APPEND PROPERTY ENVIRONMENT "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
+  set_property(TEST ${target}_chk APPEND PROPERTY ENVIRONMENT "ERKALE_SAP_LIBRARY=${PROJECT_SOURCE_DIR}/sap")
   set_property(TEST ${target}_chk APPEND PROPERTY DEPENDS erkale)
-  set_property(TEST ${target}_chk APPEND PROPERTY DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)
-  
+  set_property(TEST ${target}_chk APPEND PROPERTY DEPENDS ${input})
+  set_property(TEST ${target}_chk APPEND PROPERTY FIXTURES_SETUP ${target})
+  if(arg_LOAD)
+    set_property(TEST ${target}_chk APPEND PROPERTY FIXTURES_REQUIRED ${arg_LOAD})
+  endif()
+
   # Run comparison against checkpoint file
-  add_test(NAME ${target} COMMAND chkcompare ${target}.chk)
+  add_test(NAME ${target} COMMAND chkcompare ${target}.chk ${arg_REF}.chk)
   set_property(TEST ${target} APPEND PROPERTY DEPENDS ${target}_chk)
   set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_REFDIR=${PROJECT_SOURCE_DIR}/refdata")
   set_property(TEST ${target} APPEND PROPERTY DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.chk)
@@ -32,31 +69,36 @@ function(run_xrs target dep)
   set_property(TEST ${target} APPEND PROPERTY DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.chk)
 endfunction()
 
-# A calculation that starts from the checkpoint of another test (the
-# projection-free guess on a change of basis)
-function(run_projfree target dep)
-  run_test(${target})
-  set_property(TEST ${target}_chk APPEND PROPERTY DEPENDS ${dep}_chk)
-endfunction()
-
 # Multicomponent (NEO) tests. The dump's self-consistency check reconstructs
 # the SCF energy from the exported tensors and throws if they disagree, so the
 # run validates the charge and the mass factors by itself; the expected energy
 # guards against numerical drift. The multicomponent codes have no reference
 # checkpoints, so they are not compared with chkcompare.
 function(run_neo target energy)
-  add_test(NAME ${target} COMMAND erkale_neo ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)
+  cmake_parse_arguments(PARSE_ARGV 2 arg "" "LOAD" "")
+  test_input(${target} input)
+  add_test(NAME ${target} COMMAND erkale_neo ${input})
+  set_property(TEST ${target} APPEND PROPERTY FIXTURES_SETUP ${target})
+  if(arg_LOAD)
+    set_property(TEST ${target} APPEND PROPERTY FIXTURES_REQUIRED ${arg_LOAD})
+  endif()
   set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_SYSDIR=${CMAKE_CURRENT_SOURCE_DIR}/xyz")
   set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
   set_property(TEST ${target} APPEND PROPERTY DEPENDS erkale_neo)
-  set_property(TEST ${target} APPEND PROPERTY DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)
+  set_property(TEST ${target} APPEND PROPERTY DEPENDS ${input})
   set_property(TEST ${target} PROPERTY PASS_REGULAR_EXPRESSION "Converged to energy ${energy}")
 endfunction()
 
 # Linear-symmetry SCF with erkale_complex_orbs, checked against the
 # energy erkale gives for the same calculation.
 function(run_complex_orbs target energy)
-  add_test(NAME ${target} COMMAND erkale_complex_orbs ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)
+  cmake_parse_arguments(PARSE_ARGV 2 arg "" "LOAD" "")
+  test_input(${target} input)
+  add_test(NAME ${target} COMMAND erkale_complex_orbs ${input})
+  set_property(TEST ${target} APPEND PROPERTY FIXTURES_SETUP ${target})
+  if(arg_LOAD)
+    set_property(TEST ${target} APPEND PROPERTY FIXTURES_REQUIRED ${arg_LOAD})
+  endif()
   set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_SYSDIR=${CMAKE_CURRENT_SOURCE_DIR}/xyz")
   set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "ERKALE_LIBRARY=${PROJECT_SOURCE_DIR}/basis")
   set_property(TEST ${target} APPEND PROPERTY DEPENDS erkale_complex_orbs)
@@ -102,6 +144,23 @@ endif()
 run_neo(neo_wb97x "-76.36052")
 # Density fitting in the automatic electron-proton auxiliary basis
 run_neo(neo_ri "-76.01543")
+# Unrestricted electrons in triplet methylene
+run_neo(neo_triplet "-38.88650")
+# The initial guesses: the core Hamiltonian, and the orbitals of a
+# multicomponent calculation in another basis or of an electronic one of
+# erkale; the triplet also from a restricted calculation of the singlet
+derived_input(neo_proton neo_proton_guess_Core "Guess Core")
+run_neo(neo_proton_guess_Core "-75.98665")
+derived_input(neo_proton neo_proton_guess_Load "Guess Load" "LoadChk neo_ri.chk")
+run_neo(neo_proton_guess_Load "-75.98665" LOAD neo_ri)
+derived_input(neo_proton neo_proton_guess_Load_erkale "Guess Load" "LoadChk H2O_tz_hf.chk")
+run_neo(neo_proton_guess_Load_erkale "-75.98665" LOAD H2O_tz_hf)
+derived_input(neo_triplet neo_triplet_guess_Core "Guess Core")
+run_neo(neo_triplet_guess_Core "-38.88650")
+derived_input(neo_triplet neo_triplet_guess_Load "Guess Load" "LoadChk CH2_dz_hf.chk")
+run_neo(neo_triplet_guess_Load "-38.88650" LOAD CH2_dz_hf)
+derived_input(neo_triplet neo_triplet_guess_Load_restricted "Guess Load" "LoadChk CH2_dz_rhf.chk")
+run_neo(neo_triplet_guess_Load_restricted "-38.88650" LOAD CH2_dz_rhf)
 
 # Linear symmetry in the complex basis, restricted and unrestricted DFT
 add_test(build_erkale_complex_orbs "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale_complex_orbs)
@@ -125,6 +184,21 @@ run_complex_orbs(complex_orbs_b_tpss_ml_m "-24.6048081")
 run_complex_orbs(complex_orbs_o2_b3lyp_cyl "-150.23617")
 run_complex_orbs_term(complex_orbs_o2_b3lyp_triplet "3Sigma_g-" "-150.334038")
 run_complex_orbs_term(complex_orbs_c_hund "3Pi_g" "-37.457485")
+# The initial guesses: the core Hamiltonian, and the Fock matrices of a
+# calculation in another basis, with another functional, or unrestricted
+# without cylindrical symmetry for a restricted one with it
+derived_input(complex_orbs_n2_b3lyp complex_orbs_n2_b3lyp_guess_Core "Guess Core")
+run_complex_orbs(complex_orbs_n2_b3lyp_guess_Core "-109.53324")
+derived_input(complex_orbs_n2_b3lyp complex_orbs_n2_b3lyp_tz "Basis cc-pVTZ")
+run_complex_orbs(complex_orbs_n2_b3lyp_tz "-109.568317")
+derived_input(complex_orbs_n2_b3lyp complex_orbs_n2_b3lyp_guess_Load "Guess Load" "LoadChk complex_orbs_n2_b3lyp_tz.chk")
+run_complex_orbs(complex_orbs_n2_b3lyp_guess_Load "-109.53324" LOAD complex_orbs_n2_b3lyp_tz)
+derived_input(complex_orbs_o2_tpss complex_orbs_o2_tpss_guess_Core "Guess Core")
+run_complex_orbs(complex_orbs_o2_tpss_guess_Core "-150.35981")
+derived_input(complex_orbs_o2_tpss complex_orbs_o2_tpss_guess_Load "Guess Load" "LoadChk complex_orbs_o2_b3lyp_triplet.chk")
+run_complex_orbs(complex_orbs_o2_tpss_guess_Load "-150.35981" LOAD complex_orbs_o2_b3lyp_triplet)
+derived_input(complex_orbs_o2_b3lyp_cyl complex_orbs_o2_b3lyp_cyl_guess_Load "Guess Load" "LoadChk complex_orbs_o2_b3lyp_triplet.chk")
+run_complex_orbs(complex_orbs_o2_b3lyp_cyl_guess_Load "-150.23617" LOAD complex_orbs_o2_b3lyp_triplet)
 
 # Second-order trust-region SCF and stability analysis (OpenTrustRegion)
 if(ERKALE_TRUST_REGION)
@@ -142,8 +216,31 @@ endif()
 
 # Projection-free guess on a change of basis, restricted DFT and
 # unrestricted Hartree-Fock
-run_projfree(H2O_projfree_pbe H2O_tz_pbe)
-run_projfree(H2O+_projfree_hf H2O+_tz_hf)
+run_test(H2O_projfree_pbe LOAD H2O_tz_pbe)
+run_test(H2O+_projfree_hf LOAD H2O+_tz_hf)
+
+# Every initial guess for the closed-shell water molecule and triplet
+# methylene, whose orbitals are not degenerate and from which every guess
+# converges to the solution of the reference calculation with the default
+# guess (SAD). The Load and ProjFree guesses start from a calculation in a
+# smaller basis, which for methylene is also an unrestricted or a
+# restricted singlet one, and Auto is Load when LoadChk is given.
+foreach(ref H2O_tz_hf CH2_tz_hf)
+  foreach(guess Core SADNO GWH Huckel SAP SAPfit MinSAP)
+    derived_input(${ref} ${ref}_guess_${guess} "Guess ${guess}")
+    run_test(${ref}_guess_${guess} REF ${ref})
+  endforeach()
+endforeach()
+foreach(guess Load ProjFree)
+  derived_input(H2O_tz_hf H2O_tz_hf_guess_${guess} "Guess ${guess}" "LoadChk H2O_qz.chk")
+  run_test(H2O_tz_hf_guess_${guess} REF H2O_tz_hf LOAD H2O_qz)
+  derived_input(CH2_tz_hf CH2_tz_hf_guess_${guess} "Guess ${guess}" "LoadChk CH2_dz_hf.chk")
+  run_test(CH2_tz_hf_guess_${guess} REF CH2_tz_hf LOAD CH2_dz_hf)
+  derived_input(CH2_tz_hf CH2_tz_hf_guess_${guess}_restricted "Guess ${guess}" "LoadChk CH2_dz_rhf.chk")
+  run_test(CH2_tz_hf_guess_${guess}_restricted REF CH2_tz_hf LOAD CH2_dz_rhf)
+endforeach()
+derived_input(CH2_tz_hf CH2_tz_hf_guess_Auto "LoadChk CH2_dz_hf.chk")
+run_test(CH2_tz_hf_guess_Auto REF CH2_tz_hf LOAD CH2_dz_hf)
 
 # Generate list with genlist.sh
 include(TestList.txt)
