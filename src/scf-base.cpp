@@ -62,8 +62,6 @@ enum guess_t parse_guess(const std::string & val, bool loadchk) {
     return SAP_GUESS;
   else if(stricmp(val,"SAPFIT")==0)
     return SAPFIT_GUESS;
-  else if(stricmp(val,"MINSAP")==0)
-    return MINSAP_GUESS;
   else if(stricmp(val,"SADNO")==0 || stricmp(val,"NO")==0)
     return SADNO_GUESS;
   else if(stricmp(val,"GWH")==0)
@@ -1792,26 +1790,6 @@ void calculate(const BasisSet & basis, bool force) {
       } else if(guess==SAPFIT_GUESS) {
 	solver.sapfit_guess(sol);
         solver.diagonalize(sol);
-      } else if(guess==MINSAP_GUESS) {
-        // Form SAP Hamiltonian
-	solver.sap_guess(sol);
-
-        // Get minimal basis projection
-        arma::mat proj(minimal_basis_projection(basis));
-
-        // Projection to minimal basis
-        sol.H=proj.t()*sol.H*proj;
-        // Scale off-diagonal elements
-        for(size_t j=0;j<sol.H.n_cols;j++)
-          for(size_t i=0;i<j;i++) {
-            sol.H(i,j)*=0.5*Kgwh;
-            sol.H(j,i)*=0.5*Kgwh;
-          }
-
-        // Project back to AO basis
-        sol.H=proj*sol.H*proj.t();
-
-        solver.diagonalize(sol);
       } else if(guess==GWH_GUESS) {
 	solver.gwh_guess(sol,Kgwh);
         solver.diagonalize(sol);
@@ -2159,26 +2137,6 @@ void calculate(const BasisSet & basis, bool force) {
         solver.diagonalize(sol);
       } else if(guess==SAPFIT_GUESS) {
 	solver.sapfit_guess(sol);
-        solver.diagonalize(sol);
-      } else if(guess==MINSAP_GUESS) {
-        // Form SAP Hamiltonian
-	solver.sap_guess(sol);
-
-        // Get minimal basis projection
-        arma::mat proj(minimal_basis_projection(basis));
-
-        // Projection to minimal basis
-        sol.Ha=proj.t()*sol.Ha*proj;
-        // Scale off-diagonal elements
-        for(size_t j=0;j<sol.Ha.n_cols;j++)
-          for(size_t i=0;i<j;i++) {
-            sol.Ha(i,j)*=0.5*Kgwh;
-            sol.Ha(j,i)*=0.5*Kgwh;
-          }
-
-        // Project back to AO basis
-        sol.Ha=proj*sol.Ha*proj.t();
-        sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if(guess==GWH_GUESS) {
 	solver.gwh_guess(sol,Kgwh);

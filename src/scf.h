@@ -171,8 +171,6 @@ enum guess_t {
   GWH_GUESS,
   /// Huckel type guess
   HUCKEL_GUESS,
-  /// Minimal basis SAP
-  MINSAP_GUESS,
   /// Gaussian-basis fit SAP
   SAPFIT_GUESS,
   /// Orbitals loaded with LoadChk, projected onto the new basis
