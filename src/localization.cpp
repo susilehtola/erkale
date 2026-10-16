@@ -119,7 +119,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
   // Optimizer
   UnitaryOptimizer opt(Gthr,Fthr,verbose,real);
   // Cost function
-  UnitaryFunction *func;
+  std::unique_ptr<UnitaryFunction> func;
 
   // Real operation?
   if(real)
@@ -197,7 +197,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
       else if(met==BOYS_4)
 	n=4;
 
-      func=new Boys(basis,C,n,verbose,delocalize);
+      func=std::make_unique<Boys>(basis,C,n,verbose,delocalize);
 
     } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
       int n=0;
@@ -210,7 +210,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
       else if(met==FM_4)
 	n=4;
 
-      func=new FMLoc(basis,C,n,verbose,delocalize);
+      func=std::make_unique<FMLoc>(basis,C,n,verbose,delocalize);
 
     } else if(met==PIPEK_MULLIKENH    ||	\
 	      met==PIPEK_MULLIKEN2    ||	\
@@ -389,11 +389,11 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
       if(basis.Nnuc()==1)
 	continue;
 
-      func=new Pipek(chg,basis,C,P,p,verbose);
+      func=std::make_unique<Pipek>(chg,basis,C,P,p,verbose);
       pipek=true;
 
     } else if(met==EDMISTON) {
-      func=new Edmiston(basis,C);
+      func=std::make_unique<Edmiston>(basis,C);
 
     } else {
       ERROR_INFO();
@@ -416,12 +416,8 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
 
     // Clean up after PM?
     if(pipek) {
-      Pipek *p((Pipek *) func);
-      p->cleanup_disk();
+      static_cast<Pipek &>(*func).cleanup_disk();
     }
-
-    // Free worker
-    delete func;
   }
 
   if(verbose) {
@@ -462,8 +458,8 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool d
 Boys::~Boys() {
 }
 
-Boys* Boys::copy() const {
-  return new Boys(*this);
+std::unique_ptr<UnitaryFunction> Boys::copy() const {
+  return std::make_unique<Boys>(*this);
 }
 
 void Boys::set_n(int nv) {
@@ -650,8 +646,8 @@ FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool
 FMLoc::~FMLoc() {
 }
 
-FMLoc* FMLoc::copy() const {
-  return new FMLoc(*this);
+std::unique_ptr<UnitaryFunction> FMLoc::copy() const {
+  return std::make_unique<FMLoc>(*this);
 }
 
 void FMLoc::set_n(int nv) {
@@ -1055,8 +1051,8 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
 Pipek::~Pipek() {
 }
 
-Pipek* Pipek::copy() const {
-  return new Pipek(*this);
+std::unique_ptr<UnitaryFunction> Pipek::copy() const {
+  return std::make_unique<Pipek>(*this);
 }
 
 void Pipek::cleanup_disk() {
@@ -1225,8 +1221,8 @@ Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize
 Edmiston::~Edmiston() {
 }
 
-Edmiston* Edmiston::copy() const {
-  return new Edmiston(*this);
+std::unique_ptr<UnitaryFunction> Edmiston::copy() const {
+  return std::make_unique<Edmiston>(*this);
 }
 
 void Edmiston::update_W(const arma::cx_mat & Wv) {
