@@ -214,15 +214,15 @@ class dERIWorker_srlr: public dERIWorker {
 inline std::unique_ptr<ERIWorker>
 make_eri_worker(const CintEnv & env, double omega, double alpha, double beta) {
   if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
-    return std::unique_ptr<ERIWorker>(new ERIWorker(env));
-  return std::unique_ptr<ERIWorker>(new ERIWorker_srlr(env, omega, alpha, beta));
+    return std::make_unique<ERIWorker>(env);
+  return std::make_unique<ERIWorker_srlr>(env, omega, alpha, beta);
 }
 
 inline std::unique_ptr<dERIWorker>
 make_deri_worker(const CintEnv & env, double omega, double alpha, double beta) {
   if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
-    return std::unique_ptr<dERIWorker>(new dERIWorker(env));
-  return std::unique_ptr<dERIWorker>(new dERIWorker_srlr(env, omega, alpha, beta));
+    return std::make_unique<dERIWorker>(env);
+  return std::make_unique<dERIWorker_srlr>(env, omega, alpha, beta);
 }
 
 #endif
