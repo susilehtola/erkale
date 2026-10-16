@@ -74,6 +74,100 @@ arma::cx_mat basis_transform_mat(int l) {
 }
 
 /**
+ * Transform from the real to the complex basis functions; the identity
+ * in the real basis.
+ */
+arma::cx_mat complex_transform(const BasisSet & basis, bool complexbas) {
+  const size_t Nbf = basis.Nbf();
+  arma::cx_mat D(Nbf, Nbf, arma::fill::zeros);
+  if (!complexbas) {
+    D.eye();
+    return D;
+  }
+  const arma::ivec mvals = basis.m_values();
+  const auto & shells = basis.shells();
+  for (size_t i=0; i<shells.size(); i++) {
+    // The transform acts on one set of 2l+1 real functions in the order
+    // m = -l, ..., l. The functions are not stored in that order for p
+    // shells (x, y, z), so place each function by its m label. A
+    // generally contracted shell carries nctr such sets stacked
+    // contraction-slowest, so place the transform block-diagonally,
+    // once per contraction.
+    const int l = shells[i].am();
+    const arma::cx_mat Tm = basis_transform_mat(l);
+    const size_t Nlm = Tm.n_rows;
+    for(size_t ic=0; ic<shells[i].Nctr(); ic++) {
+      const size_t i0 = shells[i].first_ind() + ic*Nlm;
+      // Index of the function with m = k-l
+      arma::uvec idx(Nlm);
+      for(size_t p=0; p<Nlm; p++)
+        idx(mvals(i0+p)+l) = i0+p;
+      D.submat(idx, idx) = Tm;
+    }
+  }
+  return D;
+}
+
+/// The functions of each m = -maxam, ..., maxam
+std::vector<arma::uvec> m_blocks(const BasisSet & basis) {
+  const int maxam = basis.max_am();
+  std::vector<arma::uvec> idx(2*maxam+1);
+  for (int m = -maxam; m <= maxam; m++)
+    idx[m+maxam] = basis.m_indices(m);
+  return idx;
+}
+
+/**
+ * Orthonormal bases of the m blocks from the overlap S of the (real or
+ * complex) basis functions. With CylindricalSymmetry, the functions of
+ * m and -m correspond shell by shell, so the -m block reuses the
+ * orthonormal basis of m, which would otherwise differ by the signs of
+ * its vectors.
+ */
+std::vector<arma::mat> block_bases(const arma::mat & S, const std::vector<arma::uvec> & m_indices, bool cylindrical) {
+  const int maxam = (m_indices.size()-1)/2;
+  std::vector<arma::mat> X(m_indices.size());
+  for (size_t m=0; m<X.size(); m++)
+    X[m] = BasOrth(S(m_indices[m], m_indices[m]));
+  if (cylindrical)
+    for (int m = 1; m <= maxam; m++) {
+      const arma::uvec & ip = m_indices[maxam+m];
+      const arma::uvec & im = m_indices[maxam-m];
+      if (arma::abs(S(ip, ip) - S(im, im)).max() > 1e-10)
+        throw std::logic_error("The functions of m=" + std::to_string(m) + " and m=" + std::to_string(-m) + " do not correspond.\n");
+      X[maxam-m] = X[maxam+m];
+    }
+  return X;
+}
+
+/**
+ * The Fock matrices of the m blocks of an old calculation, given in the
+ * orthonormal bases Xold of the functions oldidx of the old basis, in the
+ * orthonormal bases X of the functions idx of the new basis, where Sno is
+ * the overlap of the new and old (real or complex) functions. The old Fock
+ * operator is carried over, with its eigenvalues on the old orbitals that
+ * the new basis represents; the directions the old basis does not
+ * represent get the eigenvalue lambda, which lies above those of the old
+ * orbitals so that the aufbau occupies the same orbitals as before. In the
+ * same basis, this is the old Fock matrix.
+ */
+std::vector<arma::mat> project_fock(const std::vector<arma::mat> & Fold, const std::vector<arma::mat> & Xold, const std::vector<arma::uvec> & oldidx, const std::vector<arma::mat> & X, const std::vector<arma::uvec> & idx, const arma::mat & Sno, double lambda) {
+  const int maxam = (idx.size()-1)/2;
+  const int oldmaxam = (oldidx.size()-1)/2;
+  std::vector<arma::mat> F(X.size());
+  for (int m = -maxam; m <= maxam; m++) {
+    const arma::mat & Xm = X[m+maxam];
+    F[m+maxam] = lambda*arma::eye(Xm.n_cols, Xm.n_cols);
+    if (std::abs(m) > oldmaxam)
+      continue;
+    const size_t mo = m+oldmaxam;
+    const arma::mat O(Xm.t() * Sno(idx[m+maxam], oldidx[mo]) * Xold[mo]);
+    F[m+maxam] += O * (Fold[mo] - lambda*arma::eye(arma::size(Fold[mo]))) * O.t();
+  }
+  return F;
+}
+
+/**
  * Matrix of the reflection y -> -y through the molecular axis in the
  * real basis: the functions of m < 0 go as sin(|m| phi) and change sign.
  */
@@ -209,6 +303,10 @@ int main_guarded(int argc, char **argv) {
   if(trustregion || stability)
     throw std::runtime_error("TrustRegion and StabilityAnalysis need ERKALE built with OpenTrustRegion.\n");
 #endif
+  // The guess: the Fock matrices of the calculation in LoadChk projected onto
+  // the basis, the core Hamiltonian, or the superposition of atomic
+  // potentials
+  const bool loadguess = load_guess(guess, loadchk, "erkale_complex_orbs");
 
   Checkpoint chkpt(savechk,true);
 
@@ -242,13 +340,13 @@ int main_guarded(int argc, char **argv) {
   construct_basis(basis, atoms, baslib);
   basis.check_linear();
   chkpt.write(basis);
+  // The blocks of the Fock matrices in the checkpoint depend on these
+  chkpt.write("ComplexBasis", complexbas);
+  chkpt.write("CylindricalSymmetry", cylindrical);
 
   int maxam = basis.max_am();
   auto mvals = basis.m_values();
-  std::vector<arma::uvec> m_indices(2*maxam+1);
-  for (int m = -maxam; m <= maxam; m++) {
-    m_indices[m+maxam]=basis.m_indices(m);
-  }
+  const std::vector<arma::uvec> m_indices(m_blocks(basis));
 
   // Coulomb/exchange via the unified driver: it resolves JKMethod
   // (RI / Cholesky / CDFit / four-index), owns the integral engine and
@@ -280,71 +378,33 @@ int main_guarded(int argc, char **argv) {
   arma::mat T(basis.kinetic());
   arma::mat V(basis.nuclear());
   arma::mat Vsap(basis.sap_potential(potlib));
-  if(guess=="core")
+  if(stricmp(guess,"Core")==0)
     Vsap.zeros();
   arma::mat fock_terms = T + V + Vsap; // Helper
   std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
 
-  arma::cx_mat D(Nbf, Nbf, arma::fill::zeros);
-  if (complexbas) {
-    const auto & shells = basis.shells();
-    for (size_t i=0; i<shells.size(); i++) {
-      // The transform acts on one set of 2l+1 real functions in the order
-      // m = -l, ..., l. The functions are not stored in that order for p
-      // shells (x, y, z), so place each function by its m label. A
-      // generally contracted shell carries nctr such sets stacked
-      // contraction-slowest, so place the transform block-diagonally,
-      // once per contraction.
-      const int l = shells[i].am();
-      const arma::cx_mat Tm = basis_transform_mat(l);
-      const size_t Nlm = Tm.n_rows;
-      for(size_t ic=0; ic<shells[i].Nctr(); ic++) {
-        const size_t i0 = shells[i].first_ind() + ic*Nlm;
-        // Index of the function with m = k-l
-        arma::uvec idx(Nlm);
-        for(size_t p=0; p<Nlm; p++)
-          idx(mvals(i0+p)+l) = i0+p;
-        D.submat(idx, idx) = Tm;
-      }
-    }
-  } else
-    D.eye();
+  const arma::cx_mat D(complex_transform(basis, complexbas));
 
   // Blocked matrices
   arma::mat S_c = arma::real(D.t() * S * D);
+  const std::vector<arma::mat> X(block_bases(complexbas ? S_c : S, m_indices, cylindrical));
   size_t Nmo=0;
-  std::vector<arma::mat> X(2*maxam+1);
-  for (size_t m=0; m<X.size(); m++) {
-    const auto & Smat = complexbas ? S_c : S;
-    X[m] = BasOrth(Smat(m_indices[m], m_indices[m]));
-    Nmo += X[m].n_cols;
-  }
+  for (const auto & Xm : X)
+    Nmo += Xm.n_cols;
 
   // Symmetry blocks seen by the SCF solver. By default, these are the m
   // blocks. With CylindricalSymmetry, m and -m share one |m| block, whose
   // orbitals are used for both, half of each orbital's occupation going to
   // each, and whose Fock matrix is the average of theirs, which gives the
   // energy derivatives with respect to the shared orbitals and occupations
-  // (the derivative with respect to an occupation is half the sum). The
-  // functions of m and -m correspond shell by shell, so the -m block
-  // reuses the orthonormal basis of m, which would otherwise differ by the
-  // signs of its vectors.
+  // (the derivative with respect to an occupation is half the sum); the
+  // two share their orthonormal basis.
   std::vector<size_t> symblock(X.size()), symmult;
   for (int m = -maxam; m <= maxam; m++)
     symblock[m+maxam] = cylindrical ? std::abs(m) : m+maxam;
   symmult.assign(symblock.back()+1, 0);
   for (size_t m=0; m<X.size(); m++)
     symmult[symblock[m]]++;
-  if (cylindrical) {
-    const arma::mat & Smat = complexbas ? S_c : S;
-    for (int m = 1; m <= maxam; m++) {
-      const arma::uvec & ip = m_indices[maxam+m];
-      const arma::uvec & im = m_indices[maxam-m];
-      if (arma::abs(Smat(ip, ip) - Smat(im, im)).max() > 1e-10)
-        throw std::logic_error("The functions of m=" + std::to_string(m) + " and m=" + std::to_string(-m) + " do not correspond.\n");
-      X[maxam-m] = X[maxam+m];
-    }
-  }
   const size_t nsym = symmult.size();
 
   int Nel = basis.Ztot() - Q;
@@ -633,21 +693,58 @@ int main_guarded(int argc, char **argv) {
   }; // Save matrices to disk
 
 
-  if(loadchk != "") {
+  if(loadguess) {
     Checkpoint load(loadchk,false);
+    BasisSet oldbas;
+    load.read(oldbas);
+    oldbas.check_linear();
+    bool oldcomplex(complexbas), oldcylindrical(cylindrical);
+    if(load.exist("ComplexBasis"))
+      load.read("ComplexBasis", oldcomplex);
+    if(load.exist("CylindricalSymmetry"))
+      load.read("CylindricalSymmetry", oldcylindrical);
+    if(oldcomplex != complexbas)
+      throw std::runtime_error("LoadChk was not calculated with the same ComplexBasis setting.\n");
 
-    if(!unrestricted) {
-      for (size_t m=0; m<X.size(); m++) {
-	std::string fm = "F" + std::to_string(m);
-	load.read(fm,Fguess[m]);
+    // The m blocks of the old calculation
+    const std::vector<arma::uvec> oldidx(m_blocks(oldbas));
+    const arma::cx_mat oldD(complex_transform(oldbas, complexbas));
+    const std::vector<arma::mat> oldX(block_bases(arma::real(oldD.t()*oldbas.overlap()*oldD), oldidx, oldcylindrical));
+    const arma::mat Sno(arma::real(D.t()*basis.overlap(oldbas)*oldD));
+
+    // The old Fock matrices of the m blocks of the spin s ("" restricted),
+    // from the AO Fock matrix of an erkale calculation
+    std::function<std::vector<arma::mat>(const std::string &)> old_fock = [&](const std::string & s) {
+      std::vector<arma::mat> F(oldX.size());
+      if (load.exist("F" + s + "0")) {
+        for (size_t m=0; m<F.size(); m++)
+          load.read("F" + s + std::to_string(m), F[m]);
+      } else {
+        arma::mat H;
+        load.read("H" + s, H);
+        const arma::mat Hc(arma::real(oldD.t()*H*oldD));
+        for (size_t m=0; m<F.size(); m++)
+          F[m] = oldX[m].t() * Hc(oldidx[m], oldidx[m]) * oldX[m];
       }
-    } else {
-      for (size_t m=0; m<X.size(); m++) {
-	std::string fam = "Fa" + std::to_string(m);
-	load.read(fam,Fguess[m]);
-	std::string fbm = "Fb" + std::to_string(m);
-	load.read(fbm,Fguess[X.size() + m]);
-      }
+      return F;
+    };
+    // A restricted calculation has the same Fock matrix for both spins,
+    // and one started from an unrestricted calculation the average
+    const bool oldrestr = load.exist("F0") || load.exist("H");
+    std::vector<arma::mat> Fa(old_fock(oldrestr ? "" : "a"));
+    const std::vector<arma::mat> Fb(oldrestr ? Fa : old_fock("b"));
+    if (!unrestricted)
+      for (size_t m=0; m<Fa.size(); m++)
+        Fa[m] = 0.5*(Fa[m] + Fb[m]);
+    double lambda = 0.0;
+    for (size_t m=0; m<oldX.size(); m++)
+      if (Fa[m].n_elem)
+        lambda = std::max(lambda, std::max(arma::eig_sym(Fa[m]).max(), arma::eig_sym(Fb[m]).max()));
+
+    Fguess = project_fock(Fa, oldX, oldidx, X, m_indices, Sno, lambda);
+    if (unrestricted) {
+      const std::vector<arma::mat> Fgb(project_fock(Fb, oldX, oldidx, X, m_indices, Sno, lambda));
+      Fguess.insert(Fguess.end(), Fgb.begin(), Fgb.end());
     }
   } else { // Else guess Fock from SAP/core
     for (size_t m=0; m<X.size(); m++) {
@@ -655,7 +752,7 @@ int main_guarded(int argc, char **argv) {
       if (unrestricted)
 	Fguess[X.size() + m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
     }
-  }// if(loadchk != "")
+  }// if(loadguess)
     
 
   // The solver's density matrix for the m blocks, and the solver's Fock
