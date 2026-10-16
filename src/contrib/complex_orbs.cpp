@@ -194,13 +194,17 @@ arma::mat inversion_matrix(const BasisSet & basis, const arma::mat & S, const ar
   arma::mat I(basis.Nbf(), basis.Nbf(), arma::fill::zeros);
   for (const auto & a : nuclei) {
     const coords_t image = c*2.0 - a.r;
+    const std::vector<GaussianShell> ashells(basis.funcs(a.ind));
     bool found = false;
     for (const auto & b : nuclei) {
-      if (norm(b.r - image) > 1e-6 || b.Z != a.Z || b.bsse != a.bsse || b.shells.size() != a.shells.size())
+      if (norm(b.r - image) > 1e-6 || b.Z != a.Z || b.bsse != a.bsse)
         continue;
-      for (size_t is=0; is<a.shells.size(); is++) {
-        const GaussianShell & sa = *a.shells[is];
-        const GaussianShell & sb = *b.shells[is];
+      const std::vector<GaussianShell> bshells(basis.funcs(b.ind));
+      if (bshells.size() != ashells.size())
+        continue;
+      for (size_t is=0; is<ashells.size(); is++) {
+        const GaussianShell & sa = ashells[is];
+        const GaussianShell & sb = bshells[is];
         if (sa.am() != sb.am() || sa.Nbf() != sb.Nbf())
           return arma::mat();
         const double sign = (sa.am() % 2) ? -1.0 : 1.0;
