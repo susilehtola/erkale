@@ -1263,6 +1263,60 @@ void check_diffuse_eri() {
   }
 }
 
+void check_function_integrals() {
+  // A Cartesian function phi of exponent zeta and degree L, and an s
+  // function g = c exp(-eps r^2) on the same center: x^a y^b z^c phi g is
+  // c x^a y^b z^c phi with the exponent zeta+eps, so the moments of phi
+  // follow from libcint's overlap and moment integrals <phi|x^a y^b z^c|g>
+  // times ((zeta+eps)/zeta)^((L+a+b+c+3)/2) / c
+  const double zeta=1.3, eps=0.4;
+  BasisSet basis;
+  nucleus_t nuc;
+  nuc.ind=0;
+  nuc.r.x=nuc.r.y=nuc.r.z=0.0;
+  nuc.bsse=false;
+  nuc.symbol="Ne";
+  nuc.Z=10;
+  nuc.Q=0;
+  basis.add_nucleus(nuc);
+  auto primitive=[](double z) {
+    std::vector<contr_t> c(1);
+    c[0].z=z;
+    c[0].c=1.0;
+    return c;
+  };
+  basis.add_shell(0, 0, false, primitive(eps), false);
+  for(int l=0;l<=4;l++)
+    basis.add_shell(0, l, false, primitive(zeta), false);
+  basis.finalize();
+
+  const std::vector<GaussianShell> shells(basis.shells());
+  size_t ig=0;
+  for(const auto & sh : shells)
+    if(sh.am()==0 && sh.contr()[0].z==eps)
+      ig=sh.first_ind();
+  const double cg=basis.integral()(ig)/std::pow(M_PI/eps,1.5);
+
+  const std::vector<std::array<int,3>> monomials({{0,0,0},{1,0,0},{0,0,1},{2,0,0},{1,1,0},{0,1,2}});
+  for(const auto & mon : monomials) {
+    const int k=mon[0]+mon[1]+mon[2];
+    const arma::mat M(k ? basis.moment(k)[getind(mon[0],mon[1],mon[2])] : basis.overlap());
+    const arma::vec I(basis.integral(mon[0],mon[1],mon[2]));
+    for(const auto & sh : shells) {
+      if(sh.contr()[0].z!=zeta)
+        continue;
+      for(size_t f=sh.first_ind();f<=sh.last_ind();f++) {
+        const double ref=M(f,ig)/cg*std::pow((zeta+eps)/zeta,0.5*(sh.am()+k+3));
+        if(std::abs(I(f)-ref) > 1e-12*std::max(1.0,std::abs(ref))) {
+          std::ostringstream oss;
+          oss << "check_function_integrals: the integral with x^" << mon[0] << " y^" << mon[1] << " z^" << mon[2] << " of function " << f << " (l=" << sh.am() << ") is " << I(f) << ", expected " << ref << ".\n";
+          throw std::runtime_error(oss.str());
+        }
+      }
+    }
+  }
+}
+
 int main(void) {
   settings.add_scf_settings();
   // Test indices
@@ -1282,6 +1336,9 @@ int main(void) {
   // A basis mixing spherical and cartesian shells
   check_mixed_basis();
   printf("Mixed spherical and cartesian basis OK.\n");
+  // Integrals and moments of the basis functions
+  check_function_integrals();
+  printf("Basis function integrals OK.\n");
   // Integrals of diffuse functions of high angular momentum
   check_diffuse_eri();
   printf("Diffuse high angular momentum integrals OK.\n");

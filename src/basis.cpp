@@ -1025,9 +1025,9 @@ arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
 
 
 
-arma::vec GaussianShell::integral() const {
-  // Integral over each function of the shell, one contraction after the
-  // other.
+arma::vec GaussianShell::integral(int a, int b, int c) const {
+  // Integral over each function of the shell times x^a y^b z^c, one
+  // contraction after the other.
   const size_t Nout = uselm_ ? Nlm() : cart_.size();
   arma::vec out(Nctr()*Nout);
 
@@ -1036,20 +1036,19 @@ arma::vec GaussianShell::integral() const {
     ints.zeros();
 
     for(size_t ic=0;ic<cart_.size();ic++) {
-      int l=cart_[ic].l;
-      int m=cart_[ic].m;
-      int n=cart_[ic].n;
+      int l=cart_[ic].l+a;
+      int m=cart_[ic].m+b;
+      int n=cart_[ic].n+c;
 
       if(l%2 || m%2 || n%2)
         // Odd function - zero integral
         continue;
 
       for(size_t ix=0;ix<c_.size();ix++) {
-        double zeta=c_[ix].z;
-        double intx=2.0*pow(0.5/sqrt(zeta),l+1)*sqrt(M_PI);
-        double inty=2.0*pow(0.5/sqrt(zeta),m+1)*sqrt(M_PI);
-        double intz=2.0*pow(0.5/sqrt(zeta),n+1)*sqrt(M_PI);
-        ints(ic)+=cf_(ix,ictr)*intx*inty*intz;
+        // int x^l exp(-zeta x^2) dx = (l-1)!! sqrt(pi) / (2^(l/2) zeta^((l+1)/2)) for even l
+        const double zeta=c_[ix].z;
+        auto int1d = [zeta](int k) { return doublefact(k-1)*sqrt(M_PI)/(std::pow(2.0,k/2)*std::pow(zeta,0.5*(k+1))); };
+        ints(ic)+=cf_(ix,ictr)*int1d(l)*int1d(m)*int1d(n);
       }
 
       ints(ic)*=cart_[ic].relnorm;
@@ -2777,13 +2776,13 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
   return ret;
 }
 
-arma::vec BasisSet::integral() const {
+arma::vec BasisSet::integral(int a, int b, int c) const {
   arma::vec ints(Nbf());
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
   for(size_t is=0;is<shells_.size();is++)
-    ints.subvec(shells_[is].first_ind(),shells_[is].last_ind())=shells_[is].integral();
+    ints.subvec(shells_[is].first_ind(),shells_[is].last_ind())=shells_[is].integral(a,b,c);
 
   return ints;
 }
