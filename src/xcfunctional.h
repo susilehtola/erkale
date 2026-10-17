@@ -119,6 +119,15 @@ class XCFunctional {
   void eval_fxc(size_t N, const double * rho, const double * sigma,
                 const double * lapl, const double * tau,
                 std::map<std::string, arma::mat> & out) const;
+  /**
+   * The energy density split into exchange, correlation, and the
+   * exchange-correlation that is not given as separate exchange and
+   * correlation: the columns of the N x 3 result, which sum to the energy
+   * density. A functional defined as a mix of others is split into its
+   * components. Inputs as in eval.
+   */
+  arma::mat exc_split(size_t N, const double * rho, const double * sigma,
+                      const double * lapl, const double * tau) const;
 };
 
 #endif

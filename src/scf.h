@@ -80,6 +80,11 @@ typedef struct {
   double Exc;
   /// Exact exchange energy
   double Exx;
+  /// Density-functional exchange and correlation energies, and the
+  /// density-functional exchange-correlation energy that is not given as
+  /// separate exchange and correlation; these sum to Exc-Exx and are only
+  /// evaluated for the final solution
+  double Ex, Ec, Exc_unsplit;
   /// One-electron contribution
   double Eone;
 

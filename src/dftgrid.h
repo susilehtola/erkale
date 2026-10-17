@@ -22,9 +22,11 @@
 #include "basis.h"
 #include "sap.h"
 
+#include <functional>
 #include <map>
 #include <string>
 class Hirshfeld;
+class XCFunctional;
 
 /// Screen out points with Becke weights smaller than 1e-8 * tol
 /// (Köster et al 2004). Used in DFTGrid as well as Bader and Casida
@@ -526,6 +528,13 @@ class AngularGrid {
   void compute_xc(int func_id, bool pot, bool fxc=false);
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
+  /// Integrate an energy density per particle over the batch
+  double integrate_exc(const arma::vec & e) const;
+  /// Set the density threshold and external parameters of functional func_id
+  void configure(XCFunctional & xcf, int func_id) const;
+  /// Exchange, correlation, and unsplit exchange-correlation energies of
+  /// functional func_id for the density on the batch
+  arma::vec3 eval_Exc_split(int func_id) const;
   /// Zero out energy
   void zero_Exc();
   /// Numerical clean up of xc
@@ -662,6 +671,8 @@ class DFTGrid {
   /// and the matrices are the general kernel outputs, from which the
   /// complex overloads assemble the Hermitian XC matrices.
   void eval_Fxc_impl(int x_func, int c_func, const arma::mat & P, const arma::mat * ImP, arma::mat & H, double & Exc, double & Nel, const BasisSet * dens_basis);
+  /// eval_Exc_split with the density put on each batch by update_density
+  arma::vec3 eval_Exc_split_impl(int x_func, int c_func, const std::function<void(AngularGrid &)> & update_density);
   void eval_Fxc_impl(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const arma::mat * ImPa, const arma::mat * ImPb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b, bool fock_a, bool fock_b, const BasisSet * dens_basis);
   std::vector<arma::mat> eval_Kxc_impl(int x_func, int c_func, const arma::mat & P, const arma::mat * ImP, const std::vector<arma::mat> & Px, const std::vector<arma::mat> * ImPx);
   void eval_Kxc_impl(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, const arma::mat * ImPa, const arma::mat * ImPb, const std::vector<arma::mat> & Pxa, const std::vector<arma::mat> & Pxb, const std::vector<arma::mat> * ImPxa, const std::vector<arma::mat> * ImPxb, std::vector<arma::mat> & Hxa, std::vector<arma::mat> & Hxb, const BasisSet * basis_b);
@@ -731,6 +742,13 @@ class DFTGrid {
   /// grid's primary basis: the projection-free guess, whose loaded
   /// density is in the old basis.
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel, const BasisSet * basis_b=nullptr, bool fock_a=true, bool fock_b=true, const BasisSet * dens_basis=nullptr);
+
+  /// The exchange-correlation energy split into exchange, correlation, and
+  /// the exchange-correlation that is not given as separate exchange and
+  /// correlation, for a restricted density
+  arma::vec3 eval_Exc_split(int x_func, int c_func, const arma::mat & P);
+  /// Same, for an unrestricted density
+  arma::vec3 eval_Exc_split(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb);
 
   /**
    * XC response kernel: the first-order change of the restricted XC
