@@ -726,6 +726,31 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
     iiter++;
   } // End SCF cycle
 
+#ifdef DFT
+  // Split the exchange-correlation energy, for the density it was
+  // computed from: that of the last iteration
+  if(maxiter>0 && (dft.x_func>0 || dft.c_func>0)) {
+    Timer tsplit;
+    if(verbose) {
+      printf("\nSplitting the exchange-correlation energy ... ");
+      fflush(stdout);
+    }
+#ifdef RESTRICTED
+    const arma::vec3 Es(grid.eval_Exc_split(dft.x_func,dft.c_func,oldsol.P));
+#else
+    const arma::vec3 Es(grid.eval_Exc_split(dft.x_func,dft.c_func,oldsol.Pa,oldsol.Pb));
+#endif
+    sol.en.Ex=Es(0);
+    sol.en.Ec=Es(1);
+    sol.en.Exc_unsplit=Es(2);
+    chkptp->write(sol.en);
+    if(verbose) {
+      printf("done (%s)\n",tsplit.elapsed().c_str());
+      fflush(stdout);
+    }
+  }
+#endif
+
   if(verbose) {
 
     if(converged) {
@@ -761,10 +786,14 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
     printf("%-21s energy: % .16e\n","Exchange",sol.en.Exc);
 #else
     printf("%-21s energy: % .16e\n","Exchange-correlation",sol.en.Exc);
-    if(sol.en.Exx != 0.0) {
+    if(sol.en.Exx != 0.0)
       printf("%-21s energy: % .16e\n","  exact exchange",sol.en.Exx);
-      printf("%-21s energy: % .16e\n","  density functional",sol.en.Exc-sol.en.Exx);
-    }
+    if(sol.en.Ex != 0.0)
+      printf("%-21s energy: % .16e\n","  semilocal exchange",sol.en.Ex);
+    if(sol.en.Ec != 0.0)
+      printf("%-21s energy: % .16e\n","  correlation",sol.en.Ec);
+    if(sol.en.Exc_unsplit != 0.0)
+      printf("%-21s energy: % .16e\n","  unsplit xc",sol.en.Exc_unsplit);
     printf("%-21s energy: % .16e\n","Non-local correlation",sol.en.Enl);
 #endif
     printf("-----------------------------------------------------\n");

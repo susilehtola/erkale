@@ -1000,18 +1000,7 @@ void AngularGrid::compute_xc(int func_id, bool pot, bool fxc) {
       vlapl_wrk.zeros(xdim.vlapl,N);
   }
 
-  // Set density threshold
-  xcf.set_dens_threshold(settings.get_double("DFTDensityThr"));
-
-  // Set external parameters
-  {
-    arma::vec pars;
-    if(is_exchange(func_id))
-      pars=settings.get_vec("DFTXpars");
-    else if(is_correlation(func_id))
-      pars=settings.get_vec("DFTCpars");
-    xcf.set_ext_params(pars);
-  }
+  configure(xcf, func_id);
 
   // Evaluate the functional. The laplacian / tau inputs and their
   // potentials are referenced only for the matching meta-GGA rung.
@@ -1595,7 +1584,40 @@ libxc_pot_t AngularGrid::pot(size_t idx) const {
   return ret;
 }
 
+void AngularGrid::configure(XCFunctional & xcf, int func_id) const {
+  // Set density threshold
+  xcf.set_dens_threshold(settings.get_double("DFTDensityThr"));
+
+  // Set external parameters
+  arma::vec pars;
+  if(is_exchange(func_id))
+    pars=settings.get_vec("DFTXpars");
+  else if(is_correlation(func_id))
+    pars=settings.get_vec("DFTCpars");
+  xcf.set_ext_params(pars);
+}
+
+arma::vec3 AngularGrid::eval_Exc_split(int func_id) const {
+  XCFunctional xcf(func_id, polarized_);
+  configure(xcf, func_id);
+  arma::vec3 E(arma::fill::zeros);
+  if(!xcf.has_exc())
+    return E;
+  arma::mat e(xcf.exc_split(grid_.size(), rho_.memptr(), sigma_.memptr(),
+                            xcf.is_mgga_lapl() ? lapl_.memptr() : NULL,
+                            xcf.is_mgga_tau()  ? tau_.memptr()  : NULL));
+  // Numerical clean up, as in check_xc
+  e.replace(arma::datum::nan, 0.0);
+  for(arma::uword i=0;i<3;i++)
+    E(i)=integrate_exc(e.col(i));
+  return E;
+}
+
 double AngularGrid::eval_Exc() const {
+  return integrate_exc(exc_);
+}
+
+double AngularGrid::integrate_exc(const arma::vec & exc) const {
   arma::uvec screen(screen_density());
 
   arma::rowvec dens(rho_.row(0));
@@ -1607,8 +1629,8 @@ double AngularGrid::eval_Exc() const {
   // dens are arma::rowvec, so transpose exc to align orientations
   // before the element-wise multiply.
   if(screen.n_elem == w_.n_elem)
-    return arma::sum(w_ % exc_.t() % dens);
-  return arma::sum(w_(screen)%exc_(screen)%dens(screen));
+    return arma::sum(w_ % exc.t() % dens);
+  return arma::sum(w_(screen)%exc(screen)%dens(screen));
 }
 
 void AngularGrid::eval_overlap(arma::mat & So) const {
@@ -4208,6 +4230,50 @@ void DFTGrid::eval_Fxc_impl(int x_func, int c_func, const arma::mat & P, const a
   Nelv=Nel;
 }
 
+
+arma::vec3 DFTGrid::eval_Exc_split(int x_func, int c_func, const arma::mat & P) {
+  return eval_Exc_split_impl(x_func, c_func, [&](AngularGrid & g) { g.update_density(P); });
+}
+
+arma::vec3 DFTGrid::eval_Exc_split(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb) {
+  return eval_Exc_split_impl(x_func, c_func, [&](AngularGrid & g) { g.update_density(Pa, Pb); });
+}
+
+arma::vec3 DFTGrid::eval_Exc_split_impl(int x_func, int c_func, const std::function<void(AngularGrid &)> & update_density) {
+  arma::vec3 E(arma::fill::zeros);
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    const int ith=omp_get_thread_num();
+#else
+    const int ith=0;
+#endif
+    arma::vec3 Eth(arma::fill::zeros);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids_.size();i++) {
+      wrk_[ith].set_shell(grids_[i]);
+      wrk_[ith].form_grid();
+      update_density(wrk_[ith]);
+      for(int func : {x_func, c_func})
+        if(func>0)
+          Eth+=wrk_[ith].eval_Exc_split(func);
+      wrk_[ith].free();
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    E+=Eth;
+  }
+
+  return E;
+}
 
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv, const BasisSet * basis_b, bool fock_a, bool fock_b, const BasisSet * dens_basis) {
   eval_Fxc_impl(x_func, c_func, Pa, Pb, nullptr, nullptr, Ha, Hb, Excv, Nelv, basis_b, fock_a, fock_b, dens_basis);

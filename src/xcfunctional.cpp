@@ -126,6 +126,63 @@ void XCFunctional::eval(size_t N, const double * rho, const double * sigma,
   }
 }
 
+namespace {
+  /// Energy density of the functional f, of any family
+  arma::vec exc_of(const xc_func_type * f, size_t N, const double * rho, const double * sigma,
+                   const double * lapl, const double * tau) {
+    arma::vec zk(N, arma::fill::zeros);
+    switch(f->info->family) {
+    case XC_FAMILY_LDA:
+    case XC_FAMILY_HYB_LDA:
+      xc_lda_exc(f, N, rho, zk.memptr());
+      break;
+    case XC_FAMILY_GGA:
+    case XC_FAMILY_HYB_GGA:
+      xc_gga_exc(f, N, rho, sigma, zk.memptr());
+      break;
+    case XC_FAMILY_MGGA:
+    case XC_FAMILY_HYB_MGGA:
+      xc_mgga_exc(f, N, rho, sigma, lapl, tau, zk.memptr());
+      break;
+    default:
+      throw std::logic_error("Unknown functional family.\n");
+    }
+    return zk;
+  }
+
+  /**
+   * Add the energy density of f times weight to the column of e for its
+   * kind, and return the energy density. Libxc evaluates a functional's
+   * own term, if any, and adds its mix of components; the components are
+   * split in turn, and the own term is what remains of the energy density.
+   */
+  arma::vec split_exc(const xc_func_type * f, double weight, size_t N, const double * rho, const double * sigma,
+                      const double * lapl, const double * tau, arma::mat & e) {
+    const int col = f->info->kind == XC_EXCHANGE ? 0 : (f->info->kind == XC_CORRELATION ? 1 : 2);
+    if(f->mix_coef == NULL) {
+      const arma::vec zk(exc_of(f, N, rho, sigma, lapl, tau));
+      e.col(col) += weight*zk;
+      return zk;
+    }
+    arma::vec mix(N, arma::fill::zeros);
+    for(int i=0; i<f->n_func_aux; i++)
+      mix += f->mix_coef[i]*split_exc(f->func_aux[i], weight*f->mix_coef[i], N, rho, sigma, lapl, tau, e);
+    const bool own = f->info->lda != NULL || f->info->gga != NULL || f->info->mgga != NULL;
+    if(!own)
+      return mix;
+    const arma::vec zk(exc_of(f, N, rho, sigma, lapl, tau));
+    e.col(col) += weight*(zk - mix);
+    return zk;
+  }
+}
+
+arma::mat XCFunctional::exc_split(size_t N, const double * rho, const double * sigma,
+                                  const double * lapl, const double * tau) const {
+  arma::mat e(N, 3, arma::fill::zeros);
+  split_exc(&func, 1.0, N, rho, sigma, lapl, tau, e);
+  return e;
+}
+
 void XCFunctional::eval_fxc(size_t N, const double * rho, const double * sigma,
                             const double * lapl, const double * tau,
                             std::map<std::string, arma::mat> & out) const {
