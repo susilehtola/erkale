@@ -559,8 +559,9 @@ public:
   /// Compute moment integral around (x,y,z)
   std::vector<arma::mat> moment(int mom, double x=0.0, double y=0.0, double z=0.0) const;
 
-  /// Compute integrals of basis functions (used in xc-fitting)
-  arma::vec integral() const;
+  /// Compute integrals of basis functions (used in xc-fitting), or with
+  /// x^a y^b z^c about the center of each function
+  arma::vec integral(int a=0, int b=0, int c=0) const;
 
   /// Calculate nuclear charge
   int Ztot() const;
@@ -795,8 +796,9 @@ public:
   arma::mat coulomb_overlap(const GaussianShell & rhs) const;
 
 
-  /// Calculate integral over function (used in xc-fitting)
-  arma::vec integral() const;
+  /// Calculate integral over function (used in xc-fitting), or with
+  /// x^a y^b z^c about the center of the shell
+  arma::vec integral(int a=0, int b=0, int c=0) const;
 
 };
 
