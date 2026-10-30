@@ -201,18 +201,15 @@ class TrustRegionSCF {
     if(!n_param())
       return true;
     const solver_settings_type settings(solver_settings(convthr, stability, verbose));
-    while(true) {
-      c_int err;
-      {
-        CallGuard guard(this);
-        err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) n_param(), &settings, nullptr);
-        guard.rethrow();
-      }
-      if(err==0)
-        return true;
-      if(!follow_instability(convthr, verbose))
-        throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
+    c_int err;
+    {
+      CallGuard guard(this);
+      err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) n_param(), &settings, nullptr);
+      guard.rethrow();
     }
+    if(err!=0)
+      throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
+    return true;
   }
 
   /**
@@ -221,7 +218,7 @@ class TrustRegionSCF {
    * structure are examined, along with the occupation transfers if the
    * occupations are free.
    */
-  bool is_stable(double convthr, int verbose, arma::vec * mode=nullptr) {
+  bool is_stable(double convthr, int verbose) {
     if(!n_param())
       return true;
     stability_settings_type settings=stability_settings_init();
@@ -247,43 +244,7 @@ class TrustRegionSCF {
     }
     if(err!=0)
       throw std::runtime_error("OpenTrustRegion stability check failed with error code " + std::to_string((long long) err) + ".\n");
-    if(mode)
-      *mode=kappa;
     return stable;
-  }
-
-  /**
-   * OpenTrustRegion looks for a saddle point only once the gradient has
-   * converged. Near a saddle point whose negative mode the gradient does
-   * not touch, as with a spin-symmetry breaking instability of a
-   * symmetric solution, its augmented-Hessian step has no gradient
-   * component and the solver fails. Check the stability, and if the
-   * point is unstable, go down along the lowest mode with the
-   * logarithmic line search OpenTrustRegion uses at a converged saddle
-   * point. Returns whether the energy was lowered.
-   */
-  bool follow_instability(double convthr, int verbose) {
-    arma::vec mode;
-    if(is_stable(convthr, verbose, &mode))
-      return false;
-    for(int i=0;i<21;i++) {
-      const double s=std::pow(10.0, -0.5*i);
-      std::vector<arma::mat> C, Fmo;
-      std::vector<arma::vec> occ;
-      arma::vec q;
-      double E;
-      displaced(mode.memptr(), s, C, occ, q);
-      evaluate(C, occ, E, Fmo);
-      if(E < E_) {
-        const double E0=E_;
-        arma::vec step(s*mode);
-        take_step(step.memptr());
-        printf("\nThe solver failed at a saddle point; following the unstable mode lowered the energy by %.3e. Restarting.\n", E0-E_);
-        fflush(stdout);
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
@@ -1179,12 +1140,8 @@ class TrustRegionSCF {
         err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) nparam_, &settings, nullptr);
         guard.rethrow();
       }
-      if(err!=0 && !budget_spent_ && !kink_stop_) {
-        if(!follow_instability(convthr, verbose))
-          throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
-        nrestart++;
-        continue;
-      }
+      if(err!=0 && !budget_spent_ && !kink_stop_)
+        throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
       if(budget_spent_) {
         printf("A macroiteration spent %i Hessian-vector products without accepting a step.\n", (int) hess_budget_);
         fflush(stdout);

@@ -1,8 +1,8 @@
 # Unrestricted Be 1s2 2s2 with equal alpha and beta orbitals: the
 # first-order SCF converges to the spin-symmetric saddle point, whose
-# triplet instability the spin-symmetric gradient does not touch. The
-# trust-region solver fails there; following the unstable mode down
-# reaches the broken-symmetry minimum 0.27 mEh below.
+# triplet instability the spin-symmetric gradient does not touch.
+# OpenTrustRegion starts at the saddle point, follows the unstable mode
+# down, and reaches the broken-symmetry minimum 0.27 mEh below.
 System Be.xyz
 Basis cc-pVDZ
 Method HF
