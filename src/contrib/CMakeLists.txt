@@ -83,14 +83,12 @@ if(ERKALE_TRUST_REGION)
   include(FetchContent)
   FetchContent_Declare(OpenTrustRegion
     GIT_REPOSITORY https://github.com/eriksen-lab/opentrustregion.git
-    GIT_TAG        v2.0.1)
+    GIT_TAG        v3.0.0)
   FetchContent_MakeAvailable(OpenTrustRegion)
   target_link_libraries(erkale_neo_deps INTERFACE opentrustregion)
+  # The target also carries OTR_ILP64, which sets the integer type of
+  # the C header, in a 64-bit build
   target_compile_definitions(erkale_neo_deps INTERFACE ERKALE_TRUST_REGION)
-  if(ERKALE_USE_ILP64)
-    # The C header's integer type follows this macro
-    target_compile_definitions(erkale_neo_deps INTERFACE USE_ILP64)
-  endif()
 endif()
 
 add_executable(erkale_neo neo.cpp neo_dump.cpp neo_cholesky.cpp)

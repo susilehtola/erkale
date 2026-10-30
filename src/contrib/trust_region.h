@@ -200,16 +200,12 @@ class TrustRegionSCF {
       return optimize_free(convthr, stability, verbose);
     if(!n_param())
       return true;
-    solver_settings_type settings=solver_settings_init();
-    settings.logger=&TrustRegionSCF::cb_logger;
-    settings.stability=stability;
-    settings.conv_tol=convthr;
-    settings.verbose=verbose;
+    const solver_settings_type settings(solver_settings(convthr, stability, verbose));
     while(true) {
       c_int err;
       {
-        Activate guard(this);
-        err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) n_param(), settings);
+        CallGuard guard(this);
+        err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) n_param(), &settings, nullptr);
         guard.rethrow();
       }
       if(err==0)
@@ -229,6 +225,7 @@ class TrustRegionSCF {
     if(!n_param())
       return true;
     stability_settings_type settings=stability_settings_init();
+    settings.context=this;
     settings.logger=&TrustRegionSCF::cb_logger;
     settings.conv_tol=convthr;
     settings.verbose=verbose;
@@ -243,8 +240,8 @@ class TrustRegionSCF {
     hess_budget_=0;
     c_int err;
     {
-      Activate guard(this);
-      err=stability_check(h_diag.memptr(), &TrustRegionSCF::cb_hess_x, (c_int) n_param(), &stable, settings, kappa.memptr());
+      CallGuard guard(this);
+      err=stability_check(h_diag.memptr(), &TrustRegionSCF::cb_hess_x, (c_int) n_param(), &stable, &settings, nullptr, kappa.memptr());
       hess_budget_=budget;
       guard.rethrow();
     }
@@ -465,19 +462,26 @@ class TrustRegionSCF {
   /// lower energy stops the optimization before that
   static constexpr int max_restarts=100;
 
-  /// The optimizer whose callbacks OpenTrustRegion calls; its C interface
-  /// passes no user data.
-  static TrustRegionSCF *& active() {
-    static TrustRegionSCF * p=nullptr;
-    return p;
-  }
-  /// Sets the active optimizer for the duration of a solver call
-  struct Activate {
+  /// Clears the stored exception for the duration of a solver call, and
+  /// rethrows one that a callback stored
+  struct CallGuard {
     TrustRegionSCF * self;
-    explicit Activate(TrustRegionSCF * s) : self(s) { self->error_=nullptr; active()=s; }
-    ~Activate() { active()=nullptr; }
+    explicit CallGuard(TrustRegionSCF * s) : self(s) { self->error_=nullptr; }
     void rethrow() const { if(self->error_) std::rethrow_exception(self->error_); }
   };
+  /// The settings of a solver call, with the callbacks reaching this
+  /// object through the context
+  solver_settings_type solver_settings(double convthr, bool stability, int verbose) {
+    solver_settings_type settings=solver_settings_init();
+    settings.context=this;
+    settings.logger=&TrustRegionSCF::cb_logger;
+    settings.stability=stability;
+    settings.conv_tol=convthr;
+    settings.verbose=verbose;
+    settings.stability_settings.context=this;
+    settings.stability_settings.logger=&TrustRegionSCF::cb_logger;
+    return settings;
+  }
 
   /// Occupation difference of a rotation pair
   static double dn(const pair_t & p, const std::vector<arma::vec> & occ) {
@@ -1120,11 +1124,7 @@ class TrustRegionSCF {
   /// Optimize with free occupations: the solve runs in a loop that
   /// rebuilds the parametrization whenever the occupation pattern changes
   bool optimize_free(double convthr, bool stability, int verbose) {
-    solver_settings_type settings=solver_settings_init();
-    settings.logger=&TrustRegionSCF::cb_logger;
-    settings.stability=stability;
-    settings.conv_tol=convthr;
-    settings.verbose=verbose;
+    solver_settings_type settings(solver_settings(convthr, stability, verbose));
     if(exact_precond_)
       settings.precond=&TrustRegionSCF::cb_precond;
     settings.conv_check=&TrustRegionSCF::cb_conv_check;
@@ -1175,8 +1175,8 @@ class TrustRegionSCF {
       kink_stop_=false;
       c_int err;
       {
-        Activate guard(this);
-        err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) nparam_, settings);
+        CallGuard guard(this);
+        err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) nparam_, &settings, nullptr);
         guard.rethrow();
       }
       if(err!=0 && !budget_spent_ && !kink_stop_) {
@@ -1258,8 +1258,8 @@ class TrustRegionSCF {
 
   /* OpenTrustRegion callbacks. Exceptions must not cross the Fortran
      library: they are stored and rethrown after it returns. */
-  static c_int cb_update(const c_real * kappa, c_real * func, c_real * grad, c_real * h_diag, hess_x_fp * hess_x) {
-    TrustRegionSCF * self=active();
+  static c_int cb_update(const c_real * kappa, c_real * func, c_real * grad, c_real * h_diag, hess_x_fp * hess_x, void * context) {
+    TrustRegionSCF * self=static_cast<TrustRegionSCF *>(context);
     try {
       self->take_step(kappa);
       std::copy(self->grad_.begin(), self->grad_.end(), grad);
@@ -1277,8 +1277,8 @@ class TrustRegionSCF {
       return 1;
     }
   }
-  static c_int cb_obj(const c_real * kappa, c_real * func) {
-    TrustRegionSCF * self=active();
+  static c_int cb_obj(const c_real * kappa, c_real * func, void * context) {
+    TrustRegionSCF * self=static_cast<TrustRegionSCF *>(context);
     try {
       std::vector<arma::mat> C, Fmo;
       std::vector<arma::vec> occ;
@@ -1309,8 +1309,8 @@ class TrustRegionSCF {
       return 1;
     }
   }
-  static c_int cb_hess_x(const c_real * x, c_real * hx) {
-    TrustRegionSCF * self=active();
+  static c_int cb_hess_x(const c_real * x, c_real * hx, void * context) {
+    TrustRegionSCF * self=static_cast<TrustRegionSCF *>(context);
     try {
       if(self->free_occ_) {
         // Failing here is the clean way out of a runaway macroiteration;
@@ -1331,8 +1331,8 @@ class TrustRegionSCF {
       return 1;
     }
   }
-  static c_int cb_precond(const c_real * residual, const c_real * mu, c_real * out) {
-    TrustRegionSCF * self=active();
+  static c_int cb_precond(const c_real * residual, const c_real * mu, c_real * out, void * context) {
+    TrustRegionSCF * self=static_cast<TrustRegionSCF *>(context);
     try {
       self->precondition(residual, *mu, out);
       return 0;
@@ -1342,11 +1342,11 @@ class TrustRegionSCF {
     }
   }
   /// Stops the solve when the occupation pattern has changed under it
-  static c_int cb_conv_check(c_bool * converged) {
-    *converged=active()->pattern_changed_;
+  static c_int cb_conv_check(c_bool * converged, void * context) {
+    *converged=static_cast<TrustRegionSCF *>(context)->pattern_changed_;
     return 0;
   }
-  static void cb_logger(const char * message) {
+  static void cb_logger(const char * message, void *) {
     printf("%s\n", message);
     fflush(stdout);
   }
