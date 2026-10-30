@@ -47,43 +47,46 @@
  * basis; Hessian-vector products are analytic given the Fock response,
  * and central differences of the gradient otherwise.
  *
- * The occupations are either fixed, or free to move between the blocks
+ * The occupations are either fixed, or free to move between the orbitals
  * of each particle type, as when an aufbau over symmetry blocks leaves a
- * shell fractionally occupied. Free occupations follow the second-order
- * optimizer of HelFEM (src/general/trustregion_scf.h):
+ * shell fractionally occupied:
  *
- * - Each block carries one continuous variable, its electron count q_b,
- *   and fills its orbitals in order, f_bi = clamp(q_b - i w_b, 0, w_b)
- *   with w_b the occupation of a filled orbital. A block thus holds at
- *   most one fractional orbital, k_b, and fills continuously past it.
- * - Only blocks whose k_b is fractional are free; a block at an exact
- *   shell closing sits on a kink of E(q), and an empty one on the bound
- *   q = 0. Whether such a block opens follows from the KKT conditions
- *   below.
+ * - The occupation n_i of each orbital, 0 <= n_i <= w_b with w_b that of a
+ *   filled orbital of its block, is a variable in its own right. The
+ *   energy is smooth in the occupations, dE/dn_i = F_ii (Janak), so a
+ *   block that fills past a shell closing or empties past one is no
+ *   kink: the occupations of the orbitals on both sides move together.
+ *   Nor is the number of fractional orbitals of a block limited.
+ * - The free occupations are those of the fractional orbitals, and those
+ *   of the orbitals at a bound that the KKT conditions of the occupation
+ *   problem release: with eps_F the Fermi level (the mean energy of the
+ *   fractional orbitals), a full orbital above it or an empty one below
+ *   it; without fractional orbitals, the highest full orbital and the
+ *   lowest empty one, if the former lies above the latter. Only the
+ *   highest full and the lowest empty orbital of each block are
+ *   candidates, in the canonical orbitals. This is checked whenever the
+ *   parametrization is built, and again once the solver has converged.
  * - The electron count of each particle type is conserved, so the free
- *   q_b move in the sum-zero subspace, in an orthonormal (Helmert) basis
- *   that keeps the trust-region metric isotropic.
- * - dE/dq_b = F_kk (Janak). The uncoupled Hessian diagonal vanishes
- *   along every occupation direction, so the occupation block of the
- *   Hessian is built exactly at every accepted step and inverted exactly
- *   in the preconditioner, with its small curvatures floored: the
- *   minimum can be a valley of equivalent ensembles, such as charge
- *   moving between the complex m and -m orbitals in a pure functional.
- * - A step does not carry a free block past the filling or emptying of
- *   its fractional orbital: E(q) has a kink there, and the quadratic
- *   model does not hold across it. The occupation part of the step is cut
- *   short at the first kink, so that a step overshooting a shell closing
- *   does not leave a sliver of charge in the next orbital, to be drained
- *   back by the next step in an endless back and forth. When such a step
- *   lowers the energy, the solve stops there, and the parametrization is
- *   rebuilt with that block integer and frozen.
- * - A frozen block that violates the KKT conditions of the occupation
- *   problem (a full orbital above the Fermi level, an empty one below
- *   it, or with no free blocks, a full orbital above an empty one in
- *   another block) is released by moving a little charge, so that the
- *   solve does not stop at a stationary point of the problem with that
- *   block pinned. The orbital energies serve as the multipliers, so this
- *   is done only once the orbital gradient is small.
+ *   occupations move in the sum-zero subspace, in an orthonormal
+ *   (Helmert) basis that keeps the trust-region metric isotropic.
+ * - The uncoupled Hessian diagonal vanishes along every occupation
+ *   direction, so the occupation block of the Hessian is built exactly
+ *   at every accepted step and inverted exactly in the preconditioner,
+ *   with its small curvatures floored: the minimum can be a valley of
+ *   equivalent ensembles, such as charge moving between the complex m and
+ *   -m orbitals in a pure functional.
+ * - A step that would carry a free occupation out of [0, w] is cut short
+ *   where the first one reaches its bound, and a step that lowers the
+ *   energy there stops the solve; the parametrization is rebuilt with
+ *   that orbital at its bound, which the KKT conditions then keep or
+ *   release. A free occupation at a bound whose orbital energy points
+ *   out of it, relative to the mean of the others of its particle type,
+ *   is held there: the occupation changes are projected onto the face
+ *   that keeps it, the other free occupations making up the difference,
+ *   and the gradient and the Hessian are those of the projected
+ *   occupations, with a fixed curvature along the parameters that would
+ *   only move held occupations. Whether it stays at the bound is then
+ *   decided by the KKT conditions once the solver has converged.
  * - A step that lowered the energy but that OpenTrustRegion declined is
  *   retaken, Hessian-vector products per macroiteration are capped, and
  *   convergence is judged from the gradient, since OpenTrustRegion
@@ -139,10 +142,8 @@ class TrustRegionSCF {
     grad_=gradient(Fmo_, occ_);
   }
 
-  /// Constructor for occupations that are free to move between the blocks
-  /// of each particle type. The occupations are read as block electron
-  /// counts; the orbitals must be in aufbau order within each block, as
-  /// OpenOrbitalOptimizer hands them over.
+  /// Constructor for occupations that are free to move between the
+  /// orbitals of each particle type
   TrustRegionSCF(const FockBuilder & fock, const DensityMatrix & dm, const FreeOccupations & free, const ResponseBuilder & response=ResponseBuilder(), double fdstep=1e-4) : fock_(fock), response_(response), C_(dm.first), occ_(dm.second), fdstep_(fdstep), free_occ_(true), maxocc_(free.maxocc), labels_(free.descriptions) {
     size_t b=0;
     for(size_t n : free.blocks_per_particle) {
@@ -158,9 +159,7 @@ class TrustRegionSCF {
       for(size_t c=0;c<C_.size();c++)
         labels_[c]="block " + std::to_string(c);
     }
-    read_fillings();
-    // The energy at the handover, from the occupations rebuilt from the
-    // block electron counts
+    read_occupations();
     evaluate(C_, occ_, E_, Fmo_);
     printf("Energy at the handover to the trust-region solver % .10f\n", E_);
     fflush(stdout);
@@ -261,8 +260,7 @@ class TrustRegionSCF {
     auto energy_at=[&](const arma::vec & x) {
       std::vector<arma::mat> C;
       std::vector<arma::vec> occ;
-      arma::vec q;
-      displaced(x.memptr(), 1.0, C, occ, q);
+      displaced(x.memptr(), 1.0, C, occ);
       double E;
       std::vector<arma::mat> Fmo;
       evaluate(C, occ, E, Fmo);
@@ -366,19 +364,37 @@ class TrustRegionSCF {
   /// Occupation of a filled orbital, and the label of each block
   std::vector<double> maxocc_;
   std::vector<std::string> labels_;
-  /// Blocks of each particle type, and those whose filling is free
-  std::vector<std::vector<size_t>> pblocks_, free_;
-  /// Orthonormal basis of the occupation parameters, n_blocks x n_occ:
-  /// the sum-zero subspaces of the free fillings of each particle type
+  /// Blocks of each particle type
+  std::vector<std::vector<size_t>> pblocks_;
+  /// An orbital whose occupation is a variable
+  struct var_t {
+    size_t b;
+    arma::uword i;
+  };
+  /// The free occupations, the particle type of each, which bound each
+  /// was at when the parametrization was built (-1 empty, 0 fractional,
+  /// +1 full), and a flag for the free orbitals of each block
+  std::vector<var_t> vars_;
+  std::vector<size_t> varp_;
+  std::vector<int> entry_bound_;
+  std::vector<arma::uvec> isvar_;
+  /// The free occupations held at their bounds at the reference: those
+  /// whose orbital energy points out of the bound, relative to the mean
+  /// energy of the others of the particle type. The occupation changes
+  /// are projected onto the face that keeps them, and the gradient and
+  /// the Hessian are those of the projected occupations.
+  std::vector<bool> held_;
+  /// Orthonormal basis of the occupation parameters that the projection
+  /// maps to no change, which get a curvature of held_stiffness so that
+  /// the Hessian is not singular there; the gradient has no component
+  /// along them, so the steps do not either
+  arma::mat nullbasis_;
+  /// Orthonormal basis of the occupation parameters, n_vars x n_occ: the
+  /// sum-zero subspaces of the free occupations of each particle type
   /// (Helmert)
   arma::mat occbasis_;
-  /// Electrons in each block, and the index of its fractional orbital:
-  /// the first orbital that is not full
-  arma::vec q_;
-  std::vector<arma::uword> active_;
-  /// Fractional orbitals the parametrization was built around, and
-  /// whether the reference has left that pattern
-  std::vector<arma::uword> entry_active_;
+  /// Has the reference left the bounds the parametrization was built
+  /// around?
   bool pattern_changed_=false;
   /// Hessian diagonal: uncoupled for the rotations, exact for the
   /// occupations
@@ -390,10 +406,10 @@ class TrustRegionSCF {
   /// count, and whether it was hit
   size_t hess_budget_=0, hess_this_macro_=0;
   bool budget_spent_=false;
-  /// Has an objective evaluation stopped the solve at a kink, and the
-  /// step that reached it
-  bool kink_stop_=false;
-  arma::vec kink_step_;
+  /// Has an objective evaluation stopped the solve where a free
+  /// occupation reached its bound, and the step that reached it
+  bool bound_stop_=false;
+  arma::vec bound_step_;
   /// The lowest-energy point any objective evaluation has reached since
   /// the last accepted step
   arma::vec best_step_;
@@ -405,19 +421,25 @@ class TrustRegionSCF {
   static constexpr double occ_tol=1e-6;
   /// Floor on |lambda - mu| in the preconditioner, as in OpenTrustRegion
   static constexpr double precond_floor=1e-10;
-  /// A departure from integer occupation up to this large, in a block
-  /// that already has a fractional orbital, is taken as a residue of the
-  /// first-order solution (natural occupations of an optimal-damping
-  /// mixture) rather than as a second fractional orbital
+  /// A departure from integer occupation up to this large, in a particle
+  /// type that has a genuinely fractional orbital, is taken as a residue
+  /// of the first-order solution (natural occupations of an
+  /// optimal-damping mixture) and snapped to the bound
   static constexpr double residue_tol=1e-4;
   /// Floor on the curvatures of the occupation block in the
   /// preconditioner, relative to the largest one
   static constexpr double valley_floor=1e-3;
-  /// Electrons moved to release a block frozen against the KKT conditions
-  static constexpr double kkt_nudge=1e-3;
-  /// RMS orbital gradient below which the orbital energies are trusted as
-  /// the multipliers of the KKT conditions
-  static constexpr double kkt_gate=1e-4;
+  /// Violation of the KKT conditions, in orbital energy, that releases an
+  /// orbital from its bound
+  static constexpr double kkt_tol=1e-7;
+  /// Floor on |n_i - n_a| in the Hessian diagonal of a rotation that
+  /// involves a free occupation, relative to w: such occupations can be
+  /// (nearly) equal, which leaves the rotation without curvature until
+  /// they part
+  static constexpr double dn_floor=1e-1;
+  /// Curvature of the occupation parameters that move only held
+  /// occupations
+  static constexpr double held_stiffness=1.0;
   /// Safety cap on the restarts of the solver after a pattern change, a
   /// declined step or a KKT release; a pattern that recurs without a
   /// lower energy stops the optimization before that
@@ -470,77 +492,171 @@ class TrustRegionSCF {
         C[b]=C[b]*arma::expmat(s*K[b]);
     return C;
   }
-  /// Change of the block fillings for the occupation parameters of x
-  arma::vec filling_change(const double * x) const {
+  /// Which bound the occupation n of an orbital of block b is at: -1
+  /// empty, +1 full, 0 neither
+  int bound_state(size_t b, double n) const {
+    if(n <= occ_tol)
+      return -1;
+    if(n >= maxocc_[b]-occ_tol)
+      return 1;
+    return 0;
+  }
+  /// Change of the free occupations for the occupation parameters of x
+  arma::vec occupation_change(const double * x) const {
     if(!occbasis_.n_cols)
-      return arma::vec(C_.size(), arma::fill::zeros);
+      return arma::vec(vars_.size(), arma::fill::zeros);
     return occbasis_*arma::vec(x+qoff_, occbasis_.n_cols);
   }
-  /// Occupations of block b for the filling q, and its fractional orbital
-  /// (the first one that is not full; found by scanning, since at an
-  /// exact shell closing q/w can round to just below an integer)
-  void fill(size_t b, double q, arma::vec & f, arma::uword & k) const {
-    const arma::uword n=C_[b].n_cols;
-    const double w=maxocc_[b];
-    f.zeros(n);
-    for(arma::uword i=0;i<n;i++)
-      f(i)=std::min(std::max(q-i*w, 0.0), w);
-    k=n ? n-1 : 0;
-    for(arma::uword i=0;i<n;i++)
-      if(f(i) < w-occ_tol) {
-        k=i;
-        break;
-      }
-  }
-  /// Occupations for the fillings q
-  std::vector<arma::vec> fillings(const arma::vec & q) const {
-    std::vector<arma::vec> occ(C_.size());
-    arma::uword k;
+  /// The change dv of the free occupations by block
+  std::vector<arma::vec> by_block(const arma::vec & dv) const {
+    std::vector<arma::vec> d(C_.size());
     for(size_t b=0;b<C_.size();b++)
-      fill(b, q(b), occ[b], k);
-    return occ;
+      d[b].zeros(C_[b].n_cols);
+    for(size_t v=0;v<vars_.size();v++)
+      d[vars_[v].b](vars_[v].i)=dv(v);
+    return d;
   }
-  /// Orbitals, occupations and fillings displaced from the reference by
-  /// the parameters x, scaled by s. Only the free fillings move, so no
-  /// charge leaks into a frozen block. The occupation part of the step is
-  /// cut short where a free block's fractional orbital fills or empties,
-  /// and that block is put exactly on the kink; kink says whether it was.
-  void displaced(const double * x, double s, std::vector<arma::mat> & C, std::vector<arma::vec> & occ, arma::vec & q, bool * kink=nullptr) const {
-    C=rotated(x, s);
-    if(kink)
-      *kink=false;
-    if(!free_occ_) {
-      occ=occ_;
-      return;
-    }
-    q=q_+s*filling_change(x);
+  /// The occupation change d with the held occupations kept, the others
+  /// of their particle type making up the difference equally (with none
+  /// left, the change of the particle type vanishes)
+  arma::vec project_change(arma::vec d, const std::vector<bool> & held) const {
     for(size_t p=0;p<pblocks_.size();p++) {
-      // The largest fraction t of the step that keeps every free block's
-      // filling within the segment of its fractional orbital; scaling the
-      // whole step keeps the electron count
-      double t=1.0, qkink=0.0;
-      size_t bkink=0;
-      for(size_t b : free_[p]) {
-        const double lo=active_[b]*maxocc_[b], hi=lo+maxocc_[b], d=q(b)-q_(b);
-        const double bound=(d < 0.0) ? lo : hi;
-        if((d < 0.0 && q(b) < lo) || (d > 0.0 && q(b) > hi)) {
-          const double tb=(bound-q_(b))/d;
-          if(tb < t) {
-            t=tb;
-            bkink=b;
-            qkink=bound;
+      double excess=0.0;
+      size_t nfree=0;
+      for(size_t v=0;v<vars_.size();v++)
+        if(varp_[v]==p) {
+          if(held[v]) {
+            excess+=d(v);
+            d(v)=0.0;
+          } else
+            nfree++;
+        }
+      for(size_t v=0;v<vars_.size();v++)
+        if(varp_[v]==p && !held[v])
+          d(v) = nfree ? d(v)+excess/nfree : 0.0;
+    }
+    return d;
+  }
+  /// The transpose of project_change() for the held occupations of the
+  /// reference: a held occupation takes the mean of the others of its
+  /// particle type
+  arma::vec project_derivative(arma::vec g) const {
+    for(size_t p=0;p<pblocks_.size();p++) {
+      double mean=0.0;
+      size_t nfree=0;
+      for(size_t v=0;v<vars_.size();v++)
+        if(varp_[v]==p && !held_[v]) {
+          mean+=g(v);
+          nfree++;
+        }
+      mean = nfree ? mean/nfree : 0.0;
+      for(size_t v=0;v<vars_.size();v++)
+        if(varp_[v]==p && held_[v])
+          g(v)=mean;
+      if(!nfree)
+        for(size_t v=0;v<vars_.size();v++)
+          if(varp_[v]==p)
+            g(v)=0.0;
+    }
+    return g;
+  }
+  /// Find the free occupations held at their bounds at the reference,
+  /// and the occupation parameters that only move them
+  void find_held() {
+    held_.assign(vars_.size(), false);
+    nullbasis_.reset();
+    for(bool changed=true;changed;) {
+      changed=false;
+      for(size_t p=0;p<pblocks_.size();p++) {
+        double mean=0.0;
+        size_t nfree=0;
+        for(size_t v=0;v<vars_.size();v++)
+          if(varp_[v]==p && !held_[v]) {
+            mean+=Fmo_[vars_[v].b](vars_[v].i,vars_[v].i);
+            nfree++;
+          }
+        if(!nfree)
+          continue;
+        mean/=nfree;
+        for(size_t v=0;v<vars_.size();v++) {
+          if(varp_[v]!=p || held_[v])
+            continue;
+          const double e=Fmo_[vars_[v].b](vars_[v].i,vars_[v].i);
+          const int st=bound_state(vars_[v].b, occ_[vars_[v].b](vars_[v].i));
+          if((st>0 && e < mean-kkt_tol) || (st<0 && e > mean+kkt_tol)) {
+            held_[v]=true;
+            changed=true;
           }
         }
       }
-      if(t < 1.0) {
-        for(size_t b : free_[p])
-          q(b)=q_(b)+t*(q(b)-q_(b));
-        q(bkink)=qkink;
-        if(kink)
-          *kink=true;
+    }
+    if(occbasis_.n_cols && std::find(held_.begin(), held_.end(), true)!=held_.end()) {
+      arma::mat M(vars_.size(), occbasis_.n_cols);
+      for(size_t j=0;j<occbasis_.n_cols;j++)
+        M.col(j)=project_change(occbasis_.col(j), held_);
+      nullbasis_=arma::null(M);
+    }
+  }
+
+  /// Orbitals and occupations displaced from the reference by the
+  /// parameters x, scaled by s. The held occupations, and any other at a
+  /// bound that the step would push further out, stay there, the other
+  /// free occupations of their particle type making up the difference;
+  /// the occupation part of the step is then cut short where the first
+  /// free occupation reaches its bound, which is put exactly there.
+  /// bound says whether that happened.
+  void displaced(const double * x, double s, std::vector<arma::mat> & C, std::vector<arma::vec> & occ, bool * bound=nullptr) const {
+    C=rotated(x, s);
+    occ=occ_;
+    if(bound)
+      *bound=false;
+    if(!free_occ_ || !occbasis_.n_cols)
+      return;
+    // Hold also the occupations that the step pushes out of their
+    // bounds, until none is
+    std::vector<bool> held(held_);
+    arma::vec d(project_change(s*occupation_change(x), held));
+    for(bool changed=true;changed;) {
+      changed=false;
+      for(size_t v=0;v<vars_.size();v++) {
+        const int st=bound_state(vars_[v].b, occ_[vars_[v].b](vars_[v].i));
+        if(!held[v] && ((st<0 && d(v)<0.0) || (st>0 && d(v)>0.0))) {
+          held[v]=true;
+          changed=true;
+        }
+      }
+      if(changed)
+        d=project_change(d, held);
+    }
+    // The largest fraction t of the step that keeps the occupations
+    // within their bounds; scaling the whole step keeps the electron
+    // counts
+    double t=1.0, nbound=0.0;
+    size_t vbound=0;
+    for(size_t v=0;v<vars_.size();v++) {
+      const double n=occ_[vars_[v].b](vars_[v].i), w=maxocc_[vars_[v].b];
+      double tv=1.0, nb=0.0;
+      if(n+d(v) < 0.0) {
+        tv=std::max(0.0, -n/d(v));
+        nb=0.0;
+      } else if(n+d(v) > w) {
+        tv=std::max(0.0, (w-n)/d(v));
+        nb=w;
+      }
+      if(tv < t) {
+        t=tv;
+        vbound=v;
+        nbound=nb;
       }
     }
-    occ=fillings(q);
+    const std::vector<arma::vec> dn(by_block(t*d));
+    for(size_t b=0;b<C_.size();b++)
+      occ[b]+=dn[b];
+    if(t < 1.0) {
+      occ[vars_[vbound].b](vars_[vbound].i)=nbound;
+      if(bound)
+        *bound=true;
+    }
   }
   /// Energy and orbital-basis Fock matrices for the orbitals C
   void evaluate(const std::vector<arma::mat> & C, const std::vector<arma::vec> & occ, double & E, std::vector<arma::mat> & Fmo) const {
@@ -557,28 +673,35 @@ class TrustRegionSCF {
       const pair_t & p=pairs_[k];
       g(k)=2.0*dn(p, occ)*Fmo[p.b](p.a,p.i);
     }
-    // dE/dq_b is the energy of the fractional orbital (Janak)
+    // dE/dn_i is the orbital energy (Janak)
     if(occbasis_.n_cols) {
-      arma::vec gq(C_.size(), arma::fill::zeros);
-      for(const auto & fp : free_)
-        for(size_t b : fp)
-          gq(b)=Fmo[b](active_[b],active_[b]);
-      g.tail(occbasis_.n_cols)=occbasis_.t()*gq;
+      arma::vec gv(vars_.size());
+      for(size_t v=0;v<vars_.size();v++)
+        gv(v)=Fmo[vars_[v].b](vars_[v].i,vars_[v].i);
+      g.tail(occbasis_.n_cols)=occbasis_.t()*project_derivative(gv);
     }
     return g;
   }
-  /// Uncoupled Hessian diagonal of the rotations; zero for the occupations
+  /// Uncoupled Hessian diagonal of the rotations; zero for the
+  /// occupations. A rotation that involves a free occupation has its
+  /// occupation difference floored, as the two can meet.
   arma::vec hessian_diagonal(const std::vector<arma::mat> & Fmo) const {
     arma::vec h(nparam_, arma::fill::zeros);
     for(size_t k=0;k<pairs_.size();k++) {
       const pair_t & p=pairs_[k];
-      h(k)=2.0*dn(p, occ_)*(Fmo[p.b](p.a,p.a)-Fmo[p.b](p.i,p.i));
+      double d=dn(p, occ_);
+      if(free_occ_ && (isvar_[p.b](p.a) || isvar_[p.b](p.i)))
+        d=std::max(d, dn_floor*maxocc_[p.b]);
+      h(k)=2.0*d*(Fmo[p.b](p.a,p.a)-Fmo[p.b](p.i,p.i));
     }
     return h;
   }
   /// Hessian-vector product: analytic with a Fock response, else finite differences
   arma::vec hessian_times(const double * x) const {
-    return response_ ? hessian_times_analytic(x) : hessian_times_fd(x);
+    arma::vec hx(response_ ? hessian_times_analytic(x) : hessian_times_fd(x));
+    if(nullbasis_.n_cols)
+      hx.tail(nullbasis_.n_rows)+=held_stiffness*nullbasis_*(nullbasis_.t()*arma::vec(x+qoff_, nullbasis_.n_rows));
+    return hx;
   }
 
   /**
@@ -588,22 +711,22 @@ class TrustRegionSCF {
    * in the orbital basis, where F are the current Fock matrices and G(D)
    * the Fock response to the transition density D. Differentiating,
    *   (H x)_ai = dn [F,X]_ai + [F,M]_ai + 2 dn G(M)_ai,  M = [X,N].
-   * A change dq_b of a free filling adds dq_b e_k e_k^T to M, with k the
-   * fractional orbital; the rotation rows gain 2 F_ai d(dn) in all, and
-   * the occupation rows are ([F,X] + G(M))_kk.
+   * A change d_k of a free occupation adds d_k e_k e_k^T to M; the
+   * rotation rows gain 2 F_ai d(dn) in all, and the occupation rows are
+   * ([F,X] + G(M))_kk.
    * The transition density D = C M C^T is passed to the response as
    * L R^T + R L^T, with L the orbitals that lose occupation: M only has
    * rows and columns of those orbitals.
    */
   arma::vec hessian_times_analytic(const double * x) const {
     std::vector<arma::mat> X(generators(x));
-    const arma::vec dq(free_occ_ ? filling_change(x) : arma::vec());
+    const std::vector<arma::vec> dv(free_occ_ ? by_block(project_change(occupation_change(x), held_)) : std::vector<arma::vec>());
     std::vector<arma::mat> M(C_.size()), L(C_.size()), R(C_.size());
     for(size_t b=0;b<C_.size();b++) {
       const arma::mat N(arma::diagmat(occ_[b]));
       M[b]=X[b]*N-N*X[b];
-      if(free_occ_ && dq(b)!=0.0)
-        M[b](active_[b],active_[b])+=dq(b);
+      if(free_occ_)
+        M[b].diag()+=dv[b];
       const arma::uvec & I=occupied_[b];
       arma::mat MI(M[b].cols(I));
       MI.rows(I)-=0.5*M[b](I,I);
@@ -626,23 +749,21 @@ class TrustRegionSCF {
       if(free_occ_) {
         // The mixed term is 2 F_ai d(dn); [F,M] already carries one F_ai
         // d(dn), since M includes the change of the occupations
-        const arma::uword kb=active_[p.b];
-        const double ddn=(p.i==kb ? dq(p.b) : 0.0)-(p.a==kb ? dq(p.b) : 0.0);
-        hx(k)+=F(p.a,p.i)*ddn;
+        hx(k)+=F(p.a,p.i)*(dv[p.b](p.i)-dv[p.b](p.a));
       }
     }
 
     if(occbasis_.n_cols) {
-      arma::vec hq(C_.size(), arma::fill::zeros);
-      for(const auto & fp : free_)
-        for(size_t b : fp) {
-          const arma::uword kb=active_[b];
-          const arma::mat & F=Fmo_[b];
-          const double FX=arma::dot(F.row(kb), X[b].col(kb))-arma::dot(X[b].row(kb), F.col(kb));
-          const arma::vec ck(C_[b].col(kb));
-          hq(b)=FX+arma::dot(ck, dF[b]*ck);
-        }
-      hx.tail(occbasis_.n_cols)=occbasis_.t()*hq;
+      arma::vec hv(vars_.size());
+      for(size_t v=0;v<vars_.size();v++) {
+        const size_t b=vars_[v].b;
+        const arma::uword kb=vars_[v].i;
+        const arma::mat & F=Fmo_[b];
+        const double FX=arma::dot(F.row(kb), X[b].col(kb))-arma::dot(X[b].row(kb), F.col(kb));
+        const arma::vec ck(C_[b].col(kb));
+        hv(v)=FX+arma::dot(ck, dF[b]*ck);
+      }
+      hx.tail(occbasis_.n_cols)=occbasis_.t()*project_derivative(hv);
     }
     return hx;
   }
@@ -655,15 +776,14 @@ class TrustRegionSCF {
    * the current orbitals adds [X, G], where X and G are the generators of
    * x and of the current gradient (G_ai = g_ai/2). This term vanishes at
    * convergence and makes the product that of the symmetric Hessian. The
-   * fillings are additive, so the occupation rows need no such term.
+   * occupations are additive, so the occupation rows need no such term.
    */
   arma::vec hessian_times_fd(const double * x) const {
     double E;
     std::vector<arma::mat> Cp, Cm, Fp, Fm;
     std::vector<arma::vec> occp, occm;
-    arma::vec qp, qm;
-    displaced(x, fdstep_, Cp, occp, qp);
-    displaced(x, -fdstep_, Cm, occm, qm);
+    displaced(x, fdstep_, Cp, occp);
+    displaced(x, -fdstep_, Cm, occm);
     evaluate(Cp, occp, E, Fp);
     evaluate(Cm, occm, E, Fm);
     arma::vec hx((gradient(Fp, occp)-gradient(Fm, occm))/(2.0*fdstep_));
@@ -693,134 +813,267 @@ class TrustRegionSCF {
     return H;
   }
 
-  /// Read the block electron counts from the starting occupations, which
-  /// must be in aufbau order with at most one fractional orbital per block
-  void read_fillings() {
-    q_.zeros(C_.size());
-    active_.assign(C_.size(), 0);
-    double dev=0.0;
+  /// Read the starting occupations. In a particle type with a genuinely
+  /// fractional orbital, departures from integer occupation below
+  /// residue_tol are residues of the first-order solution: they are
+  /// snapped to the bound, the most fractional orbital taking up the
+  /// difference.
+  void read_occupations() {
     for(size_t b=0;b<C_.size();b++) {
-      const arma::vec & n=occ_[b];
-      const double w=maxocc_[b];
-      if(n.n_elem!=C_[b].n_cols)
+      if(occ_[b].n_elem!=C_[b].n_cols)
         throw std::logic_error("TrustRegionSCF: occupation and orbital counts differ in " + labels_[b] + ".\n");
-      // Fractional orbitals, and among them those that are genuinely so
-      // rather than a residue of an unconverged first-order solution
-      int nfrac=0, nmajor=0;
-      double residue=0.0;
-      for(size_t i=0;i<n.n_elem;i++) {
-        if(i>0 && n(i) > n(i-1)+occ_tol)
-          throw std::runtime_error("The occupations of " + labels_[b] + " increase from orbital " + std::to_string(i-1) + " to " + std::to_string(i) + ". The trust-region solver fills each block in orbital order, so the orbitals must arrive sorted by energy.\n");
-        const double d=std::min(n(i), w-n(i));
-        if(d > occ_tol) {
-          nfrac++;
-          if(d > residue_tol)
-            nmajor++;
-          else
-            residue=std::max(residue, d);
-        }
-      }
-      if(nmajor > 1)
-        throw std::runtime_error(labels_[b] + " has " + std::to_string(nmajor) + " fractionally occupied orbitals. The trust-region solver gives each block one electron count and so represents at most one fractional orbital per block; an ensemble of orbitals in the same block, such as 4s and 3d0 in the m=0 block of an atom, needs both. Fix the occupations with LinearOccupations, or leave TrustRegion off.\n");
-      if(nfrac > nmajor && nfrac > 1)
-        printf("%s: %i orbital(s) depart from integer occupation by at most %.2e, a residue of the first-order solution; the aufbau filling absorbs it.\n", labels_[b].c_str(), nfrac-nmajor, residue);
-      q_(b)=arma::accu(n);
-      arma::vec f;
-      fill(b, q_(b), f, active_[b]);
-      if(f.n_elem)
-        dev=std::max(dev, arma::abs(f-n).max());
-      occ_[b]=f;
+      if(occ_[b].n_elem && (occ_[b].min() < -occ_tol || occ_[b].max() > maxocc_[b]+occ_tol))
+        throw std::runtime_error("The occupations of " + labels_[b] + " are not within [0, " + std::to_string(maxocc_[b]) + "].\n");
+      occ_[b]=arma::clamp(occ_[b], 0.0, maxocc_[b]);
     }
-    printf("Occupations rebuilt from the block electron counts, largest change %.3e\n", dev);
-    fflush(stdout);
+    for(size_t p=0;p<pblocks_.size();p++) {
+      // The most fractional orbital
+      double dmax=0.0;
+      size_t bmax=0;
+      arma::uword imax=0;
+      for(size_t b : pblocks_[p])
+        for(arma::uword i=0;i<occ_[b].n_elem;i++) {
+          const double d=std::min(occ_[b](i), maxocc_[b]-occ_[b](i));
+          if(d > dmax) {
+            dmax=d;
+            bmax=b;
+            imax=i;
+          }
+        }
+      if(dmax <= residue_tol)
+        continue;
+      double moved=0.0, residue=0.0;
+      int nres=0;
+      for(size_t b : pblocks_[p])
+        for(arma::uword i=0;i<occ_[b].n_elem;i++) {
+          double & n=occ_[b](i);
+          const double d=std::min(n, maxocc_[b]-n);
+          if(d <= occ_tol || d > residue_tol)
+            continue;
+          const double snapped = (n < 0.5*maxocc_[b]) ? 0.0 : maxocc_[b];
+          moved+=n-snapped;
+          residue=std::max(residue, d);
+          nres++;
+          n=snapped;
+        }
+      occ_[bmax](imax)+=moved;
+      if(nres) {
+        printf("%i orbital(s) depart from integer occupation by at most %.2e, a residue of the first-order solution; snapped to integer, with %s taking up %.2e electrons.\n", nres, residue, labels_[bmax].c_str(), moved);
+        fflush(stdout);
+      }
+    }
   }
 
-  /// Rotate the full and the empty orbitals of each block among
-  /// themselves to diagonalize the Fock matrix there. This leaves the
-  /// density and the energy unchanged, and makes the fill order the
-  /// energy order, so that a block filling past its fractional orbital
-  /// continues into its lowest empty one, and empties from its highest
-  /// full one.
+  /// Rotate the orbitals of equal occupation in each block among
+  /// themselves to diagonalize the Fock matrix there, which leaves the
+  /// density and the energy unchanged, and sort the orbitals by
+  /// decreasing occupation and then increasing energy. The diagonal of
+  /// the Fock matrix then gives the edges of the spectra of the full and
+  /// the empty orbitals, which the KKT conditions compare.
   void canonicalize() {
     for(size_t b=0;b<C_.size();b++) {
       const arma::uword n=C_[b].n_cols;
-      const double w=maxocc_[b];
-      const arma::uvec full(arma::find(occ_[b] >= w-occ_tol)), empty(arma::find(occ_[b] <= occ_tol));
+      if(!n)
+        continue;
+      const arma::vec & f=occ_[b];
+      arma::uvec order(arma::sort_index(f, "descend"));
       arma::mat W(n, n, arma::fill::eye);
-      for(const arma::uvec & S : {full, empty}) {
-        if(S.n_elem < 2)
-          continue;
-        arma::vec e;
-        arma::mat U;
-        arma::eig_sym(e, U, arma::symmatu(Fmo_[b](S,S)));
-        W(S,S)=U;
+      for(arma::uword g0=0;g0<n;) {
+        arma::uword g1=g0+1;
+        while(g1<n && f(order(g0))-f(order(g1)) <= occ_tol)
+          g1++;
+        if(g1-g0 > 1) {
+          const arma::uvec S(order.subvec(g0, g1-1));
+          arma::vec e;
+          arma::mat U;
+          arma::eig_sym(e, U, arma::symmatu(Fmo_[b](S,S)));
+          W(S,S)=U;
+        }
+        g0=g1;
       }
       C_[b]=C_[b]*W;
       Fmo_[b]=W.t()*Fmo_[b]*W;
+      // Sort
+      std::vector<arma::uword> perm(n);
+      for(arma::uword i=0;i<n;i++)
+        perm[i]=i;
+      std::stable_sort(perm.begin(), perm.end(), [&](arma::uword i, arma::uword j) {
+        if(std::abs(f(i)-f(j)) > occ_tol)
+          return f(i) > f(j);
+        return Fmo_[b](i,i) < Fmo_[b](j,j);
+      });
+      const arma::uvec P(arma::conv_to<arma::uvec>::from(perm));
+      C_[b]=arma::mat(C_[b].cols(P));
+      occ_[b]=arma::vec(occ_[b](P));
+      Fmo_[b]=arma::mat(Fmo_[b](P,P));
     }
   }
 
-  /// Build the parameter layout around the current occupation pattern
-  void build_layout() {
+  /// Fermi level of particle type p: the mean energy of its fractional
+  /// orbitals; false if there are none
+  bool fermi_level(size_t p, double & ef) const {
+    ef=0.0;
+    int nf=0;
+    for(size_t b : pblocks_[p])
+      for(arma::uword i=0;i<occ_[b].n_elem;i++)
+        if(!bound_state(b, occ_[b](i))) {
+          ef+=Fmo_[b](i,i);
+          nf++;
+        }
+    if(nf)
+      ef/=nf;
+    return nf>0;
+  }
+
+  /**
+   * The orbitals of particle type p at a bound that violate the KKT
+   * conditions of min E(n) s.t. 0 <= n_i <= w, sum n_i = N: with
+   * eps_i = dE/dn_i (Janak), eps_i = eps_F for fractional, eps_i <= eps_F
+   * for full and eps_i >= eps_F for empty orbitals. Only the highest full
+   * and the lowest empty orbital of each block are candidates; the
+   * orbitals must be canonical. Without fractional orbitals, the
+   * violation is a full orbital above an empty one, and both are given.
+   */
+  std::vector<var_t> kkt_violations(size_t p) const {
+    // The highest full and the lowest empty orbital of each block
+    std::vector<var_t> top, bottom;
+    for(size_t b : pblocks_[p]) {
+      bool havetop=false, havebottom=false;
+      var_t t{b, 0}, u{b, 0};
+      for(arma::uword i=0;i<occ_[b].n_elem;i++) {
+        const int st=bound_state(b, occ_[b](i));
+        if(st>0 && (!havetop || Fmo_[b](i,i) > Fmo_[b](t.i,t.i))) {
+          t.i=i;
+          havetop=true;
+        }
+        if(st<0 && (!havebottom || Fmo_[b](i,i) < Fmo_[b](u.i,u.i))) {
+          u.i=i;
+          havebottom=true;
+        }
+      }
+      if(havetop)
+        top.push_back(t);
+      if(havebottom)
+        bottom.push_back(u);
+    }
+    auto eps=[&](const var_t & v) { return Fmo_[v.b](v.i,v.i); };
+    std::vector<var_t> viol;
+    double ef;
+    if(fermi_level(p, ef)) {
+      for(const auto & v : top)
+        if(eps(v) > ef+kkt_tol)
+          viol.push_back(v);
+      for(const auto & v : bottom)
+        if(eps(v) < ef-kkt_tol)
+          viol.push_back(v);
+      return viol;
+    }
+    if(top.empty() || bottom.empty())
+      return viol;
+    var_t vt=top[0], vb=bottom[0];
+    for(const auto & v : top)
+      if(eps(v) > eps(vt))
+        vt=v;
+    for(const auto & v : bottom)
+      if(eps(v) < eps(vb))
+        vb=v;
+    if(eps(vt) > eps(vb)+kkt_tol) {
+      viol.push_back(vt);
+      viol.push_back(vb);
+    }
+    return viol;
+  }
+
+  /// Build the parameter layout around the current occupations, freeing
+  /// the fractional orbitals and those that the KKT conditions release.
+  /// Returns the number of orbitals released from a bound.
+  size_t build_layout() {
     pairs_.clear();
     occupied_.assign(C_.size(), arma::uvec());
-    free_.assign(pblocks_.size(), std::vector<size_t>());
-    for(size_t p=0;p<pblocks_.size();p++)
-      for(size_t b : pblocks_[p]) {
-        const arma::uword n=C_[b].n_cols, k=active_[b];
-        const bool is_free=n && occ_[b](k) > occ_tol && occ_[b](k) < maxocc_[b]-occ_tol;
-        if(is_free)
-          free_[p].push_back(b);
-        // A rotation changes the density only between orbitals of
-        // different occupation; pairs of equal occupation (two full or
-        // two empty orbitals, or the empty orbital at a shell closing
-        // with the empty ones above it) are redundant
-        std::vector<arma::uword> occd;
-        for(arma::uword i=0;i<n;i++) {
-          bool is_occupied=false;
-          for(arma::uword a=i+1;a<n;a++)
-            if(occ_[b](i)-occ_[b](a) > occ_tol) {
-              pairs_.push_back({b, a, i});
-              is_occupied=true;
-            }
-          // The fractional orbital carries the occupation changes, so the
-          // transition densities need it even when it is the last one
-          if(is_occupied || (is_free && i==k))
-            occd.push_back(i);
-        }
-        occupied_[b]=arma::uvec(occd);
+    vars_.clear();
+    varp_.clear();
+    entry_bound_.clear();
+    isvar_.assign(C_.size(), arma::uvec());
+    for(size_t b=0;b<C_.size();b++)
+      isvar_[b].zeros(C_[b].n_cols);
+    size_t released=0;
+    for(size_t p=0;p<pblocks_.size();p++) {
+      std::vector<var_t> pv;
+      for(size_t b : pblocks_[p])
+        for(arma::uword i=0;i<occ_[b].n_elem;i++)
+          if(!bound_state(b, occ_[b](i)))
+            pv.push_back({b, i});
+      const std::vector<var_t> viol(kkt_violations(p));
+      for(const auto & v : viol) {
+        printf("%s orbital %i at % .6f is %s, against the KKT conditions: releasing it.\n", labels_[v.b].c_str(), (int) v.i, Fmo_[v.b](v.i,v.i), occ_[v.b](v.i) > 0.5*maxocc_[v.b] ? "full" : "empty");
+        fflush(stdout);
+        pv.push_back(v);
       }
+      released+=viol.size();
+      for(const auto & v : pv) {
+        vars_.push_back(v);
+        varp_.push_back(p);
+        entry_bound_.push_back(bound_state(v.b, occ_[v.b](v.i)));
+        isvar_[v.b](v.i)=1;
+      }
+    }
+
+    for(size_t b=0;b<C_.size();b++) {
+      const arma::uword n=C_[b].n_cols;
+      const arma::vec & f=occ_[b];
+      // A rotation changes the density only between orbitals of
+      // different occupation; pairs of equal occupation are redundant,
+      // unless one of the occupations is free
+      std::vector<arma::uword> occd;
+      for(arma::uword i=0;i<n;i++) {
+        for(arma::uword a=i+1;a<n;a++)
+          if(std::abs(f(i)-f(a)) > occ_tol || isvar_[b](i) || isvar_[b](a)) {
+            if(f(i) >= f(a))
+              pairs_.push_back({b, a, i});
+            else
+              pairs_.push_back({b, i, a});
+          }
+        // The orbitals that carry occupation, or whose occupation can
+        // change, enter the transition densities
+        if(f(i) > occ_tol || isvar_[b](i))
+          occd.push_back(i);
+      }
+      occupied_[b]=arma::uvec(occd);
+    }
     qoff_=pairs_.size();
+
     size_t ny=0;
-    for(const auto & fp : free_)
-      ny+=fp.size() ? fp.size()-1 : 0;
-    occbasis_.zeros(C_.size(), ny);
+    for(size_t p=0;p<pblocks_.size();p++) {
+      const size_t m=std::count(varp_.begin(), varp_.end(), p);
+      ny+=m ? m-1 : 0;
+    }
+    occbasis_.zeros(vars_.size(), ny);
     size_t off=0;
-    for(const auto & fp : free_) {
-      if(fp.size() < 2)
+    for(size_t p=0;p<pblocks_.size();p++) {
+      std::vector<arma::uword> rows;
+      for(size_t v=0;v<vars_.size();v++)
+        if(varp_[v]==p)
+          rows.push_back(v);
+      if(rows.size() < 2)
         continue;
-      const arma::mat H(helmert(fp.size()));
-      occbasis_.submat(arma::conv_to<arma::uvec>::from(fp), arma::regspace<arma::uvec>(off, off+H.n_cols-1))=H;
+      const arma::mat H(helmert(rows.size()));
+      occbasis_.submat(arma::conv_to<arma::uvec>::from(rows), arma::regspace<arma::uvec>(off, off+H.n_cols-1))=H;
       off+=H.n_cols;
     }
     nparam_=qoff_+occbasis_.n_cols;
-    entry_active_=active_;
     pattern_changed_=false;
+    find_held();
+    return released;
   }
 
-  /// Has the reference left the occupation pattern the parametrization
-  /// was built around: has a free block's fractional orbital filled or
-  /// emptied, or has any block's fractional orbital moved?
+  /// Has a free occupation reached a bound it was not at when the
+  /// parametrization was built?
   bool pattern_stale() const {
-    for(size_t b=0;b<C_.size();b++)
-      if(active_[b]!=entry_active_[b])
+    for(size_t v=0;v<vars_.size();v++) {
+      const int st=bound_state(vars_[v].b, occ_[vars_[v].b](vars_[v].i));
+      if(st && st!=entry_bound_[v])
         return true;
-    for(size_t p=0;p<free_.size();p++)
-      for(size_t b : free_[p]) {
-        const double fk=occ_[b](active_[b]);
-        if(fk <= occ_tol || fk >= maxocc_[b]-occ_tol)
-          return true;
-      }
+    }
     return false;
   }
 
@@ -844,6 +1097,8 @@ class TrustRegionSCF {
   /// Derived quantities at the reference: gradient, Hessian diagonal and
   /// the exact occupation block
   void derive() {
+    if(free_occ_)
+      find_held();
     grad_=gradient(Fmo_, occ_);
     hdiag_=hessian_diagonal(Fmo_);
     if(pattern_stale())
@@ -857,11 +1112,9 @@ class TrustRegionSCF {
   }
 
   /// Adopt a point as the new reference
-  void adopt(const std::vector<arma::mat> & C, const arma::vec & q) {
+  void adopt(const std::vector<arma::mat> & C, const std::vector<arma::vec> & occ) {
     C_=C;
-    q_=q;
-    for(size_t b=0;b<C_.size();b++)
-      fill(b, q_(b), occ_[b], active_[b]);
+    occ_=occ;
     evaluate(C_, occ_, E_, Fmo_);
     derive();
     n_update_++;
@@ -876,9 +1129,8 @@ class TrustRegionSCF {
     if(free_occ_) {
       std::vector<arma::mat> C;
       std::vector<arma::vec> occ;
-      arma::vec q;
-      displaced(kappa, 1.0, C, occ, q);
-      adopt(C, q);
+      displaced(kappa, 1.0, C, occ);
+      adopt(C, occ);
     } else {
       C_=rotated(kappa);
       evaluate(C_, occ_, E_, Fmo_);
@@ -925,149 +1177,20 @@ class TrustRegionSCF {
     std::copy(z.begin(), z.end(), out+qoff_);
   }
 
-  /// Fermi level of particle type p: the highest fractional-orbital
-  /// energy of its free blocks
-  double fermi_level(size_t p) const {
-    double ef=-std::numeric_limits<double>::max();
-    for(size_t b : free_[p])
-      ef=std::max(ef, Fmo_[b](active_[b],active_[b]));
-    return ef;
-  }
-  /// Energies of the highest full and lowest empty orbital of a frozen
-  /// block (+-infinity where there is none)
-  void frozen_edges(size_t b, double & etop, double & enext) const {
-    const arma::uword n=C_[b].n_cols, k=active_[b];
-    const bool all_full=occ_[b](k) >= maxocc_[b]-occ_tol;
-    etop=-std::numeric_limits<double>::infinity();
-    enext=std::numeric_limits<double>::infinity();
-    if(all_full)
-      etop=Fmo_[b](k,k);
-    else {
-      if(k>0)
-        etop=Fmo_[b](k-1,k-1);
-      if(k<n)
-        enext=Fmo_[b](k,k);
-    }
-  }
-  /// With every block of particle type p at an integer filling, the KKT
-  /// conditions say no full orbital lies above an empty one. Is that
-  /// violated across two blocks, where the orbital rotations cannot fix
-  /// it? Gives the blocks with the highest full and the lowest empty
-  /// orbital, and their energies.
-  bool integer_aufbau_violation(size_t p, size_t & btop, size_t & bnext, double & emax, double & emin) const {
-    btop=bnext=0;
-    emax=-std::numeric_limits<double>::infinity();
-    emin=std::numeric_limits<double>::infinity();
-    for(size_t b : pblocks_[p]) {
-      if(!C_[b].n_cols)
-        continue;
-      double etop, enext;
-      frozen_edges(b, etop, enext);
-      if(etop > emax) {
-        emax=etop;
-        btop=b;
-      }
-      if(enext < emin) {
-        emin=enext;
-        bnext=b;
-      }
-    }
-    return btop!=bnext && emax > emin+1e-8;
-  }
-  bool is_free(size_t p, size_t b) const {
-    return std::find(free_[p].begin(), free_[p].end(), b)!=free_[p].end();
-  }
-
-  /**
-   * The KKT conditions of min E(n) s.t. 0 <= n <= w, sum n = N are, with
-   * eps_i = dE/dn_i (Janak), eps_i = eps_F for fractional, eps_i <= eps_F
-   * for full and eps_i >= eps_F for empty orbitals. A frozen block that
-   * violates them is stationary only for the problem with it pinned, so
-   * the gradient can be small while the energy is wrong. Move a little
-   * charge the way the multipliers say, which makes the block free.
-   * Returns the new fillings, or an empty vector if nothing was moved.
-   */
-  arma::vec release_kkt_violation() const {
-    for(size_t p=0;p<pblocks_.size();p++) {
-      if(free_[p].empty()) {
-        // With every block at an integer filling, open the two blocks
-        // between which the aufbau is violated
-        size_t btop, bnext;
-        double emax, emin;
-        if(!integer_aufbau_violation(p, btop, bnext, emax, emin))
-          continue;
-        printf("\n%s is held full up to an orbital at % .6f, above the empty orbital of %s at % .6f:\nthe integer occupations are not aufbau. Moving charge between them.\n", labels_[btop].c_str(), emax, labels_[bnext].c_str(), emin);
-        fflush(stdout);
-        arma::vec q(q_);
-        q(btop)-=kkt_nudge;
-        q(bnext)+=kkt_nudge;
-        return q;
-      }
-      const double ef=fermi_level(p);
-      for(size_t b : pblocks_[p]) {
-        if(!C_[b].n_cols || is_free(p, b))
-          continue;
-        double etop, enext;
-        frozen_edges(b, etop, enext);
-        arma::vec q(q_);
-        if(etop > ef+1e-8) {
-          // Full above the Fermi level: give charge to the free block
-          // with the lowest fractional orbital
-          size_t to=free_[p][0];
-          for(size_t c : free_[p])
-            if(Fmo_[c](active_[c],active_[c]) < Fmo_[to](active_[to],active_[to]))
-              to=c;
-          printf("\n%s is held full up to an orbital at % .6f, above the Fermi level % .6f:\nthe solution is stationary only with it pinned. Releasing charge to %s.\n", labels_[b].c_str(), etop, ef, labels_[to].c_str());
-          fflush(stdout);
-          q(b)-=kkt_nudge;
-          q(to)+=kkt_nudge;
-          return q;
-        }
-        if(enext < ef-1e-8) {
-          // Its next orbital lies below the Fermi level: take charge from
-          // the free block with the highest fractional orbital
-          size_t from=free_[p][0];
-          for(size_t c : free_[p])
-            if(Fmo_[c](active_[c],active_[c]) > Fmo_[from](active_[from],active_[from]))
-              from=c;
-          if(q_(from) <= kkt_nudge)
-            continue;
-          printf("\n%s is held with its next orbital at % .6f, below the Fermi level % .6f:\nthe solution is stationary only with it pinned. Releasing charge from %s.\n", labels_[b].c_str(), enext, ef, labels_[from].c_str());
-          fflush(stdout);
-          q(b)+=kkt_nudge;
-          q(from)-=kkt_nudge;
-          return q;
-        }
-      }
-    }
-    return arma::vec();
-  }
-
   /// Print the fractional occupations, the Fermi levels and whether the
-  /// frozen blocks are aufbau-consistent with them
+  /// orbitals at their bounds are consistent with them
   void report_occupations() const {
     for(size_t p=0;p<pblocks_.size();p++) {
-      if(free_[p].empty()) {
-        size_t btop, bnext;
-        double emax, emin;
-        if(integer_aufbau_violation(p, btop, bnext, emax, emin))
-          printf("WARNING: %s is held full up to an orbital at % .6f, above the empty orbital of %s at % .6f: the occupations are not aufbau.\n", labels_[btop].c_str(), emax, labels_[bnext].c_str(), emin);
-        continue;
+      double ef;
+      if(fermi_level(p, ef)) {
+        printf("Particle type %i: Fermi level % .8f\n", (int) p, ef);
+        for(size_t b : pblocks_[p])
+          for(arma::uword i=0;i<occ_[b].n_elem;i++)
+            if(!bound_state(b, occ_[b](i)))
+              printf("  %-12s orbital %3i occupation %.8f energy % .8f\n", labels_[b].c_str(), (int) i, occ_[b](i), Fmo_[b](i,i));
       }
-      const double ef=fermi_level(p);
-      printf("Particle type %i: Fermi level % .8f\n", (int) p, ef);
-      for(size_t b : free_[p])
-        printf("  %-12s orbital %3i occupation %.8f energy % .8f\n", labels_[b].c_str(), (int) active_[b], occ_[b](active_[b]), Fmo_[b](active_[b],active_[b]));
-      for(size_t b : pblocks_[p]) {
-        if(!C_[b].n_cols || is_free(p, b))
-          continue;
-        double etop, enext;
-        frozen_edges(b, etop, enext);
-        if(etop > ef+1e-8)
-          printf("WARNING: %s is held full up to an orbital at % .6f, above the Fermi level: the occupations are not aufbau.\n", labels_[b].c_str(), etop);
-        if(enext < ef-1e-8)
-          printf("WARNING: %s is held with its next orbital at % .6f, below the Fermi level: the occupations are not aufbau.\n", labels_[b].c_str(), enext);
-      }
+      for(const auto & v : kkt_violations(p))
+        printf("WARNING: %s orbital %i at % .6f is %s against the KKT conditions: the occupations are not aufbau.\n", labels_[v.b].c_str(), (int) v.i, Fmo_[v.b](v.i,v.i), occ_[v.b](v.i) > 0.5*maxocc_[v.b] ? "full" : "empty");
     }
     if(exact_val_.n_elem) {
       printf("Eigenvalues of the occupation Hessian:");
@@ -1083,7 +1206,9 @@ class TrustRegionSCF {
   }
 
   /// Optimize with free occupations: the solve runs in a loop that
-  /// rebuilds the parametrization whenever the occupation pattern changes
+  /// rebuilds the parametrization whenever a free occupation reaches a
+  /// bound, and once the solver has converged, until the KKT conditions
+  /// release no orbital
   bool optimize_free(double convthr, bool stability, int verbose) {
     solver_settings_type settings(solver_settings(convthr, stability, verbose));
     if(exact_precond_)
@@ -1100,69 +1225,69 @@ class TrustRegionSCF {
     n_update_=n_objective_=n_hessian_=0;
 
     int nrestart=0;
-    // Occupation patterns visited, as the fractional orbital of each block
-    // and whether the block is free, with the energy on entry
+    // Did the last solve finish? Then a layout that releases nothing ends
+    // the optimization.
+    bool finished=false;
+    // Free occupations visited, with the energy on entry
     std::vector<std::pair<std::vector<arma::uword>, double>> visited;
     for(int pass=0;;pass++) {
-      // A block that fills or empties continues with its lowest empty or
-      // highest full orbital, as the canonical orbitals say
       if(pass) {
         canonicalize();
-        build_layout();
+        const size_t released=build_layout();
+        if(finished && !released)
+          break;
+        nrestart++;
       }
-      std::vector<arma::uword> pattern(active_);
-      for(const auto & fp : free_)
-        for(size_t b : fp)
-          pattern.push_back(b);
+      std::vector<arma::uword> pattern;
+      for(const auto & v : vars_) {
+        pattern.push_back(v.b);
+        pattern.push_back(v.i);
+      }
       bool cycle=false;
       for(const auto & v : visited)
         if(v.first==pattern && E_ >= v.second-1e-10*std::abs(E_))
           cycle=true;
       if(cycle) {
-        printf("\nThe occupation pattern recurs without a lower energy; stopping.\n");
+        printf("\nThe free occupations recur without a lower energy; stopping.\n");
         fflush(stdout);
         break;
       }
       visited.emplace_back(pattern, E_);
-      size_t nfree=0;
-      for(const auto & fp : free_)
-        nfree+=fp.size();
-      printf("\n%s over %i parameters: %i orbital rotations and %i occupation transfers among %i fractionally occupied blocks\n", pass ? "Restarting the trust-region optimization" : "Trust-region optimization", (int) nparam_, (int) qoff_, (int) (nparam_-qoff_), (int) nfree);
+      printf("\n%s over %i parameters: %i orbital rotations and %i occupation transfers among %i free occupations\n", pass ? "Restarting the trust-region optimization" : "Trust-region optimization", (int) nparam_, (int) qoff_, (int) (nparam_-qoff_), (int) vars_.size());
       fflush(stdout);
       if(!nparam_)
         break;
 
+      finished=false;
       budget_spent_=false;
-      kink_stop_=false;
+      bound_stop_=false;
       c_int err;
       {
         CallGuard guard(this);
         err=solver(&TrustRegionSCF::cb_update, &TrustRegionSCF::cb_obj, (c_int) nparam_, &settings, nullptr);
         guard.rethrow();
       }
-      if(err!=0 && !budget_spent_ && !kink_stop_)
+      if(err!=0 && !budget_spent_ && !bound_stop_)
         throw std::runtime_error("OpenTrustRegion solver failed with error code " + std::to_string((long long) err) + ".\n");
       if(budget_spent_) {
         printf("A macroiteration spent %i Hessian-vector products without accepting a step.\n", (int) hess_budget_);
         fflush(stdout);
+        break;
       }
       if(pass >= max_restarts)
         break;
 
-      // A step that reached a kink lowered the energy: restart from there,
-      // with the block that reached it integer
-      if(kink_stop_) {
+      // A step that took a free occupation to its bound lowered the
+      // energy: restart from there
+      if(bound_stop_) {
         std::vector<arma::mat> C;
         std::vector<arma::vec> occ;
-        arma::vec q;
-        displaced(kink_step_.memptr(), 1.0, C, occ, q);
-        adopt(C, q);
-        printf("\nA step filled or emptied a fractional orbital, lowering the energy to % .10f; restarting at the shell closing.\n", E_);
+        displaced(bound_step_.memptr(), 1.0, C, occ);
+        adopt(C, occ);
+        printf("\nA step filled or emptied an orbital, lowering the energy to % .10f; restarting there.\n", E_);
         fflush(stdout);
-        nrestart++;
         continue;
       }
-
       // OpenTrustRegion returns success on a stalled line search. If the
       // pass ends unconverged having declined a step that lowered the
       // energy, take that step and continue from there.
@@ -1171,33 +1296,17 @@ class TrustRegionSCF {
         fflush(stdout);
         std::vector<arma::mat> C;
         std::vector<arma::vec> occ;
-        arma::vec q;
-        displaced(best_step_.memptr(), 1.0, C, occ, q);
-        adopt(C, q);
-        nrestart++;
+        displaced(best_step_.memptr(), 1.0, C, occ);
+        adopt(C, occ);
         continue;
       }
-      // Is the point a KKT point of the problem with free occupations? The
-      // orbital energies are its multipliers once the orbitals are nearly
-      // converged. Those of the full and the empty orbitals are the
-      // eigenvalues of the Fock matrix within them: rotations among them
-      // are redundant, so the optimizer leaves them mixed, and a diagonal
-      // element can lie far from the edge of their spectrum.
-      if(!pattern_changed_ && gradient_rms() <= std::max(convthr, kkt_gate)) {
-        canonicalize();
-        derive();
-        const arma::vec q(release_kkt_violation());
-        if(q.n_elem) {
-          adopt(C_, q);
-          nrestart++;
-          continue;
-        }
+      if(pattern_changed_) {
+        printf("\nAn orbital filled or emptied; rebuilding the parametrization.\n");
+        fflush(stdout);
+        continue;
       }
-      if(!pattern_changed_ || budget_spent_)
-        break;
-      printf("\nThe occupation pattern changed (a shell filled or emptied); rebuilding the parametrization around the new one.\n");
-      fflush(stdout);
-      nrestart++;
+      // The solve finished: check the KKT conditions
+      finished=true;
     }
 
     // Report convergence from the gradient: a zero return from
@@ -1239,10 +1348,9 @@ class TrustRegionSCF {
     try {
       std::vector<arma::mat> C, Fmo;
       std::vector<arma::vec> occ;
-      arma::vec q;
       double E;
-      bool kink;
-      self->displaced(kappa, 1.0, C, occ, q, &kink);
+      bool bound;
+      self->displaced(kappa, 1.0, C, occ, &bound);
       self->evaluate(C, occ, E, Fmo);
       *func=E;
       if(self->free_occ_) {
@@ -1251,12 +1359,13 @@ class TrustRegionSCF {
           self->best_energy_=E;
           self->best_step_=arma::vec(kappa, self->nparam_);
         }
-        // The step was cut short at a kink and still lowered the energy:
-        // stop the solve to restart from there. (Failing here is the clean
-        // way out; optimize_free() treats it as a stop, not an error.)
-        if(kink && E < self->E_) {
-          self->kink_stop_=true;
-          self->kink_step_=arma::vec(kappa, self->nparam_);
+        // The step was cut short where a free occupation reached its
+        // bound and still lowered the energy: stop the solve to restart
+        // from there. (Failing here is the clean way out; optimize_free()
+        // treats it as a stop, not an error.)
+        if(bound && E < self->E_) {
+          self->bound_stop_=true;
+          self->bound_step_=arma::vec(kappa, self->nparam_);
           return 1;
         }
       }
@@ -1298,7 +1407,7 @@ class TrustRegionSCF {
       return 1;
     }
   }
-  /// Stops the solve when the occupation pattern has changed under it
+  /// Stops the solve when a free occupation has reached a bound under it
   static c_int cb_conv_check(c_bool * converged, void * context) {
     *converged=static_cast<TrustRegionSCF *>(context)->pattern_changed_;
     return 0;

@@ -2,11 +2,11 @@
 # optimized by the trust-region solver from the bare guess (no
 # first-order iterations). The minimum, sigma^26 pi^20 delta^6 with the
 # second delta orbital at 2 of 4, is what ODA finds. From the guess, the
-# occupations travel across the sigma, pi and delta blocks: steps that
-# would cross a shell closing stop there, and the KKT check reads the
-# orbital energies off canonical orbitals. Without the first, the solver
-# cycled at the sigma closing; without the second, it stopped 13 mEh
-# higher with an empty sigma orbital 22 mEh below the Fermi level.
+# occupations travel across the sigma, pi and delta blocks, with orbitals
+# released from and returned to their bounds by the KKT conditions, which
+# read the orbital energies off canonical orbitals; without that, the
+# solver stopped 13 mEh higher with an empty sigma orbital 22 mEh below
+# the Fermi level.
 System Fe2.xyz
 Basis def2-SVP
 Method gga_x_pbe-gga_c_pbe
