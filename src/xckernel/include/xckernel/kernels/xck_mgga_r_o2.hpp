@@ -6,113 +6,77 @@
 
 namespace xckernel {
 namespace detail_xck_mgga_r_o2 {
-static constexpr double c0_0[] = {
-    1.0,1.0,1.0,2.0,2.0,2.0
+static constexpr double c0s_0[] = {
+    1.0,1.0,1.0,0.5,0.5,0.5
 };
-static constexpr int32_t o0_0[] = {
-    0,3,6,9,13,17,21
+static constexpr int32_t o0s_0[] = {
+    0,4,8,12,15,18,21
 };
-static constexpr uint16_t f0_0[] = {
-    7,16,0,8,11,0,9,18,0,4,1,17,0,5,2,17,0,6,3,17,0
+static constexpr uint16_t f0s_0[] = {
+    4,1,17,0,5,2,17,0,6,3,17,0,7,16,0,8,11,0,9,18,0
 };
-static constexpr double c0_1[] = {
-    2.0,2.0,2.0,2.0,4.0,4.0,4.0
+static constexpr double c0s_1[] = {
+    4.0,2.0,4.0,4.0,2.0,2.0,2.0
 };
-static constexpr int32_t o0_1[] = {
-    0,3,7,11,15,20,25,30
+static constexpr int32_t o0s_1[] = {
+    0,5,8,13,18,22,26,30
 };
-static constexpr uint16_t f0_1[] = {
-    4,14,0,1,7,19,0,1,8,17,0,1,9,20,0,4,1,1,12,0,5,1,2,12,0,6,1,3,12,0
+static constexpr uint16_t f0s_1[] = {
+    4,1,1,12,0,4,14,0,5,1,2,12,0,6,1,3,12,0,1,7,19,0,1,8,17,0,1,9,20,0
 };
-static constexpr double c0_2[] = {
-    2.0,2.0,2.0,2.0,4.0,4.0,4.0
+static constexpr double c0s_2[] = {
+    4.0,4.0,2.0,4.0,2.0,2.0,2.0
 };
-static constexpr int32_t o0_2[] = {
-    0,3,7,11,15,20,25,30
+static constexpr int32_t o0s_2[] = {
+    0,5,10,13,18,22,26,30
 };
-static constexpr uint16_t f0_2[] = {
-    5,14,0,2,7,19,0,2,8,17,0,2,9,20,0,4,1,2,12,0,5,2,2,12,0,6,2,3,12,0
+static constexpr uint16_t f0s_2[] = {
+    4,1,2,12,0,5,2,2,12,0,5,14,0,6,2,3,12,0,2,7,19,0,2,8,17,0,2,9,20,0
 };
-static constexpr double c0_3[] = {
-    2.0,2.0,2.0,2.0,4.0,4.0,4.0
+static constexpr double c0s_3[] = {
+    4.0,4.0,4.0,2.0,2.0,2.0,2.0
 };
-static constexpr int32_t o0_3[] = {
-    0,3,7,11,15,20,25,30
+static constexpr int32_t o0s_3[] = {
+    0,5,10,15,18,22,26,30
 };
-static constexpr uint16_t f0_3[] = {
-    6,14,0,3,7,19,0,3,8,17,0,3,9,20,0,4,1,3,12,0,5,2,3,12,0,6,3,3,12,0
+static constexpr uint16_t f0s_3[] = {
+    4,1,3,12,0,5,2,3,12,0,6,3,3,12,0,6,14,0,3,7,19,0,3,8,17,0,3,9,20,0
 };
-static constexpr double c0_4[] = {
-    1.0,1.0,1.0,2.0,2.0,2.0
+static constexpr double c0s_4[] = {
+    2.0,2.0,2.0,1.0,1.0,1.0
 };
-static constexpr int32_t o0_4[] = {
-    0,3,6,9,13,17,21
+static constexpr int32_t o0s_4[] = {
+    0,4,8,12,15,18,21
 };
-static constexpr uint16_t f0_4[] = {
-    7,10,0,8,16,0,9,15,0,4,1,19,0,5,2,19,0,6,3,19,0
+static constexpr uint16_t f0s_4[] = {
+    4,1,19,0,5,2,19,0,6,3,19,0,7,10,0,8,16,0,9,15,0
 };
-static constexpr double c0_5[] = {
-    2.0,2.0,2.0,2.0,4.0,4.0,4.0
+static constexpr double c0s_5[] = {
+    2.0,0.5,2.0,0.5,2.0,0.5,1.0,0.25,1.0,0.25,1.0,0.25
 };
-static constexpr int32_t o0_5[] = {
-    0,3,7,11,15,20,25,30
+static constexpr int32_t o0s_5[] = {
+    0,4,8,12,16,20,24,27,30,33,36,39,42
 };
-static constexpr uint16_t f0_5[] = {
-    4,14,0,1,7,19,0,1,8,17,0,1,9,20,0,4,1,1,12,0,5,1,2,12,0,6,1,3,12,0
+static constexpr uint16_t f0s_5[] = {
+    4,1,19,0,4,1,20,0,5,2,19,0,5,2,20,0,6,3,19,0,6,3,20,0,7,10,0,7,15,0,8,16,0,8,18,0,9,15,0,9,13,0
 };
-static constexpr double c0_6[] = {
-    0.5,0.5,0.5,1.0,1.0,1.0,2.0,2.0,2.0,4.0,4.0,4.0
+static constexpr double c0s_6[] = {
+    2.0,0.5,2.0,0.5,2.0,0.5,1.0,0.25,1.0,0.25,1.0,0.25
 };
-static constexpr int32_t o0_6[] = {
-    0,3,6,9,13,17,21,24,27,30,34,38,42
+static constexpr int32_t o0s_6[] = {
+    0,4,8,12,16,20,24,27,30,33,36,39,42
 };
-static constexpr uint16_t f0_6[] = {
-    7,15,0,8,18,0,9,13,0,4,1,20,0,5,2,20,0,6,3,20,0,7,10,0,8,16,0,9,15,0,4,1,19,0,5,2,19,0,6,3,19,0
+static constexpr uint16_t f0s_6[] = {
+    4,1,19,0,4,1,20,0,5,2,19,0,5,2,20,0,6,3,19,0,6,3,20,0,7,10,0,7,15,0,8,16,0,8,18,0,9,15,0,9,13,0
 };
-static constexpr double c0_7[] = {
-    2.0,2.0,2.0,2.0,4.0,4.0,4.0
+static constexpr double c0s_7[] = {
+    2.0,0.5,2.0,0.5,2.0,0.5,1.0,0.25,1.0,0.25,1.0,0.25
 };
-static constexpr int32_t o0_7[] = {
-    0,3,7,11,15,20,25,30
+static constexpr int32_t o0s_7[] = {
+    0,4,8,12,16,20,24,27,30,33,36,39,42
 };
-static constexpr uint16_t f0_7[] = {
-    5,14,0,2,7,19,0,2,8,17,0,2,9,20,0,4,1,2,12,0,5,2,2,12,0,6,2,3,12,0
-};
-static constexpr double c0_8[] = {
-    0.5,0.5,0.5,1.0,1.0,1.0,2.0,2.0,2.0,4.0,4.0,4.0
-};
-static constexpr int32_t o0_8[] = {
-    0,3,6,9,13,17,21,24,27,30,34,38,42
-};
-static constexpr uint16_t f0_8[] = {
-    7,15,0,8,18,0,9,13,0,4,1,20,0,5,2,20,0,6,3,20,0,7,10,0,8,16,0,9,15,0,4,1,19,0,5,2,19,0,6,3,19,0
-};
-static constexpr double c0_9[] = {
-    2.0,2.0,2.0,2.0,4.0,4.0,4.0
-};
-static constexpr int32_t o0_9[] = {
-    0,3,7,11,15,20,25,30
-};
-static constexpr uint16_t f0_9[] = {
-    6,14,0,3,7,19,0,3,8,17,0,3,9,20,0,4,1,3,12,0,5,2,3,12,0,6,3,3,12,0
-};
-static constexpr double c0_10[] = {
-    0.5,0.5,0.5,1.0,1.0,1.0,2.0,2.0,2.0,4.0,4.0,4.0
-};
-static constexpr int32_t o0_10[] = {
-    0,3,6,9,13,17,21,24,27,30,34,38,42
-};
-static constexpr uint16_t f0_10[] = {
-    7,15,0,8,18,0,9,13,0,4,1,20,0,5,2,20,0,6,3,20,0,7,10,0,8,16,0,9,15,0,4,1,19,0,5,2,19,0,6,3,19,0
-};
-static constexpr double c0_11[] = {
-    1.0,1.0,1.0,2.0,2.0,2.0
-};
-static constexpr int32_t o0_11[] = {
-    0,3,6,9,13,17,21
-};
-static constexpr uint16_t f0_11[] = {
-    7,10,0,8,16,0,9,15,0,4,1,19,0,5,2,19,0,6,3,19,0
+static constexpr uint16_t f0s_7[] = {
+    4,1,19,0,4,1,20,0,5,2,19,0,5,2,20,0,6,3,19,0,6,3,20,0,7,10,0,7,15,0,8,16,0,8,18,0,9,15,0,9,13,0
 };
 static constexpr int64_t NFLD = 10;
 } // namespace detail_xck_mgga_r_o2
@@ -121,7 +85,7 @@ static constexpr int64_t NFLD = 10;
  * much as `work`, or nullptr to allocate it internally. */
 inline int64_t xck_mgga_r_o2_work(int64_t npts, int64_t nbf) {
     const int64_t blk = npts < grid_block ? npts : grid_block;
-    return blk * (1 + nbf * 2) + 1 * npts + 1;
+    return blk * (1 + nbf * 2) + 1 * npts + 1 * nbf * nbf + 1;
 }
 
 /* fields: the per-point tower operands (type T), in the order
@@ -153,7 +117,9 @@ int xck_mgga_r_o2_t(int64_t npts,
         static constexpr double w_[] = {1.0, 1.0, 1.0};
         combine<T>(npts, 1, 3, s_, w_, 0, S0);
     }
+    T* Z0 = c + blk * (1 + nbf * 2) + (int64_t)1*npts + (int64_t)0*nbf*nbf;
     const T* fi[10] = {fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], S0, fields[10], fields[11]};
+    for (int64_t i_ = 0; i_ < nbf * nbf; ++i_) Z0[i_] = T(0);
     for (int64_t g0 = 0; g0 < npts; g0 += blk) {
         const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
         {
@@ -161,36 +127,28 @@ int xck_mgga_r_o2_t(int64_t npts,
             static constexpr double w_[] = {1.0, 1.0, 1.0};
             combine<T>(bk, nbf, 3, s_, w_, npts, X0);
         }
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_r_o2::c0_0, detail_xck_mgga_r_o2::o0_0, detail_xck_mgga_r_o2::f0_0, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_r_o2::c0s_0, detail_xck_mgga_r_o2::o0s_0, detail_xck_mgga_r_o2::f0s_0, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0_1, detail_xck_mgga_r_o2::o0_1, detail_xck_mgga_r_o2::f0_1, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0s_1, detail_xck_mgga_r_o2::o0s_1, detail_xck_mgga_r_o2::f0s_1, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0_2, detail_xck_mgga_r_o2::o0_2, detail_xck_mgga_r_o2::f0_2, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0s_2, detail_xck_mgga_r_o2::o0s_2, detail_xck_mgga_r_o2::f0s_2, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0_3, detail_xck_mgga_r_o2::o0_3, detail_xck_mgga_r_o2::f0_3, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0s_3, detail_xck_mgga_r_o2::o0s_3, detail_xck_mgga_r_o2::f0s_3, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_r_o2::c0_4, detail_xck_mgga_r_o2::o0_4, detail_xck_mgga_r_o2::f0_4, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_r_o2::c0s_4, detail_xck_mgga_r_o2::o0s_4, detail_xck_mgga_r_o2::f0s_4, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, X0, bk, W, 0);
-        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0_5, detail_xck_mgga_r_o2::o0_5, detail_xck_mgga_r_o2::f0_5, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 12, detail_xck_mgga_r_o2::c0_6, detail_xck_mgga_r_o2::o0_6, detail_xck_mgga_r_o2::f0_6, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, chi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0_7, detail_xck_mgga_r_o2::o0_7, detail_xck_mgga_r_o2::f0_7, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 12, detail_xck_mgga_r_o2::c0_8, detail_xck_mgga_r_o2::o0_8, detail_xck_mgga_r_o2::f0_8, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, chi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 7, detail_xck_mgga_r_o2::c0_9, detail_xck_mgga_r_o2::o0_9, detail_xck_mgga_r_o2::f0_9, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 12, detail_xck_mgga_r_o2::c0_10, detail_xck_mgga_r_o2::o0_10, detail_xck_mgga_r_o2::f0_10, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, chi + (int64_t)3*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_r_o2::c0_11, detail_xck_mgga_r_o2::o0_11, detail_xck_mgga_r_o2::f0_11, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, X0, bk, Wc, bk, out + (int64_t)0*nbf*nbf);
+        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, Z0);
+        stage_a<T, Txc>(g0, bk, 12, detail_xck_mgga_r_o2::c0s_5, detail_xck_mgga_r_o2::o0s_5, detail_xck_mgga_r_o2::f0s_5, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W, 1);
+        gemm_nt(nbf, bk, chi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, Z0);
+        stage_a<T, Txc>(g0, bk, 12, detail_xck_mgga_r_o2::c0s_6, detail_xck_mgga_r_o2::o0s_6, detail_xck_mgga_r_o2::f0s_6, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 1);
+        gemm_nt(nbf, bk, chi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, Z0);
+        stage_a<T, Txc>(g0, bk, 12, detail_xck_mgga_r_o2::c0s_7, detail_xck_mgga_r_o2::o0s_7, detail_xck_mgga_r_o2::f0s_7, detail_xck_mgga_r_o2::NFLD, fi, xc, c);
+        accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 1);
+        gemm_nt(nbf, bk, chi + (int64_t)3*nbf*npts + g0, npts, Wc, bk, Z0);
     }
+    add_sym<T>(nbf, 1, Z0, out + (int64_t)0*nbf*nbf);
     if (own) delete[] c;
     return 0;
 }

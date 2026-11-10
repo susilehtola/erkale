@@ -1,7 +1,7 @@
 {
  "generator": "xckernel",
  "backend": "c",
- "version": "0.6.0",
+ "version": "0.7.0",
  "max_order": 2,
  "families": [
   "lda",

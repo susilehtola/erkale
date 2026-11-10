@@ -6,67 +6,40 @@
 
 namespace xckernel {
 namespace detail_xck_gga_r_o1 {
-static constexpr double c0_0[] = {
-    1.0
+static constexpr double c0s_0[] = {
+    0.5
 };
-static constexpr int32_t o0_0[] = {
+static constexpr int32_t o0s_0[] = {
     0,2
 };
-static constexpr uint16_t f0_0[] = {
+static constexpr uint16_t f0s_0[] = {
     4,0
 };
-static constexpr double c0_1[] = {
+static constexpr double c0s_1[] = {
     2.0
 };
-static constexpr int32_t o0_1[] = {
+static constexpr int32_t o0s_1[] = {
     0,3
 };
-static constexpr uint16_t f0_1[] = {
+static constexpr uint16_t f0s_1[] = {
     1,5,0
 };
-static constexpr double c0_2[] = {
+static constexpr double c0s_2[] = {
     2.0
 };
-static constexpr int32_t o0_2[] = {
+static constexpr int32_t o0s_2[] = {
     0,3
 };
-static constexpr uint16_t f0_2[] = {
+static constexpr uint16_t f0s_2[] = {
     2,5,0
 };
-static constexpr double c0_3[] = {
+static constexpr double c0s_3[] = {
     2.0
 };
-static constexpr int32_t o0_3[] = {
+static constexpr int32_t o0s_3[] = {
     0,3
 };
-static constexpr uint16_t f0_3[] = {
-    3,5,0
-};
-static constexpr double c0_4[] = {
-    2.0
-};
-static constexpr int32_t o0_4[] = {
-    0,3
-};
-static constexpr uint16_t f0_4[] = {
-    1,5,0
-};
-static constexpr double c0_5[] = {
-    2.0
-};
-static constexpr int32_t o0_5[] = {
-    0,3
-};
-static constexpr uint16_t f0_5[] = {
-    2,5,0
-};
-static constexpr double c0_6[] = {
-    2.0
-};
-static constexpr int32_t o0_6[] = {
-    0,3
-};
-static constexpr uint16_t f0_6[] = {
+static constexpr uint16_t f0s_3[] = {
     3,5,0
 };
 static constexpr int64_t NFLD = 4;
@@ -76,7 +49,7 @@ static constexpr int64_t NFLD = 4;
  * much as `work`, or nullptr to allocate it internally. */
 inline int64_t xck_gga_r_o1_work(int64_t npts, int64_t nbf) {
     const int64_t blk = npts < grid_block ? npts : grid_block;
-    return blk * (1 + nbf * 1) + 0 * npts + 1;
+    return blk * (1 + nbf * 1) + 0 * npts + 1 * nbf * nbf + 1;
 }
 
 /* fields: the per-point tower operands (type T), in the order
@@ -101,28 +74,22 @@ int xck_gga_r_o1_t(int64_t npts,
     if (!c) return 1;
     T* W = c + blk;
     const T* Wc = W;
+    T* Z0 = c + blk * (1 + nbf * 1) + (int64_t)0*npts + (int64_t)0*nbf*nbf;
     const T* fi[4] = {fields[0], fields[1], fields[2], fields[3]};
+    for (int64_t i_ = 0; i_ < nbf * nbf; ++i_) Z0[i_] = T(0);
     for (int64_t g0 = 0; g0 < npts; g0 += blk) {
         const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_0, detail_xck_gga_r_o1::o0_0, detail_xck_gga_r_o1::f0_0, detail_xck_gga_r_o1::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0s_0, detail_xck_gga_r_o1::o0s_0, detail_xck_gga_r_o1::f0s_0, detail_xck_gga_r_o1::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_1, detail_xck_gga_r_o1::o0_1, detail_xck_gga_r_o1::f0_1, detail_xck_gga_r_o1::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0s_1, detail_xck_gga_r_o1::o0s_1, detail_xck_gga_r_o1::f0s_1, detail_xck_gga_r_o1::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_2, detail_xck_gga_r_o1::o0_2, detail_xck_gga_r_o1::f0_2, detail_xck_gga_r_o1::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0s_2, detail_xck_gga_r_o1::o0s_2, detail_xck_gga_r_o1::f0s_2, detail_xck_gga_r_o1::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W, 0);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_3, detail_xck_gga_r_o1::o0_3, detail_xck_gga_r_o1::f0_3, detail_xck_gga_r_o1::NFLD, fi, xc, c);
+        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0s_3, detail_xck_gga_r_o1::o0s_3, detail_xck_gga_r_o1::f0s_3, detail_xck_gga_r_o1::NFLD, fi, xc, c);
         accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W, 0);
-        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_4, detail_xck_gga_r_o1::o0_4, detail_xck_gga_r_o1::f0_4, detail_xck_gga_r_o1::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)1*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_5, detail_xck_gga_r_o1::o0_5, detail_xck_gga_r_o1::f0_5, detail_xck_gga_r_o1::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)2*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
-        stage_a<T, Txc>(g0, bk, 1, detail_xck_gga_r_o1::c0_6, detail_xck_gga_r_o1::o0_6, detail_xck_gga_r_o1::f0_6, detail_xck_gga_r_o1::NFLD, fi, xc, c);
-        accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W, 1);
-        gemm_nt(nbf, bk, chi + (int64_t)3*nbf*npts + g0, npts, Wc, bk, out + (int64_t)0*nbf*nbf);
+        gemm_nt(nbf, bk, chi + (int64_t)0*nbf*npts + g0, npts, Wc, bk, Z0);
     }
+    add_sym<T>(nbf, 1, Z0, out + (int64_t)0*nbf*nbf);
     if (own) delete[] c;
     return 0;
 }

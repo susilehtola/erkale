@@ -210,6 +210,16 @@ XCK_HD inline void rowdot(int64_t n, int64_t k, const T* A, int64_t lda,
     }
 }
 
+/* The symmetric (sign +1) or antisymmetric (-1) completion of a half
+ * product: out(i,j) += X(i,j) + sign X(j,i), n x n row-major. */
+template <typename T>
+XCK_HD inline void add_sym(int64_t n, int sign, const T* X, T* out) {
+    const T s = T(sign);
+    for (int64_t i = 0; i < n; ++i)
+        for (int64_t j = 0; j < n; ++j)
+            out[i * n + j] += X[i * n + j] + s * X[j * n + i];
+}
+
 #ifdef XCKERNEL_USE_BLAS
 namespace detail {
 inline bool blas_fits(int64_t n, int64_t k, int64_t lda, int64_t ldb) {
