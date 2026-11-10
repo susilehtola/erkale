@@ -6,760 +6,508 @@
 
 namespace xckernel {
 namespace detail_xck_mgga_lapl_st_o2_m_batch {
-static constexpr double c0_4[] = {
-    2.0,-2.0
+static constexpr double cs0_4[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o0_4[] = {
+static constexpr int32_t os0_4[] = {
     0,3,6
 };
-static constexpr uint16_t f0_4[] = {
+static constexpr uint16_t fs0_4[] = {
     1,13,0,1,15,0
 };
-static constexpr double c0_5[] = {
-    2.0,-2.0
+static constexpr double cs0_5[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o0_5[] = {
+static constexpr int32_t os0_5[] = {
     0,3,6
 };
-static constexpr uint16_t f0_5[] = {
+static constexpr uint16_t fs0_5[] = {
     2,13,0,2,15,0
 };
-static constexpr double c0_6[] = {
-    2.0,-2.0
+static constexpr double cs0_6[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o0_6[] = {
+static constexpr int32_t os0_6[] = {
     0,3,6
 };
-static constexpr uint16_t f0_6[] = {
+static constexpr uint16_t fs0_6[] = {
     3,13,0,3,15,0
 };
-static constexpr double c0_7[] = {
-    1.0,-1.0
+static constexpr double cs0_7[] = {
+    0.5,-0.5
 };
-static constexpr int32_t o0_7[] = {
+static constexpr int32_t os0_7[] = {
     0,2,4
 };
-static constexpr uint16_t f0_7[] = {
+static constexpr uint16_t fs0_7[] = {
     10,0,11,0
 };
-static constexpr double c0_8[] = {
-    1.0,-1.0
+static constexpr double cs0_8[] = {
+    0.5,-0.5
 };
-static constexpr int32_t o0_8[] = {
+static constexpr int32_t os0_8[] = {
     0,2,4
 };
-static constexpr uint16_t f0_8[] = {
+static constexpr uint16_t fs0_8[] = {
     10,0,11,0
 };
-static constexpr double c0_9[] = {
-    1.0,-1.0
+static constexpr double cs0_9[] = {
+    0.5,-0.5
 };
-static constexpr int32_t o0_9[] = {
+static constexpr int32_t os0_9[] = {
     0,2,4
 };
-static constexpr uint16_t f0_9[] = {
+static constexpr uint16_t fs0_9[] = {
     10,0,11,0
 };
-static constexpr double c0_10[] = {
-    1.0,-1.0
+static constexpr double cs0_10[] = {
+    0.5,-0.5
 };
-static constexpr int32_t o0_10[] = {
+static constexpr int32_t os0_10[] = {
     0,2,4
 };
-static constexpr uint16_t f0_10[] = {
+static constexpr uint16_t fs0_10[] = {
     8,0,9,0
 };
-static constexpr double c1_4[] = {
-    -1.0,2.0,-2.0,2.0,4.0,-4.0
+static constexpr double cs1_4[] = {
+    4.0,2.0,-4.0,-2.0,2.0,-1.0
 };
-static constexpr int32_t o1_4[] = {
-    0,2,6,10,12,16,20
+static constexpr int32_t os1_4[] = {
+    0,4,8,12,16,18,20
 };
-static constexpr uint16_t f1_4[] = {
-    5,0,1,1,19,0,1,1,21,0,4,0,1,1,18,0,1,1,20,0
+static constexpr uint16_t fs1_4[] = {
+    1,1,18,0,1,1,19,0,1,1,20,0,1,1,21,0,4,0,5,0
 };
-static constexpr double c1_5[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs1_5[] = {
+    4.0,2.0,-4.0,-2.0
 };
-static constexpr int32_t o1_5[] = {
+static constexpr int32_t os1_5[] = {
     0,4,8,12,16
 };
-static constexpr uint16_t f1_5[] = {
-    1,2,19,0,1,2,21,0,1,2,18,0,1,2,20,0
+static constexpr uint16_t fs1_5[] = {
+    1,2,18,0,1,2,19,0,1,2,20,0,1,2,21,0
 };
-static constexpr double c1_6[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs1_6[] = {
+    4.0,2.0,-4.0,-2.0
 };
-static constexpr int32_t o1_6[] = {
+static constexpr int32_t os1_6[] = {
     0,4,8,12,16
 };
-static constexpr uint16_t f1_6[] = {
-    1,3,19,0,1,3,21,0,1,3,18,0,1,3,20,0
+static constexpr uint16_t fs1_6[] = {
+    1,3,18,0,1,3,19,0,1,3,20,0,1,3,21,0
 };
-static constexpr double c1_7[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs1_7[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o1_7[] = {
+static constexpr int32_t os1_7[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f1_7[] = {
-    1,24,0,1,25,0,1,22,0,1,23,0
+static constexpr uint16_t fs1_7[] = {
+    1,22,0,1,23,0,1,24,0,1,25,0
 };
-static constexpr double c1_8[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs1_8[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o1_8[] = {
+static constexpr int32_t os1_8[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f1_8[] = {
-    1,24,0,1,25,0,1,22,0,1,23,0
+static constexpr uint16_t fs1_8[] = {
+    1,22,0,1,23,0,1,24,0,1,25,0
 };
-static constexpr double c1_9[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs1_9[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o1_9[] = {
+static constexpr int32_t os1_9[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f1_9[] = {
-    1,24,0,1,25,0,1,22,0,1,23,0
+static constexpr uint16_t fs1_9[] = {
+    1,22,0,1,23,0,1,24,0,1,25,0
 };
-static constexpr double c1_10[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs1_10[] = {
+    2.0,1.0,-2.0,-1.0
 };
-static constexpr int32_t o1_10[] = {
+static constexpr int32_t os1_10[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f1_10[] = {
-    1,14,0,1,17,0,1,13,0,1,16,0
+static constexpr uint16_t fs1_10[] = {
+    1,13,0,1,14,0,1,16,0,1,17,0
 };
-static constexpr double c2_4[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs2_4[] = {
+    4.0,2.0,-4.0,-2.0
 };
-static constexpr int32_t o2_4[] = {
+static constexpr int32_t os2_4[] = {
     0,4,8,12,16
 };
-static constexpr uint16_t f2_4[] = {
-    1,2,19,0,1,2,21,0,1,2,18,0,1,2,20,0
+static constexpr uint16_t fs2_4[] = {
+    1,2,18,0,1,2,19,0,1,2,20,0,1,2,21,0
 };
-static constexpr double c2_5[] = {
-    -1.0,2.0,-2.0,2.0,4.0,-4.0
+static constexpr double cs2_5[] = {
+    4.0,2.0,-4.0,-2.0,2.0,-1.0
 };
-static constexpr int32_t o2_5[] = {
-    0,2,6,10,12,16,20
+static constexpr int32_t os2_5[] = {
+    0,4,8,12,16,18,20
 };
-static constexpr uint16_t f2_5[] = {
-    5,0,2,2,19,0,2,2,21,0,4,0,2,2,18,0,2,2,20,0
+static constexpr uint16_t fs2_5[] = {
+    2,2,18,0,2,2,19,0,2,2,20,0,2,2,21,0,4,0,5,0
 };
-static constexpr double c2_6[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs2_6[] = {
+    4.0,2.0,-4.0,-2.0
 };
-static constexpr int32_t o2_6[] = {
+static constexpr int32_t os2_6[] = {
     0,4,8,12,16
 };
-static constexpr uint16_t f2_6[] = {
-    2,3,19,0,2,3,21,0,2,3,18,0,2,3,20,0
+static constexpr uint16_t fs2_6[] = {
+    2,3,18,0,2,3,19,0,2,3,20,0,2,3,21,0
 };
-static constexpr double c2_7[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs2_7[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o2_7[] = {
+static constexpr int32_t os2_7[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f2_7[] = {
-    2,24,0,2,25,0,2,22,0,2,23,0
+static constexpr uint16_t fs2_7[] = {
+    2,22,0,2,23,0,2,24,0,2,25,0
 };
-static constexpr double c2_8[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs2_8[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o2_8[] = {
+static constexpr int32_t os2_8[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f2_8[] = {
-    2,24,0,2,25,0,2,22,0,2,23,0
+static constexpr uint16_t fs2_8[] = {
+    2,22,0,2,23,0,2,24,0,2,25,0
 };
-static constexpr double c2_9[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs2_9[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o2_9[] = {
+static constexpr int32_t os2_9[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f2_9[] = {
-    2,24,0,2,25,0,2,22,0,2,23,0
+static constexpr uint16_t fs2_9[] = {
+    2,22,0,2,23,0,2,24,0,2,25,0
 };
-static constexpr double c2_10[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs2_10[] = {
+    2.0,1.0,-2.0,-1.0
 };
-static constexpr int32_t o2_10[] = {
+static constexpr int32_t os2_10[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f2_10[] = {
-    2,14,0,2,17,0,2,13,0,2,16,0
+static constexpr uint16_t fs2_10[] = {
+    2,13,0,2,14,0,2,16,0,2,17,0
 };
-static constexpr double c3_4[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs3_4[] = {
+    4.0,2.0,-4.0,-2.0
 };
-static constexpr int32_t o3_4[] = {
+static constexpr int32_t os3_4[] = {
     0,4,8,12,16
 };
-static constexpr uint16_t f3_4[] = {
-    1,3,19,0,1,3,21,0,1,3,18,0,1,3,20,0
+static constexpr uint16_t fs3_4[] = {
+    1,3,18,0,1,3,19,0,1,3,20,0,1,3,21,0
 };
-static constexpr double c3_5[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs3_5[] = {
+    4.0,2.0,-4.0,-2.0
 };
-static constexpr int32_t o3_5[] = {
+static constexpr int32_t os3_5[] = {
     0,4,8,12,16
 };
-static constexpr uint16_t f3_5[] = {
-    2,3,19,0,2,3,21,0,2,3,18,0,2,3,20,0
+static constexpr uint16_t fs3_5[] = {
+    2,3,18,0,2,3,19,0,2,3,20,0,2,3,21,0
 };
-static constexpr double c3_6[] = {
-    -1.0,2.0,-2.0,2.0,4.0,-4.0
+static constexpr double cs3_6[] = {
+    4.0,2.0,-4.0,-2.0,2.0,-1.0
 };
-static constexpr int32_t o3_6[] = {
-    0,2,6,10,12,16,20
+static constexpr int32_t os3_6[] = {
+    0,4,8,12,16,18,20
 };
-static constexpr uint16_t f3_6[] = {
-    5,0,3,3,19,0,3,3,21,0,4,0,3,3,18,0,3,3,20,0
+static constexpr uint16_t fs3_6[] = {
+    3,3,18,0,3,3,19,0,3,3,20,0,3,3,21,0,4,0,5,0
 };
-static constexpr double c3_7[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs3_7[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o3_7[] = {
+static constexpr int32_t os3_7[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f3_7[] = {
-    3,24,0,3,25,0,3,22,0,3,23,0
+static constexpr uint16_t fs3_7[] = {
+    3,22,0,3,23,0,3,24,0,3,25,0
 };
-static constexpr double c3_8[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs3_8[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o3_8[] = {
+static constexpr int32_t os3_8[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f3_8[] = {
-    3,24,0,3,25,0,3,22,0,3,23,0
+static constexpr uint16_t fs3_8[] = {
+    3,22,0,3,23,0,3,24,0,3,25,0
 };
-static constexpr double c3_9[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs3_9[] = {
+    2.0,-2.0,1.0,-1.0
 };
-static constexpr int32_t o3_9[] = {
+static constexpr int32_t os3_9[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f3_9[] = {
-    3,24,0,3,25,0,3,22,0,3,23,0
+static constexpr uint16_t fs3_9[] = {
+    3,22,0,3,23,0,3,24,0,3,25,0
 };
-static constexpr double c3_10[] = {
-    1.0,-1.0,2.0,-2.0
+static constexpr double cs3_10[] = {
+    2.0,1.0,-2.0,-1.0
 };
-static constexpr int32_t o3_10[] = {
+static constexpr int32_t os3_10[] = {
     0,3,6,9,12
 };
-static constexpr uint16_t f3_10[] = {
-    3,14,0,3,17,0,3,13,0,3,16,0
+static constexpr uint16_t fs3_10[] = {
+    3,13,0,3,14,0,3,16,0,3,17,0
 };
-static constexpr double c4_4[] = {
+static constexpr double cs4_4[] = {
     2.0,-2.0
 };
-static constexpr int32_t o4_4[] = {
+static constexpr int32_t os4_4[] = {
     0,3,6
 };
-static constexpr uint16_t f4_4[] = {
+static constexpr uint16_t fs4_4[] = {
     1,22,0,1,26,0
 };
-static constexpr double c4_5[] = {
+static constexpr double cs4_5[] = {
     2.0,-2.0
 };
-static constexpr int32_t o4_5[] = {
+static constexpr int32_t os4_5[] = {
     0,3,6
 };
-static constexpr uint16_t f4_5[] = {
+static constexpr uint16_t fs4_5[] = {
     2,22,0,2,26,0
 };
-static constexpr double c4_6[] = {
+static constexpr double cs4_6[] = {
     2.0,-2.0
 };
-static constexpr int32_t o4_6[] = {
+static constexpr int32_t os4_6[] = {
     0,3,6
 };
-static constexpr uint16_t f4_6[] = {
+static constexpr uint16_t fs4_6[] = {
     3,22,0,3,26,0
 };
-static constexpr double c4_7[] = {
+static constexpr double cs4_7[] = {
     1.0,-1.0
 };
-static constexpr int32_t o4_7[] = {
+static constexpr int32_t os4_7[] = {
     0,2,4
 };
-static constexpr uint16_t f4_7[] = {
+static constexpr uint16_t fs4_7[] = {
     6,0,7,0
 };
-static constexpr double c4_8[] = {
+static constexpr double cs4_8[] = {
     1.0,-1.0
 };
-static constexpr int32_t o4_8[] = {
+static constexpr int32_t os4_8[] = {
     0,2,4
 };
-static constexpr uint16_t f4_8[] = {
+static constexpr uint16_t fs4_8[] = {
     6,0,7,0
 };
-static constexpr double c4_9[] = {
+static constexpr double cs4_9[] = {
     1.0,-1.0
 };
-static constexpr int32_t o4_9[] = {
+static constexpr int32_t os4_9[] = {
     0,2,4
 };
-static constexpr uint16_t f4_9[] = {
+static constexpr uint16_t fs4_9[] = {
     6,0,7,0
 };
-static constexpr double c4_10[] = {
+static constexpr double cs4_10[] = {
     1.0,-1.0
 };
-static constexpr int32_t o4_10[] = {
+static constexpr int32_t os4_10[] = {
     0,2,4
 };
-static constexpr uint16_t f4_10[] = {
+static constexpr uint16_t fs4_10[] = {
     10,0,12,0
 };
-static constexpr double c5_4[] = {
-    -1.0,2.0,-2.0,2.0,4.0,-4.0
+static constexpr double cs5_4[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o5_4[] = {
-    0,2,6,10,12,16,20
-};
-static constexpr uint16_t f5_4[] = {
-    5,0,1,1,19,0,1,1,21,0,4,0,1,1,18,0,1,1,20,0
-};
-static constexpr double c5_5[] = {
-    2.0,-2.0,4.0,-4.0
-};
-static constexpr int32_t o5_5[] = {
-    0,4,8,12,16
-};
-static constexpr uint16_t f5_5[] = {
-    1,2,19,0,1,2,21,0,1,2,18,0,1,2,20,0
-};
-static constexpr double c5_6[] = {
-    2.0,-2.0,4.0,-4.0
-};
-static constexpr int32_t o5_6[] = {
-    0,4,8,12,16
-};
-static constexpr uint16_t f5_6[] = {
-    1,3,19,0,1,3,21,0,1,3,18,0,1,3,20,0
-};
-static constexpr double c5_7[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o5_7[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f5_7[] = {
-    1,24,0,1,25,0,1,22,0,1,23,0
-};
-static constexpr double c5_8[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o5_8[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f5_8[] = {
-    1,24,0,1,25,0,1,22,0,1,23,0
-};
-static constexpr double c5_9[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o5_9[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f5_9[] = {
-    1,24,0,1,25,0,1,22,0,1,23,0
-};
-static constexpr double c5_10[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o5_10[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f5_10[] = {
-    1,14,0,1,17,0,1,13,0,1,16,0
-};
-static constexpr double c6_4[] = {
-    4.0,-4.0
-};
-static constexpr int32_t o6_4[] = {
+static constexpr int32_t os5_4[] = {
     0,3,6
 };
-static constexpr uint16_t f6_4[] = {
+static constexpr uint16_t fs5_4[] = {
     1,22,0,1,26,0
 };
-static constexpr double c6_5[] = {
-    4.0,-4.0
+static constexpr double cs5_5[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o6_5[] = {
+static constexpr int32_t os5_5[] = {
     0,3,6
 };
-static constexpr uint16_t f6_5[] = {
+static constexpr uint16_t fs5_5[] = {
     2,22,0,2,26,0
 };
-static constexpr double c6_6[] = {
-    4.0,-4.0
+static constexpr double cs5_6[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o6_6[] = {
+static constexpr int32_t os5_6[] = {
     0,3,6
 };
-static constexpr uint16_t f6_6[] = {
+static constexpr uint16_t fs5_6[] = {
     3,22,0,3,26,0
 };
-static constexpr double c6_7[] = {
-    2.0,-2.0
+static constexpr double cs5_7[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o6_7[] = {
+static constexpr int32_t os5_7[] = {
     0,2,4
 };
-static constexpr uint16_t f6_7[] = {
+static constexpr uint16_t fs5_7[] = {
     6,0,7,0
 };
-static constexpr double c6_8[] = {
-    2.0,-2.0
+static constexpr double cs5_8[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o6_8[] = {
+static constexpr int32_t os5_8[] = {
     0,2,4
 };
-static constexpr uint16_t f6_8[] = {
+static constexpr uint16_t fs5_8[] = {
     6,0,7,0
 };
-static constexpr double c6_9[] = {
-    2.0,-2.0
+static constexpr double cs5_9[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o6_9[] = {
+static constexpr int32_t os5_9[] = {
     0,2,4
 };
-static constexpr uint16_t f6_9[] = {
+static constexpr uint16_t fs5_9[] = {
     6,0,7,0
 };
-static constexpr double c6_10[] = {
-    2.0,-2.0
+static constexpr double cs5_10[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o6_10[] = {
+static constexpr int32_t os5_10[] = {
     0,2,4
 };
-static constexpr uint16_t f6_10[] = {
+static constexpr uint16_t fs5_10[] = {
     10,0,12,0
 };
-static constexpr double c7_4[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs6_4[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o7_4[] = {
-    0,4,8,12,16
-};
-static constexpr uint16_t f7_4[] = {
-    1,2,19,0,1,2,21,0,1,2,18,0,1,2,20,0
-};
-static constexpr double c7_5[] = {
-    -1.0,2.0,-2.0,2.0,4.0,-4.0
-};
-static constexpr int32_t o7_5[] = {
-    0,2,6,10,12,16,20
-};
-static constexpr uint16_t f7_5[] = {
-    5,0,2,2,19,0,2,2,21,0,4,0,2,2,18,0,2,2,20,0
-};
-static constexpr double c7_6[] = {
-    2.0,-2.0,4.0,-4.0
-};
-static constexpr int32_t o7_6[] = {
-    0,4,8,12,16
-};
-static constexpr uint16_t f7_6[] = {
-    2,3,19,0,2,3,21,0,2,3,18,0,2,3,20,0
-};
-static constexpr double c7_7[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o7_7[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f7_7[] = {
-    2,24,0,2,25,0,2,22,0,2,23,0
-};
-static constexpr double c7_8[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o7_8[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f7_8[] = {
-    2,24,0,2,25,0,2,22,0,2,23,0
-};
-static constexpr double c7_9[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o7_9[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f7_9[] = {
-    2,24,0,2,25,0,2,22,0,2,23,0
-};
-static constexpr double c7_10[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o7_10[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f7_10[] = {
-    2,14,0,2,17,0,2,13,0,2,16,0
-};
-static constexpr double c8_4[] = {
-    4.0,-4.0
-};
-static constexpr int32_t o8_4[] = {
+static constexpr int32_t os6_4[] = {
     0,3,6
 };
-static constexpr uint16_t f8_4[] = {
+static constexpr uint16_t fs6_4[] = {
     1,22,0,1,26,0
 };
-static constexpr double c8_5[] = {
-    4.0,-4.0
+static constexpr double cs6_5[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o8_5[] = {
+static constexpr int32_t os6_5[] = {
     0,3,6
 };
-static constexpr uint16_t f8_5[] = {
+static constexpr uint16_t fs6_5[] = {
     2,22,0,2,26,0
 };
-static constexpr double c8_6[] = {
-    4.0,-4.0
+static constexpr double cs6_6[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o8_6[] = {
+static constexpr int32_t os6_6[] = {
     0,3,6
 };
-static constexpr uint16_t f8_6[] = {
+static constexpr uint16_t fs6_6[] = {
     3,22,0,3,26,0
 };
-static constexpr double c8_7[] = {
-    2.0,-2.0
+static constexpr double cs6_7[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o8_7[] = {
+static constexpr int32_t os6_7[] = {
     0,2,4
 };
-static constexpr uint16_t f8_7[] = {
+static constexpr uint16_t fs6_7[] = {
     6,0,7,0
 };
-static constexpr double c8_8[] = {
-    2.0,-2.0
+static constexpr double cs6_8[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o8_8[] = {
+static constexpr int32_t os6_8[] = {
     0,2,4
 };
-static constexpr uint16_t f8_8[] = {
+static constexpr uint16_t fs6_8[] = {
     6,0,7,0
 };
-static constexpr double c8_9[] = {
-    2.0,-2.0
+static constexpr double cs6_9[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o8_9[] = {
+static constexpr int32_t os6_9[] = {
     0,2,4
 };
-static constexpr uint16_t f8_9[] = {
+static constexpr uint16_t fs6_9[] = {
     6,0,7,0
 };
-static constexpr double c8_10[] = {
-    2.0,-2.0
+static constexpr double cs6_10[] = {
+    1.0,-1.0
 };
-static constexpr int32_t o8_10[] = {
+static constexpr int32_t os6_10[] = {
     0,2,4
 };
-static constexpr uint16_t f8_10[] = {
+static constexpr uint16_t fs6_10[] = {
     10,0,12,0
 };
-static constexpr double c9_4[] = {
-    2.0,-2.0,4.0,-4.0
+static constexpr double cs7_4[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o9_4[] = {
-    0,4,8,12,16
-};
-static constexpr uint16_t f9_4[] = {
-    1,3,19,0,1,3,21,0,1,3,18,0,1,3,20,0
-};
-static constexpr double c9_5[] = {
-    2.0,-2.0,4.0,-4.0
-};
-static constexpr int32_t o9_5[] = {
-    0,4,8,12,16
-};
-static constexpr uint16_t f9_5[] = {
-    2,3,19,0,2,3,21,0,2,3,18,0,2,3,20,0
-};
-static constexpr double c9_6[] = {
-    -1.0,2.0,-2.0,2.0,4.0,-4.0
-};
-static constexpr int32_t o9_6[] = {
-    0,2,6,10,12,16,20
-};
-static constexpr uint16_t f9_6[] = {
-    5,0,3,3,19,0,3,3,21,0,4,0,3,3,18,0,3,3,20,0
-};
-static constexpr double c9_7[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o9_7[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f9_7[] = {
-    3,24,0,3,25,0,3,22,0,3,23,0
-};
-static constexpr double c9_8[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o9_8[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f9_8[] = {
-    3,24,0,3,25,0,3,22,0,3,23,0
-};
-static constexpr double c9_9[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o9_9[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f9_9[] = {
-    3,24,0,3,25,0,3,22,0,3,23,0
-};
-static constexpr double c9_10[] = {
-    1.0,-1.0,2.0,-2.0
-};
-static constexpr int32_t o9_10[] = {
-    0,3,6,9,12
-};
-static constexpr uint16_t f9_10[] = {
-    3,14,0,3,17,0,3,13,0,3,16,0
-};
-static constexpr double c10_4[] = {
-    4.0,-4.0
-};
-static constexpr int32_t o10_4[] = {
+static constexpr int32_t os7_4[] = {
     0,3,6
 };
-static constexpr uint16_t f10_4[] = {
+static constexpr uint16_t fs7_4[] = {
     1,22,0,1,26,0
 };
-static constexpr double c10_5[] = {
-    4.0,-4.0
+static constexpr double cs7_5[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o10_5[] = {
+static constexpr int32_t os7_5[] = {
     0,3,6
 };
-static constexpr uint16_t f10_5[] = {
+static constexpr uint16_t fs7_5[] = {
     2,22,0,2,26,0
 };
-static constexpr double c10_6[] = {
-    4.0,-4.0
+static constexpr double cs7_6[] = {
+    2.0,-2.0
 };
-static constexpr int32_t o10_6[] = {
+static constexpr int32_t os7_6[] = {
     0,3,6
 };
-static constexpr uint16_t f10_6[] = {
+static constexpr uint16_t fs7_6[] = {
     3,22,0,3,26,0
 };
-static constexpr double c10_7[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o10_7[] = {
-    0,2,4
-};
-static constexpr uint16_t f10_7[] = {
-    6,0,7,0
-};
-static constexpr double c10_8[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o10_8[] = {
-    0,2,4
-};
-static constexpr uint16_t f10_8[] = {
-    6,0,7,0
-};
-static constexpr double c10_9[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o10_9[] = {
-    0,2,4
-};
-static constexpr uint16_t f10_9[] = {
-    6,0,7,0
-};
-static constexpr double c10_10[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o10_10[] = {
-    0,2,4
-};
-static constexpr uint16_t f10_10[] = {
-    10,0,12,0
-};
-static constexpr double c11_4[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o11_4[] = {
-    0,3,6
-};
-static constexpr uint16_t f11_4[] = {
-    1,22,0,1,26,0
-};
-static constexpr double c11_5[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o11_5[] = {
-    0,3,6
-};
-static constexpr uint16_t f11_5[] = {
-    2,22,0,2,26,0
-};
-static constexpr double c11_6[] = {
-    2.0,-2.0
-};
-static constexpr int32_t o11_6[] = {
-    0,3,6
-};
-static constexpr uint16_t f11_6[] = {
-    3,22,0,3,26,0
-};
-static constexpr double c11_7[] = {
+static constexpr double cs7_7[] = {
     1.0,-1.0
 };
-static constexpr int32_t o11_7[] = {
+static constexpr int32_t os7_7[] = {
     0,2,4
 };
-static constexpr uint16_t f11_7[] = {
+static constexpr uint16_t fs7_7[] = {
     6,0,7,0
 };
-static constexpr double c11_8[] = {
+static constexpr double cs7_8[] = {
     1.0,-1.0
 };
-static constexpr int32_t o11_8[] = {
+static constexpr int32_t os7_8[] = {
     0,2,4
 };
-static constexpr uint16_t f11_8[] = {
+static constexpr uint16_t fs7_8[] = {
     6,0,7,0
 };
-static constexpr double c11_9[] = {
+static constexpr double cs7_9[] = {
     1.0,-1.0
 };
-static constexpr int32_t o11_9[] = {
+static constexpr int32_t os7_9[] = {
     0,2,4
 };
-static constexpr uint16_t f11_9[] = {
+static constexpr uint16_t fs7_9[] = {
     6,0,7,0
 };
-static constexpr double c11_10[] = {
+static constexpr double cs7_10[] = {
     1.0,-1.0
 };
-static constexpr int32_t o11_10[] = {
+static constexpr int32_t os7_10[] = {
     0,2,4
 };
-static constexpr uint16_t f11_10[] = {
+static constexpr uint16_t fs7_10[] = {
     10,0,12,0
 };
 static constexpr int64_t NFLD = 4;
@@ -769,7 +517,7 @@ static constexpr int64_t NFLD = 4;
 inline int64_t xck_mgga_lapl_st_o2_m_batch_work(int64_t npts, int64_t nbf, int64_t nx) {
     const int64_t blk = npts < grid_block ? npts : grid_block;
     const int64_t nxc = nx < 8 ? nx : 8;
-    return blk * (85 + nbf * (nxc + 1)) + 0 * npts + 1;
+    return blk * (57 + nbf * (nxc + 1)) + 0 * npts + nxc * nbf * nbf + 1;
 }
 
 /* fields: the per-point tower operands in the order of
@@ -789,103 +537,77 @@ int xck_mgga_lapl_st_o2_m_batch_t(int64_t npts, int64_t nbf, int64_t nx,
     }
     if (!c) return 1;
     T* A = c + blk;
-    T* W = A + (int64_t)84*blk;
+    T* W = A + (int64_t)56*blk;
     T* X0 = W + nxc*nbf*blk + (int64_t)0*nbf*blk;
-    T* Sb = c + blk * (85 + nbf * (nxc + 1));
+    T* Sb = c + blk * (57 + nbf * (nxc + 1));
+    T* Z = Sb + (int64_t)0*npts;
     const T* fi[4] = {fields[0], fields[1], fields[2], fields[3]};
-    for (int64_t g0 = 0; g0 < npts; g0 += blk) {
-        const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
-        {
-            const T* s_[] = {chi + (int64_t)4*nbf*npts + g0, chi + (int64_t)7*nbf*npts + g0, chi + (int64_t)9*nbf*npts + g0};
-            static constexpr double w_[] = {1.0, 1.0, 1.0};
-            combine<T>(bk, nbf, 3, s_, w_, npts, X0);
-        }
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_4, detail_xck_mgga_lapl_st_o2_m_batch::o0_4, detail_xck_mgga_lapl_st_o2_m_batch::f0_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)0*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_5, detail_xck_mgga_lapl_st_o2_m_batch::o0_5, detail_xck_mgga_lapl_st_o2_m_batch::f0_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)1*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_6, detail_xck_mgga_lapl_st_o2_m_batch::o0_6, detail_xck_mgga_lapl_st_o2_m_batch::f0_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)2*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_7, detail_xck_mgga_lapl_st_o2_m_batch::o0_7, detail_xck_mgga_lapl_st_o2_m_batch::f0_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)3*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_8, detail_xck_mgga_lapl_st_o2_m_batch::o0_8, detail_xck_mgga_lapl_st_o2_m_batch::f0_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)4*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_9, detail_xck_mgga_lapl_st_o2_m_batch::o0_9, detail_xck_mgga_lapl_st_o2_m_batch::f0_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)5*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c0_10, detail_xck_mgga_lapl_st_o2_m_batch::o0_10, detail_xck_mgga_lapl_st_o2_m_batch::f0_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)6*blk);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::c1_4, detail_xck_mgga_lapl_st_o2_m_batch::o1_4, detail_xck_mgga_lapl_st_o2_m_batch::f1_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)7*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c1_5, detail_xck_mgga_lapl_st_o2_m_batch::o1_5, detail_xck_mgga_lapl_st_o2_m_batch::f1_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)8*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c1_6, detail_xck_mgga_lapl_st_o2_m_batch::o1_6, detail_xck_mgga_lapl_st_o2_m_batch::f1_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)9*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c1_7, detail_xck_mgga_lapl_st_o2_m_batch::o1_7, detail_xck_mgga_lapl_st_o2_m_batch::f1_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)10*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c1_8, detail_xck_mgga_lapl_st_o2_m_batch::o1_8, detail_xck_mgga_lapl_st_o2_m_batch::f1_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)11*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c1_9, detail_xck_mgga_lapl_st_o2_m_batch::o1_9, detail_xck_mgga_lapl_st_o2_m_batch::f1_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)12*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c1_10, detail_xck_mgga_lapl_st_o2_m_batch::o1_10, detail_xck_mgga_lapl_st_o2_m_batch::f1_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)13*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c2_4, detail_xck_mgga_lapl_st_o2_m_batch::o2_4, detail_xck_mgga_lapl_st_o2_m_batch::f2_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)14*blk);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::c2_5, detail_xck_mgga_lapl_st_o2_m_batch::o2_5, detail_xck_mgga_lapl_st_o2_m_batch::f2_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)15*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c2_6, detail_xck_mgga_lapl_st_o2_m_batch::o2_6, detail_xck_mgga_lapl_st_o2_m_batch::f2_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)16*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c2_7, detail_xck_mgga_lapl_st_o2_m_batch::o2_7, detail_xck_mgga_lapl_st_o2_m_batch::f2_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)17*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c2_8, detail_xck_mgga_lapl_st_o2_m_batch::o2_8, detail_xck_mgga_lapl_st_o2_m_batch::f2_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)18*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c2_9, detail_xck_mgga_lapl_st_o2_m_batch::o2_9, detail_xck_mgga_lapl_st_o2_m_batch::f2_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)19*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c2_10, detail_xck_mgga_lapl_st_o2_m_batch::o2_10, detail_xck_mgga_lapl_st_o2_m_batch::f2_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)20*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c3_4, detail_xck_mgga_lapl_st_o2_m_batch::o3_4, detail_xck_mgga_lapl_st_o2_m_batch::f3_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)21*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c3_5, detail_xck_mgga_lapl_st_o2_m_batch::o3_5, detail_xck_mgga_lapl_st_o2_m_batch::f3_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)22*blk);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::c3_6, detail_xck_mgga_lapl_st_o2_m_batch::o3_6, detail_xck_mgga_lapl_st_o2_m_batch::f3_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)23*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c3_7, detail_xck_mgga_lapl_st_o2_m_batch::o3_7, detail_xck_mgga_lapl_st_o2_m_batch::f3_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)24*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c3_8, detail_xck_mgga_lapl_st_o2_m_batch::o3_8, detail_xck_mgga_lapl_st_o2_m_batch::f3_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)25*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c3_9, detail_xck_mgga_lapl_st_o2_m_batch::o3_9, detail_xck_mgga_lapl_st_o2_m_batch::f3_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)26*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c3_10, detail_xck_mgga_lapl_st_o2_m_batch::o3_10, detail_xck_mgga_lapl_st_o2_m_batch::f3_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)27*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_4, detail_xck_mgga_lapl_st_o2_m_batch::o4_4, detail_xck_mgga_lapl_st_o2_m_batch::f4_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)28*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_5, detail_xck_mgga_lapl_st_o2_m_batch::o4_5, detail_xck_mgga_lapl_st_o2_m_batch::f4_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)29*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_6, detail_xck_mgga_lapl_st_o2_m_batch::o4_6, detail_xck_mgga_lapl_st_o2_m_batch::f4_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)30*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_7, detail_xck_mgga_lapl_st_o2_m_batch::o4_7, detail_xck_mgga_lapl_st_o2_m_batch::f4_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)31*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_8, detail_xck_mgga_lapl_st_o2_m_batch::o4_8, detail_xck_mgga_lapl_st_o2_m_batch::f4_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)32*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_9, detail_xck_mgga_lapl_st_o2_m_batch::o4_9, detail_xck_mgga_lapl_st_o2_m_batch::f4_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)33*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c4_10, detail_xck_mgga_lapl_st_o2_m_batch::o4_10, detail_xck_mgga_lapl_st_o2_m_batch::f4_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)34*blk);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::c5_4, detail_xck_mgga_lapl_st_o2_m_batch::o5_4, detail_xck_mgga_lapl_st_o2_m_batch::f5_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)35*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c5_5, detail_xck_mgga_lapl_st_o2_m_batch::o5_5, detail_xck_mgga_lapl_st_o2_m_batch::f5_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)36*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c5_6, detail_xck_mgga_lapl_st_o2_m_batch::o5_6, detail_xck_mgga_lapl_st_o2_m_batch::f5_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)37*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c5_7, detail_xck_mgga_lapl_st_o2_m_batch::o5_7, detail_xck_mgga_lapl_st_o2_m_batch::f5_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)38*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c5_8, detail_xck_mgga_lapl_st_o2_m_batch::o5_8, detail_xck_mgga_lapl_st_o2_m_batch::f5_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)39*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c5_9, detail_xck_mgga_lapl_st_o2_m_batch::o5_9, detail_xck_mgga_lapl_st_o2_m_batch::f5_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)40*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c5_10, detail_xck_mgga_lapl_st_o2_m_batch::o5_10, detail_xck_mgga_lapl_st_o2_m_batch::f5_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)41*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_4, detail_xck_mgga_lapl_st_o2_m_batch::o6_4, detail_xck_mgga_lapl_st_o2_m_batch::f6_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)42*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_5, detail_xck_mgga_lapl_st_o2_m_batch::o6_5, detail_xck_mgga_lapl_st_o2_m_batch::f6_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)43*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_6, detail_xck_mgga_lapl_st_o2_m_batch::o6_6, detail_xck_mgga_lapl_st_o2_m_batch::f6_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)44*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_7, detail_xck_mgga_lapl_st_o2_m_batch::o6_7, detail_xck_mgga_lapl_st_o2_m_batch::f6_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)45*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_8, detail_xck_mgga_lapl_st_o2_m_batch::o6_8, detail_xck_mgga_lapl_st_o2_m_batch::f6_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)46*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_9, detail_xck_mgga_lapl_st_o2_m_batch::o6_9, detail_xck_mgga_lapl_st_o2_m_batch::f6_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)47*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c6_10, detail_xck_mgga_lapl_st_o2_m_batch::o6_10, detail_xck_mgga_lapl_st_o2_m_batch::f6_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)48*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c7_4, detail_xck_mgga_lapl_st_o2_m_batch::o7_4, detail_xck_mgga_lapl_st_o2_m_batch::f7_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)49*blk);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::c7_5, detail_xck_mgga_lapl_st_o2_m_batch::o7_5, detail_xck_mgga_lapl_st_o2_m_batch::f7_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)50*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c7_6, detail_xck_mgga_lapl_st_o2_m_batch::o7_6, detail_xck_mgga_lapl_st_o2_m_batch::f7_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)51*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c7_7, detail_xck_mgga_lapl_st_o2_m_batch::o7_7, detail_xck_mgga_lapl_st_o2_m_batch::f7_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)52*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c7_8, detail_xck_mgga_lapl_st_o2_m_batch::o7_8, detail_xck_mgga_lapl_st_o2_m_batch::f7_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)53*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c7_9, detail_xck_mgga_lapl_st_o2_m_batch::o7_9, detail_xck_mgga_lapl_st_o2_m_batch::f7_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)54*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c7_10, detail_xck_mgga_lapl_st_o2_m_batch::o7_10, detail_xck_mgga_lapl_st_o2_m_batch::f7_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)55*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_4, detail_xck_mgga_lapl_st_o2_m_batch::o8_4, detail_xck_mgga_lapl_st_o2_m_batch::f8_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)56*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_5, detail_xck_mgga_lapl_st_o2_m_batch::o8_5, detail_xck_mgga_lapl_st_o2_m_batch::f8_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)57*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_6, detail_xck_mgga_lapl_st_o2_m_batch::o8_6, detail_xck_mgga_lapl_st_o2_m_batch::f8_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)58*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_7, detail_xck_mgga_lapl_st_o2_m_batch::o8_7, detail_xck_mgga_lapl_st_o2_m_batch::f8_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)59*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_8, detail_xck_mgga_lapl_st_o2_m_batch::o8_8, detail_xck_mgga_lapl_st_o2_m_batch::f8_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)60*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_9, detail_xck_mgga_lapl_st_o2_m_batch::o8_9, detail_xck_mgga_lapl_st_o2_m_batch::f8_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)61*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c8_10, detail_xck_mgga_lapl_st_o2_m_batch::o8_10, detail_xck_mgga_lapl_st_o2_m_batch::f8_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)62*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c9_4, detail_xck_mgga_lapl_st_o2_m_batch::o9_4, detail_xck_mgga_lapl_st_o2_m_batch::f9_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)63*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c9_5, detail_xck_mgga_lapl_st_o2_m_batch::o9_5, detail_xck_mgga_lapl_st_o2_m_batch::f9_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)64*blk);
-        stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::c9_6, detail_xck_mgga_lapl_st_o2_m_batch::o9_6, detail_xck_mgga_lapl_st_o2_m_batch::f9_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)65*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c9_7, detail_xck_mgga_lapl_st_o2_m_batch::o9_7, detail_xck_mgga_lapl_st_o2_m_batch::f9_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)66*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c9_8, detail_xck_mgga_lapl_st_o2_m_batch::o9_8, detail_xck_mgga_lapl_st_o2_m_batch::f9_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)67*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c9_9, detail_xck_mgga_lapl_st_o2_m_batch::o9_9, detail_xck_mgga_lapl_st_o2_m_batch::f9_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)68*blk);
-        stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::c9_10, detail_xck_mgga_lapl_st_o2_m_batch::o9_10, detail_xck_mgga_lapl_st_o2_m_batch::f9_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)69*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_4, detail_xck_mgga_lapl_st_o2_m_batch::o10_4, detail_xck_mgga_lapl_st_o2_m_batch::f10_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)70*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_5, detail_xck_mgga_lapl_st_o2_m_batch::o10_5, detail_xck_mgga_lapl_st_o2_m_batch::f10_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)71*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_6, detail_xck_mgga_lapl_st_o2_m_batch::o10_6, detail_xck_mgga_lapl_st_o2_m_batch::f10_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)72*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_7, detail_xck_mgga_lapl_st_o2_m_batch::o10_7, detail_xck_mgga_lapl_st_o2_m_batch::f10_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)73*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_8, detail_xck_mgga_lapl_st_o2_m_batch::o10_8, detail_xck_mgga_lapl_st_o2_m_batch::f10_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)74*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_9, detail_xck_mgga_lapl_st_o2_m_batch::o10_9, detail_xck_mgga_lapl_st_o2_m_batch::f10_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)75*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c10_10, detail_xck_mgga_lapl_st_o2_m_batch::o10_10, detail_xck_mgga_lapl_st_o2_m_batch::f10_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)76*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_4, detail_xck_mgga_lapl_st_o2_m_batch::o11_4, detail_xck_mgga_lapl_st_o2_m_batch::f11_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)77*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_5, detail_xck_mgga_lapl_st_o2_m_batch::o11_5, detail_xck_mgga_lapl_st_o2_m_batch::f11_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)78*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_6, detail_xck_mgga_lapl_st_o2_m_batch::o11_6, detail_xck_mgga_lapl_st_o2_m_batch::f11_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)79*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_7, detail_xck_mgga_lapl_st_o2_m_batch::o11_7, detail_xck_mgga_lapl_st_o2_m_batch::f11_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)80*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_8, detail_xck_mgga_lapl_st_o2_m_batch::o11_8, detail_xck_mgga_lapl_st_o2_m_batch::f11_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)81*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_9, detail_xck_mgga_lapl_st_o2_m_batch::o11_9, detail_xck_mgga_lapl_st_o2_m_batch::f11_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)82*blk);
-        stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::c11_10, detail_xck_mgga_lapl_st_o2_m_batch::o11_10, detail_xck_mgga_lapl_st_o2_m_batch::f11_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)83*blk);
-        for (int64_t x0 = 0; x0 < nx; x0 += nxc) {
-            const int64_t nxb = nx - x0 < nxc ? nx - x0 : nxc;
+    for (int64_t x0 = 0; x0 < nx; x0 += nxc) {
+        const int64_t nxb = nx - x0 < nxc ? nx - x0 : nxc;
+        for (int64_t i_ = 0; i_ < nxb*nbf*nbf; ++i_) Z[i_] = T(0);
+        for (int64_t g0 = 0; g0 < npts; g0 += blk) {
+            const int64_t bk = npts - g0 < blk ? npts - g0 : blk;
+            {
+                const T* s_[] = {chi + (int64_t)4*nbf*npts + g0, chi + (int64_t)7*nbf*npts + g0, chi + (int64_t)9*nbf*npts + g0};
+                static constexpr double w_[] = {1.0, 1.0, 1.0};
+                combine<T>(bk, nbf, 3, s_, w_, npts, X0);
+            }
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_4, detail_xck_mgga_lapl_st_o2_m_batch::os0_4, detail_xck_mgga_lapl_st_o2_m_batch::fs0_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)0*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_5, detail_xck_mgga_lapl_st_o2_m_batch::os0_5, detail_xck_mgga_lapl_st_o2_m_batch::fs0_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)1*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_6, detail_xck_mgga_lapl_st_o2_m_batch::os0_6, detail_xck_mgga_lapl_st_o2_m_batch::fs0_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)2*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_7, detail_xck_mgga_lapl_st_o2_m_batch::os0_7, detail_xck_mgga_lapl_st_o2_m_batch::fs0_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)3*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_8, detail_xck_mgga_lapl_st_o2_m_batch::os0_8, detail_xck_mgga_lapl_st_o2_m_batch::fs0_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)4*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_9, detail_xck_mgga_lapl_st_o2_m_batch::os0_9, detail_xck_mgga_lapl_st_o2_m_batch::fs0_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)5*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs0_10, detail_xck_mgga_lapl_st_o2_m_batch::os0_10, detail_xck_mgga_lapl_st_o2_m_batch::fs0_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)6*blk);
+            stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::cs1_4, detail_xck_mgga_lapl_st_o2_m_batch::os1_4, detail_xck_mgga_lapl_st_o2_m_batch::fs1_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)7*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs1_5, detail_xck_mgga_lapl_st_o2_m_batch::os1_5, detail_xck_mgga_lapl_st_o2_m_batch::fs1_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)8*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs1_6, detail_xck_mgga_lapl_st_o2_m_batch::os1_6, detail_xck_mgga_lapl_st_o2_m_batch::fs1_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)9*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs1_7, detail_xck_mgga_lapl_st_o2_m_batch::os1_7, detail_xck_mgga_lapl_st_o2_m_batch::fs1_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)10*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs1_8, detail_xck_mgga_lapl_st_o2_m_batch::os1_8, detail_xck_mgga_lapl_st_o2_m_batch::fs1_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)11*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs1_9, detail_xck_mgga_lapl_st_o2_m_batch::os1_9, detail_xck_mgga_lapl_st_o2_m_batch::fs1_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)12*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs1_10, detail_xck_mgga_lapl_st_o2_m_batch::os1_10, detail_xck_mgga_lapl_st_o2_m_batch::fs1_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)13*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs2_4, detail_xck_mgga_lapl_st_o2_m_batch::os2_4, detail_xck_mgga_lapl_st_o2_m_batch::fs2_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)14*blk);
+            stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::cs2_5, detail_xck_mgga_lapl_st_o2_m_batch::os2_5, detail_xck_mgga_lapl_st_o2_m_batch::fs2_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)15*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs2_6, detail_xck_mgga_lapl_st_o2_m_batch::os2_6, detail_xck_mgga_lapl_st_o2_m_batch::fs2_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)16*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs2_7, detail_xck_mgga_lapl_st_o2_m_batch::os2_7, detail_xck_mgga_lapl_st_o2_m_batch::fs2_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)17*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs2_8, detail_xck_mgga_lapl_st_o2_m_batch::os2_8, detail_xck_mgga_lapl_st_o2_m_batch::fs2_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)18*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs2_9, detail_xck_mgga_lapl_st_o2_m_batch::os2_9, detail_xck_mgga_lapl_st_o2_m_batch::fs2_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)19*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs2_10, detail_xck_mgga_lapl_st_o2_m_batch::os2_10, detail_xck_mgga_lapl_st_o2_m_batch::fs2_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)20*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs3_4, detail_xck_mgga_lapl_st_o2_m_batch::os3_4, detail_xck_mgga_lapl_st_o2_m_batch::fs3_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)21*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs3_5, detail_xck_mgga_lapl_st_o2_m_batch::os3_5, detail_xck_mgga_lapl_st_o2_m_batch::fs3_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)22*blk);
+            stage_a<T, Txc>(g0, bk, 6, detail_xck_mgga_lapl_st_o2_m_batch::cs3_6, detail_xck_mgga_lapl_st_o2_m_batch::os3_6, detail_xck_mgga_lapl_st_o2_m_batch::fs3_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)23*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs3_7, detail_xck_mgga_lapl_st_o2_m_batch::os3_7, detail_xck_mgga_lapl_st_o2_m_batch::fs3_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)24*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs3_8, detail_xck_mgga_lapl_st_o2_m_batch::os3_8, detail_xck_mgga_lapl_st_o2_m_batch::fs3_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)25*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs3_9, detail_xck_mgga_lapl_st_o2_m_batch::os3_9, detail_xck_mgga_lapl_st_o2_m_batch::fs3_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)26*blk);
+            stage_a<T, Txc>(g0, bk, 4, detail_xck_mgga_lapl_st_o2_m_batch::cs3_10, detail_xck_mgga_lapl_st_o2_m_batch::os3_10, detail_xck_mgga_lapl_st_o2_m_batch::fs3_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)27*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_4, detail_xck_mgga_lapl_st_o2_m_batch::os4_4, detail_xck_mgga_lapl_st_o2_m_batch::fs4_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)28*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_5, detail_xck_mgga_lapl_st_o2_m_batch::os4_5, detail_xck_mgga_lapl_st_o2_m_batch::fs4_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)29*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_6, detail_xck_mgga_lapl_st_o2_m_batch::os4_6, detail_xck_mgga_lapl_st_o2_m_batch::fs4_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)30*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_7, detail_xck_mgga_lapl_st_o2_m_batch::os4_7, detail_xck_mgga_lapl_st_o2_m_batch::fs4_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)31*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_8, detail_xck_mgga_lapl_st_o2_m_batch::os4_8, detail_xck_mgga_lapl_st_o2_m_batch::fs4_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)32*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_9, detail_xck_mgga_lapl_st_o2_m_batch::os4_9, detail_xck_mgga_lapl_st_o2_m_batch::fs4_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)33*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs4_10, detail_xck_mgga_lapl_st_o2_m_batch::os4_10, detail_xck_mgga_lapl_st_o2_m_batch::fs4_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)34*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_4, detail_xck_mgga_lapl_st_o2_m_batch::os5_4, detail_xck_mgga_lapl_st_o2_m_batch::fs5_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)35*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_5, detail_xck_mgga_lapl_st_o2_m_batch::os5_5, detail_xck_mgga_lapl_st_o2_m_batch::fs5_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)36*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_6, detail_xck_mgga_lapl_st_o2_m_batch::os5_6, detail_xck_mgga_lapl_st_o2_m_batch::fs5_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)37*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_7, detail_xck_mgga_lapl_st_o2_m_batch::os5_7, detail_xck_mgga_lapl_st_o2_m_batch::fs5_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)38*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_8, detail_xck_mgga_lapl_st_o2_m_batch::os5_8, detail_xck_mgga_lapl_st_o2_m_batch::fs5_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)39*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_9, detail_xck_mgga_lapl_st_o2_m_batch::os5_9, detail_xck_mgga_lapl_st_o2_m_batch::fs5_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)40*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs5_10, detail_xck_mgga_lapl_st_o2_m_batch::os5_10, detail_xck_mgga_lapl_st_o2_m_batch::fs5_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)41*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_4, detail_xck_mgga_lapl_st_o2_m_batch::os6_4, detail_xck_mgga_lapl_st_o2_m_batch::fs6_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)42*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_5, detail_xck_mgga_lapl_st_o2_m_batch::os6_5, detail_xck_mgga_lapl_st_o2_m_batch::fs6_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)43*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_6, detail_xck_mgga_lapl_st_o2_m_batch::os6_6, detail_xck_mgga_lapl_st_o2_m_batch::fs6_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)44*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_7, detail_xck_mgga_lapl_st_o2_m_batch::os6_7, detail_xck_mgga_lapl_st_o2_m_batch::fs6_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)45*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_8, detail_xck_mgga_lapl_st_o2_m_batch::os6_8, detail_xck_mgga_lapl_st_o2_m_batch::fs6_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)46*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_9, detail_xck_mgga_lapl_st_o2_m_batch::os6_9, detail_xck_mgga_lapl_st_o2_m_batch::fs6_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)47*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs6_10, detail_xck_mgga_lapl_st_o2_m_batch::os6_10, detail_xck_mgga_lapl_st_o2_m_batch::fs6_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)48*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_4, detail_xck_mgga_lapl_st_o2_m_batch::os7_4, detail_xck_mgga_lapl_st_o2_m_batch::fs7_4, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)49*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_5, detail_xck_mgga_lapl_st_o2_m_batch::os7_5, detail_xck_mgga_lapl_st_o2_m_batch::fs7_5, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)50*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_6, detail_xck_mgga_lapl_st_o2_m_batch::os7_6, detail_xck_mgga_lapl_st_o2_m_batch::fs7_6, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)51*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_7, detail_xck_mgga_lapl_st_o2_m_batch::os7_7, detail_xck_mgga_lapl_st_o2_m_batch::fs7_7, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)52*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_8, detail_xck_mgga_lapl_st_o2_m_batch::os7_8, detail_xck_mgga_lapl_st_o2_m_batch::fs7_8, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)53*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_9, detail_xck_mgga_lapl_st_o2_m_batch::os7_9, detail_xck_mgga_lapl_st_o2_m_batch::fs7_9, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)54*blk);
+            stage_a<T, Txc>(g0, bk, 2, detail_xck_mgga_lapl_st_o2_m_batch::cs7_10, detail_xck_mgga_lapl_st_o2_m_batch::os7_10, detail_xck_mgga_lapl_st_o2_m_batch::fs7_10, detail_xck_mgga_lapl_st_o2_m_batch::NFLD, fi, xc, A + (int64_t)55*blk);
             for (int64_t x = 0; x < nxb; ++x) {
                 {
                     const T* A_[] = {A + (int64_t)0*blk, A + (int64_t)1*blk, A + (int64_t)2*blk, A + (int64_t)3*blk, A + (int64_t)4*blk, A + (int64_t)5*blk, A + (int64_t)6*blk};
@@ -894,86 +616,61 @@ int xck_mgga_lapl_st_o2_m_batch_t(int64_t npts, int64_t nbf, int64_t nx,
                 }
                 accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W + x*nbf*bk, 1);
                 {
-                    const T* A_[] = {A + (int64_t)35*blk, A + (int64_t)36*blk, A + (int64_t)37*blk, A + (int64_t)38*blk, A + (int64_t)39*blk, A + (int64_t)40*blk, A + (int64_t)41*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W + x*nbf*bk, 0);
-                {
-                    const T* A_[] = {A + (int64_t)49*blk, A + (int64_t)50*blk, A + (int64_t)51*blk, A + (int64_t)52*blk, A + (int64_t)53*blk, A + (int64_t)54*blk, A + (int64_t)55*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W + x*nbf*bk, 0);
-                {
-                    const T* A_[] = {A + (int64_t)63*blk, A + (int64_t)64*blk, A + (int64_t)65*blk, A + (int64_t)66*blk, A + (int64_t)67*blk, A + (int64_t)68*blk, A + (int64_t)69*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W + x*nbf*bk, 0);
-                {
-                    const T* A_[] = {A + (int64_t)77*blk, A + (int64_t)78*blk, A + (int64_t)79*blk, A + (int64_t)80*blk, A + (int64_t)81*blk, A + (int64_t)82*blk, A + (int64_t)83*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
-                accumulate<T>(bk, nbf, c, X0, bk, W + x*nbf*bk, 0);
-            }
-            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)0*nbf*npts + g0, npts, out + x0*nbf*nbf, nbf);
-            for (int64_t x = 0; x < nxb; ++x) {
-                {
                     const T* A_[] = {A + (int64_t)7*blk, A + (int64_t)8*blk, A + (int64_t)9*blk, A + (int64_t)10*blk, A + (int64_t)11*blk, A + (int64_t)12*blk, A + (int64_t)13*blk};
                     const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
                     lincomb<T>(bk, 7, A_, P_, c);
                 }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W + x*nbf*bk, 1);
-                {
-                    const T* A_[] = {A + (int64_t)42*blk, A + (int64_t)43*blk, A + (int64_t)44*blk, A + (int64_t)45*blk, A + (int64_t)46*blk, A + (int64_t)47*blk, A + (int64_t)48*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
                 accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W + x*nbf*bk, 0);
-            }
-            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)1*nbf*npts + g0, npts, out + x0*nbf*nbf, nbf);
-            for (int64_t x = 0; x < nxb; ++x) {
                 {
                     const T* A_[] = {A + (int64_t)14*blk, A + (int64_t)15*blk, A + (int64_t)16*blk, A + (int64_t)17*blk, A + (int64_t)18*blk, A + (int64_t)19*blk, A + (int64_t)20*blk};
                     const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
                     lincomb<T>(bk, 7, A_, P_, c);
                 }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W + x*nbf*bk, 1);
-                {
-                    const T* A_[] = {A + (int64_t)56*blk, A + (int64_t)57*blk, A + (int64_t)58*blk, A + (int64_t)59*blk, A + (int64_t)60*blk, A + (int64_t)61*blk, A + (int64_t)62*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
                 accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W + x*nbf*bk, 0);
-            }
-            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)2*nbf*npts + g0, npts, out + x0*nbf*nbf, nbf);
-            for (int64_t x = 0; x < nxb; ++x) {
                 {
                     const T* A_[] = {A + (int64_t)21*blk, A + (int64_t)22*blk, A + (int64_t)23*blk, A + (int64_t)24*blk, A + (int64_t)25*blk, A + (int64_t)26*blk, A + (int64_t)27*blk};
                     const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
                     lincomb<T>(bk, 7, A_, P_, c);
                 }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W + x*nbf*bk, 1);
-                {
-                    const T* A_[] = {A + (int64_t)70*blk, A + (int64_t)71*blk, A + (int64_t)72*blk, A + (int64_t)73*blk, A + (int64_t)74*blk, A + (int64_t)75*blk, A + (int64_t)76*blk};
-                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
-                    lincomb<T>(bk, 7, A_, P_, c);
-                }
                 accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W + x*nbf*bk, 0);
-            }
-            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)3*nbf*npts + g0, npts, out + x0*nbf*nbf, nbf);
-            for (int64_t x = 0; x < nxb; ++x) {
                 {
                     const T* A_[] = {A + (int64_t)28*blk, A + (int64_t)29*blk, A + (int64_t)30*blk, A + (int64_t)31*blk, A + (int64_t)32*blk, A + (int64_t)33*blk, A + (int64_t)34*blk};
                     const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
                     lincomb<T>(bk, 7, A_, P_, c);
                 }
-                accumulate<T>(bk, nbf, c, chi + (int64_t)0*nbf*npts + g0, npts, W + x*nbf*bk, 1);
+                accumulate<T>(bk, nbf, c, X0, bk, W + x*nbf*bk, 0);
             }
-            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, X0, bk, out + x0*nbf*nbf, nbf);
+            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)0*nbf*npts + g0, npts, Z, nbf);
+            for (int64_t x = 0; x < nxb; ++x) {
+                {
+                    const T* A_[] = {A + (int64_t)35*blk, A + (int64_t)36*blk, A + (int64_t)37*blk, A + (int64_t)38*blk, A + (int64_t)39*blk, A + (int64_t)40*blk, A + (int64_t)41*blk};
+                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
+                    lincomb<T>(bk, 7, A_, P_, c);
+                }
+                accumulate<T>(bk, nbf, c, chi + (int64_t)1*nbf*npts + g0, npts, W + x*nbf*bk, 1);
+            }
+            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)1*nbf*npts + g0, npts, Z, nbf);
+            for (int64_t x = 0; x < nxb; ++x) {
+                {
+                    const T* A_[] = {A + (int64_t)42*blk, A + (int64_t)43*blk, A + (int64_t)44*blk, A + (int64_t)45*blk, A + (int64_t)46*blk, A + (int64_t)47*blk, A + (int64_t)48*blk};
+                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
+                    lincomb<T>(bk, 7, A_, P_, c);
+                }
+                accumulate<T>(bk, nbf, c, chi + (int64_t)2*nbf*npts + g0, npts, W + x*nbf*bk, 1);
+            }
+            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)2*nbf*npts + g0, npts, Z, nbf);
+            for (int64_t x = 0; x < nxb; ++x) {
+                {
+                    const T* A_[] = {A + (int64_t)49*blk, A + (int64_t)50*blk, A + (int64_t)51*blk, A + (int64_t)52*blk, A + (int64_t)53*blk, A + (int64_t)54*blk, A + (int64_t)55*blk};
+                    const T* P_[] = {fields[4] + (x0 + x)*npts + g0, fields[5] + (x0 + x)*npts + g0, fields[6] + (x0 + x)*npts + g0, fields[7] + (x0 + x)*npts + g0, fields[8] + (x0 + x)*npts + g0, fields[9] + (x0 + x)*npts + g0, fields[10] + (x0 + x)*npts + g0};
+                    lincomb<T>(bk, 7, A_, P_, c);
+                }
+                accumulate<T>(bk, nbf, c, chi + (int64_t)3*nbf*npts + g0, npts, W + x*nbf*bk, 1);
+            }
+            gemm_rect(nxb*nbf, nbf, bk, static_cast<const T*>(W), bk, chi + (int64_t)3*nbf*npts + g0, npts, Z, nbf);
         }
+        for (int64_t x = 0; x < nxb; ++x)
+            add_sym<T>(nbf, 1, Z + x*nbf*nbf, out + (x0 + x)*nbf*nbf);
     }
     if (own) delete[] c;
     return 0;
