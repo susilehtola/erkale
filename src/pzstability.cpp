@@ -2892,9 +2892,11 @@ void PZStability::configure_method(const dft_t & ovmethod_v, const dft_t & oomet
       printf("\nA pure exchange functional used, no exact exchange.\n");
   }
 
-  // Compute range-separated integrals if necessary
-  if(is_range_separated(ovmethod_.x_func))
-    solverp_->fill_rs(omega);
+  // Configure the exact-exchange admixture on the J/K builder, which
+  // also computes the range-separated integrals if necessary. The
+  // builder defaults to Hartree-Fock exchange, and no SCF has
+  // configured it when the orbitals are restarted from a checkpoint.
+  solverp_->set_range_separation(kfull,kshort,omega);
 }
 
 void PZStability::configure_dof(bool real_v, bool imag_v, bool can, bool oo) {
