@@ -492,7 +492,8 @@ int main_guarded(int argc, char **argv) {
   arma::vec occnumb(X.size(), arma::fill::zeros);
   if (readlinocc < 0) {
     arma::imat linoccs;
-    linoccs.load(linoccfname,arma::raw_ascii);
+    if (!linoccs.load(linoccfname,arma::raw_ascii))
+      throw std::runtime_error("Could not read the occupations from LinearOccupationFile " + linoccfname + ".\n");
     // With InversionSymmetry, a fourth column gives the parity: 1 for
     // gerade and -1 for ungerade
     if (inversion != (linoccs.n_cols == 4))
@@ -1176,24 +1177,21 @@ int main_guarded(int argc, char **argv) {
       const int Lambda = (int) std::lround(std::abs(ML));
       std::string term = lambda_label(Lambda);
       std::string notes;
-      if (!Inv.is_empty()) {
-        const double chi = character(Inv);
+      // Since O^2 = 1, the projections (1 +- O)/2 split a determinant
+      // that is not an eigenfunction of O into its even and odd parts,
+      // of weights (1 +- chi)/2
+      auto classify = [&](double chi, const std::string & even, const std::string & odd, const std::string & what, const std::string & evenname, const std::string & oddname) {
         if (std::abs(chi-1.0) < tol)
-          term += "_g";
+          term += even;
         else if (std::abs(chi+1.0) < tol)
-          term += "_u";
+          term += odd;
         else
-          notes += "; no definite parity (<D|i D> = " + std::to_string(chi) + ")";
-      }
-      if (Lambda == 0) {
-        const double chi = character(reflection_matrix(mvals));
-        if (std::abs(chi-1.0) < tol)
-          term += "+";
-        else if (std::abs(chi+1.0) < tol)
-          term += "-";
-        else
-          notes += "; no definite reflection symmetry (<D|sigma_v D> = " + std::to_string(chi) + ")";
-      }
+          notes += "; no definite " + what + " = " + std::to_string(chi) + ": weight " + std::to_string(0.5*(1.0+chi)) + " " + evenname + ", " + std::to_string(0.5*(1.0-chi)) + " " + oddname;
+      };
+      if (!Inv.is_empty())
+        classify(character(Inv), "_g", "_u", "parity, <D|i D>", "g", "u");
+      if (Lambda == 0)
+        classify(character(reflection_matrix(mvals)), "+", "-", "reflection symmetry, <D|sigma_v D>", "Sigma+", "Sigma-");
       // <S^2> of Kohn-Sham orbitals is only a diagnostic, so note
       // contamination above a small threshold
       term = std::to_string((int) std::lround(2*std::abs(Sz)+1)) + term;
