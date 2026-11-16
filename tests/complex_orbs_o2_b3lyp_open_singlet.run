@@ -1,0 +1,17 @@
+# Unrestricted M_S=0 O2 with the two pi_g electrons in m=+1 alpha and
+# m=-1 beta: M_L=0, but the reflection through the axis maps the
+# determinant onto the orthogonal one with the spins swapped, so it is
+# an equal mixture of Sigma+ and Sigma- (of 1Sigma_g+ and the M_S=0
+# component of 3Sigma_g-).
+System O2.xyz
+Basis cc-pVDZ
+Method hyb_gga_xc_b3lyp
+Multiplicity 1
+Restricted false
+ComplexBasis true
+LinearOccupations -1
+LinearOccupationFile complex_orbs_o2_open_singlet.linocc
+JKMethod Cholesky
+DFTGrid 75 -302
+ConvThr 1e-7
+SaveChk complex_orbs_o2_b3lyp_open_singlet.chk

@@ -175,6 +175,7 @@ run_complex_orbs(complex_orbs_o2_camb3lyp "-150.2878160")
 configure_file(complex_orbs_b_ml.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_b_ml.linocc COPYONLY)
 configure_file(complex_orbs_be_hf_saddle.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_be_hf_saddle.linocc COPYONLY)
 configure_file(complex_orbs_be_hf_inversion.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_be_hf_inversion.linocc COPYONLY)
+configure_file(complex_orbs_o2_open_singlet.linocc ${CMAKE_CURRENT_BINARY_DIR}/complex_orbs_o2_open_singlet.linocc COPYONLY)
 run_complex_orbs(complex_orbs_b_ml_0 "-24.3478542")
 run_complex_orbs(complex_orbs_b_ml_p "-24.3943705")
 run_complex_orbs(complex_orbs_b_ml_m "-24.2943705")
@@ -184,6 +185,8 @@ run_complex_orbs(complex_orbs_b_tpss_ml_m "-24.6048081")
 # Cylindrical symmetry: m and -m share their orbitals and occupations
 run_complex_orbs(complex_orbs_o2_b3lyp_cyl "-150.23617")
 run_complex_orbs_term(complex_orbs_o2_b3lyp_triplet "3Sigma_g-" "-150.334038")
+# The same with the pi_g electrons of opposite spin: half Sigma+, half Sigma-
+run_complex_orbs_term(complex_orbs_o2_b3lyp_open_singlet "1Sigma_g \\(M_L = 0; no definite reflection symmetry.*: weight 0.500000 Sigma\\+, 0.500000 Sigma-;" "-150.290754")
 run_complex_orbs_term(complex_orbs_c_hund "3Pi_g" "-37.457485")
 # The initial guesses: the core Hamiltonian, and the Fock matrices of a
 # calculation in another basis, with another functional, or unrestricted
